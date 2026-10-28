@@ -305,18 +305,26 @@ function fProd(id){
 }
 
 function reps(){
-  const r=S.reps.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.fone)}</td><td>${esc(x.regiao)}</td><td class="n">${x.com||0}%</td><td><button class="sm" onclick="fRep('${x.id}')">Editar</button><button class="sm del" onclick="del('reps','${x.id}')">Excluir</button></td></tr>`).join('');
+  const r=S.reps.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.fone)}</td><td>${esc(x.email)}</td><td>${esc([x.cidade,x.uf].filter(Boolean).join('/'))}</td><td>${esc(x.regiao)}</td><td class="n">${x.com||0}%</td><td><button class="sm" onclick="fRep('${x.id}')">Editar</button><button class="sm del" onclick="del('reps','${x.id}')">Excluir</button></td></tr>`).join('');
   return `<div class="bar"><h2>Representantes</h2><button class="pri" onclick="fRep()">+ Novo representante</button></div>
-  <div class="tw"><table><tr><th>Nome</th><th>Telefone</th><th>Região</th><th class="n">Comissão</th><th></th></tr>${r||'<tr><td colspan="5" class="empty">Nenhum representante cadastrado.</td></tr>'}</table></div>`;
+  <div class="tw"><table><tr><th>Nome</th><th>Celular</th><th>E-mail</th><th>Cidade/UF</th><th>Região</th><th class="n">Comissão</th><th></th></tr>${r||'<tr><td colspan="7" class="empty">Nenhum representante cadastrado.</td></tr>'}</table></div>`;
 }
+const REP_CAMPOS=['nome','cpf','fone','email','endereco','bairro','cidade','uf','cep','regiao'];
 function fRep(id){
   const x=id?rep(id):{};
   modal(id?'Editar representante':'Novo representante',`
   <label>Nome<input name="nome" required value="${esc(x.nome)}"></label>
-  <div class="g2"><label>Telefone<input name="fone" value="${esc(x.fone)}"></label>
-  <label>Região<input name="regiao" value="${esc(x.regiao)}"></label></div>
-  <label>Comissão (%)<input name="com" type="number" step="0.1" min="0" max="100" value="${x.com??5}"></label>`,
-  async f=>{const d={nome:f.nome,fone:f.fone,regiao:f.regiao,com:+f.com||0};id?await db.doc('reps/'+id).set(d):await db.collection('reps').add(d)});
+  <div class="g2"><label>CPF<input name="cpf" inputmode="numeric" placeholder="000.000.000-00" value="${esc(x.cpf)}"></label>
+  <label>Celular<input name="fone" type="tel" placeholder="(00) 00000-0000" value="${esc(x.fone)}"></label></div>
+  <label>E-mail<input name="email" type="email" value="${esc(x.email)}"></label>
+  <label>Endereço (rua e número)<input name="endereco" value="${esc(x.endereco)}"></label>
+  <div class="g2"><label>Bairro<input name="bairro" value="${esc(x.bairro)}"></label>
+  <label>CEP<input name="cep" inputmode="numeric" placeholder="00.000-000" value="${esc(x.cep)}"></label></div>
+  <div class="g2"><label>Cidade<input name="cidade" value="${esc(x.cidade)}"></label>
+  <label>UF<input name="uf" maxlength="2" style="text-transform:uppercase" value="${esc(x.uf)}"></label></div>
+  <div class="g2"><label>Região<input name="regiao" value="${esc(x.regiao)}"></label>
+  <label>Comissão (%)<input name="com" type="number" step="0.1" min="0" max="100" value="${x.com??5}"></label></div>`,
+  async f=>{const d={...x};delete d.id;REP_CAMPOS.forEach(k=>d[k]=(f[k]||'').trim());d.uf=d.uf.toUpperCase();d.com=+f.com||0;id?await db.doc('reps/'+id).set(d):await db.collection('reps').add(d)});
 }
 
 function pedidos(){
@@ -549,7 +557,13 @@ function preencher(r){
   checaFalta();
 }
 
-function achaRep(nome){const n=(nome||'').trim().toLowerCase();return S.reps.find(x=>(x.nome||'').trim().toLowerCase()===n)}
+const normNome=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+function achaRep(nome){
+  const n=normNome(nome);if(!n)return;
+  const ex=S.reps.find(x=>normNome(x.nome)===n);if(ex)return ex;
+  const c=S.reps.filter(x=>{const r=normNome(x.nome);return r.startsWith(n+' ')||n.startsWith(r+' ')});
+  return c.length===1?c[0]:undefined;
+}
 function fRepPed(id){
   const o=S.pedidos.find(x=>x.id===id);
   modal('Representante do pedido #'+o.numero,`<label>Representante<input name="repNome" required list="replist" autocomplete="off" value="${esc(rep(o.repId)?.nome||o.repNome||'')}"><datalist id="replist">${S.reps.map(r=>`<option value="${esc(r.nome)}">`).join('')}</datalist></label><small style="color:var(--mut)">Escolha um representante cadastrado para o pedido entrar na comissão dele.</small>`,
