@@ -101,6 +101,9 @@ const ERROS=[
   [/password should be at least (\d+)/i,m=>'A senha precisa ter pelo menos '+m[1]+' caracteres.'],
   [/weak password|password is too weak|known to be weak/i,'Senha muito fraca. Use letras e números.'],
   [/email not confirmed/i,'E-mail ainda não confirmado.'],
+  [/quota|resource.?exhausted/i,'Limite gratuito da leitura automática atingido. Tente de novo mais tarde.'],
+  [/model is overloaded|unavailable|high demand/i,'A leitura automática está sobrecarregada. Tente de novo em alguns minutos.'],
+  [/api key not valid|api_key_invalid|referer|chave da ia não configurada/i,'A leitura automática não está configurada corretamente.'],
   [/rate limit|too many requests/i,'Muitas tentativas. Aguarde alguns minutos e tente de novo.'],
   [/failed to fetch|networkerror|network request|load failed/i,'Sem conexão com o servidor. Verifique sua internet e tente de novo.'],
   [/row-level security|permission denied|not authorized|unauthorized/i,'Sem permissão. Entre novamente.'],
@@ -109,7 +112,7 @@ const ERROS=[
 function ptErro(m){
   m=String((m&&m.message)||m||'');
   for(const [re,t] of ERROS){const x=m.match(re);if(x)return typeof t==='function'?t(x):t}
-  return /\b(the|is|not|error|invalid|failed|missing|unable|cannot|could)\b/i.test(m)&&!/[ãçéêíóôõú]/i.test(m)?'Ocorreu um erro. Tente novamente.':m;
+  return /\b(the|is|are|not|error|invalid|failed|missing|unable|cannot|could|from|blocked|denied|request|requests|please|try|unexpected|internal|server)\b/i.test(m)&&!/[ãçéêíóôõú]/i.test(m)?'Ocorreu um erro. Tente novamente.':m;
 }
 async function sessaoOk(){
   const {data:{session}}=await sb.auth.getSession();
@@ -374,13 +377,29 @@ function fPed(){
   });
 }
 
+const IA={
+  limits:async()=>({images:{maxCount:4}}),
+  async json(prompt,opts){
+    await sessaoOk();
+    const images=[];for(const b of (opts.images||[]))images.push(await img64(b));
+    const {data,error}=await sb.functions.invoke('ler-pedido',{body:{prompt,images}});
+    if(error){let m=error.message;try{const c=await error.context.json();m=c.error||m}catch(e){}throw new Error(m)}
+    if(!data||data.error)throw new Error((data&&data.error)||'Resposta vazia da IA.');
+    return data.result;
+  }
+};
+async function img64(b){
+  const bmp=await createImageBitmap(b);const k=Math.min(1,2000/Math.max(bmp.width,bmp.height));
+  const c=document.createElement('canvas');c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);
+  c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+  const u=c.toDataURL('image/jpeg',.85);return {mime:'image/jpeg',data:u.slice(u.indexOf(',')+1)};
+}
 async function importar(){
   const st=$('#impst'),f=$('#arq').files[0];
   if(!f){st.textContent='Escolha um arquivo primeiro.';return}
   if(!S.produtos.length){st.textContent='Cadastre os produtos antes de importar.';return}
   const isPdf=/pdf/i.test(f.type)||/\.pdf$/i.test(f.name);
-  let sample=null;
-  if(!sample){st.textContent='A leitura automática de arquivos ainda não está ativada. Preencha o pedido manualmente.';return}
+  const sample=IA;
   const opts={};let texto='';
   if(f.type.startsWith('image/')){
     const lim=await sample.limits().catch(()=>null);
