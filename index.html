@@ -94,10 +94,43 @@ table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
 <script>
 const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
 const sb=supabase.createClient(SB_URL,SB_KEY);
+const ERROS=[
+  [/auth session missing|session.*(not found|expired)|jwt expired|invalid jwt|refresh token/i,'Sua sessão expirou. Entre novamente.'],
+  [/invalid login credentials/i,'E-mail ou senha incorretos.'],
+  [/should be different from the old password/i,'A nova senha precisa ser diferente da senha atual.'],
+  [/password should be at least (\d+)/i,m=>'A senha precisa ter pelo menos '+m[1]+' caracteres.'],
+  [/weak password|password is too weak|known to be weak/i,'Senha muito fraca. Use letras e números.'],
+  [/email not confirmed/i,'E-mail ainda não confirmado.'],
+  [/rate limit|too many requests/i,'Muitas tentativas. Aguarde alguns minutos e tente de novo.'],
+  [/failed to fetch|networkerror|network request|load failed/i,'Sem conexão com o servidor. Verifique sua internet e tente de novo.'],
+  [/row-level security|permission denied|not authorized|unauthorized/i,'Sem permissão. Entre novamente.'],
+  [/duplicate key/i,'Este registro já existe.']
+];
+function ptErro(m){
+  m=String((m&&m.message)||m||'');
+  for(const [re,t] of ERROS){const x=m.match(re);if(x)return typeof t==='function'?t(x):t}
+  return /\b(the|is|not|error|invalid|failed|missing|unable|cannot|could)\b/i.test(m)&&!/[ãçéêíóôõú]/i.test(m)?'Ocorreu um erro. Tente novamente.':m;
+}
+async function sessaoOk(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){sessaoExpirada();throw new Error('Sua sessão expirou. Entre novamente.')}
+}
+let saindo=false;
+function sessaoExpirada(){
+  if(saindo)return;saindo=true;
+  try{document.querySelectorAll('dialog[open]').forEach(d=>d.close())}catch(e){}
+  mostraLogin('Sua sessão expirou. Entre novamente.');
+}
+function mostraLogin(msg){
+  $('#nav').innerHTML='';
+  $('#app').innerHTML=`<form class="c" style="max-width:360px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<label>E-mail<input name="email" type="email" required autocomplete="username"></label><label>Senha<span class="pw"><input name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
+}
+sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&db)sessaoExpirada()});
 function sbDb(){
   const cache={},subs={};
   const snap=k=>({docs:(cache[k]||[]).map(r=>({id:r.id,data:()=>r.data}))});
   async function load(k){
+    await sessaoOk();
     const {data,error}=await sb.from('docs').select('id,data').eq('col',k).order('created_at');
     if(error)throw error;
     cache[k]=data;(subs[k]||[]).forEach(f=>f(snap(k)));
@@ -110,14 +143,14 @@ function sbDb(){
         load(k).catch(err||console.error);
         sb.channel('docs-'+k).on('postgres_changes',{event:'*',schema:'public',table:'docs',filter:'col=eq.'+k},()=>load(k).catch(console.error)).subscribe();
       },
-      async add(d){ok(await sb.from('docs').insert({col:k,data:d}));await load(k)}
+      async add(d){await sessaoOk();ok(await sb.from('docs').insert({col:k,data:d}));await load(k)}
     }),
     doc(p){
       const [k,id]=p.split('/');
       return {
-        async set(d){ok(await sb.from('docs').update({data:d}).eq('id',id));await load(k)},
-        async update(d){const cur=(cache[k]||[]).find(r=>r.id===id);ok(await sb.from('docs').update({data:{...(cur?cur.data:{}),...d}}).eq('id',id));await load(k)},
-        async delete(){ok(await sb.from('docs').delete().eq('id',id));await load(k)}
+        async set(d){await sessaoOk();ok(await sb.from('docs').update({data:d}).eq('id',id));await load(k)},
+        async update(d){await sessaoOk();const cur=(cache[k]||[]).find(r=>r.id===id);ok(await sb.from('docs').update({data:{...(cur?cur.data:{}),...d}}).eq('id',id));await load(k)},
+        async delete(){await sessaoOk();ok(await sb.from('docs').delete().eq('id',id));await load(k)}
       };
     }
   };
@@ -126,7 +159,7 @@ async function entrar(e){
   e.preventDefault();
   const f=new FormData(e.target),m=$('#loginmsg');m.textContent='Entrando…';
   const {error}=await sb.auth.signInWithPassword({email:f.get('email'),password:f.get('senha')});
-  if(error){m.textContent='E-mail ou senha incorretos.';return}
+  if(error){m.textContent=ptErro(error);return}
   location.reload();
 }
 const olho=()=>`<button type="button" class="ghost olho" title="Mostrar/ocultar senha" onclick="verSenha(this)">👁</button>`;
@@ -136,8 +169,9 @@ function trocarSenha(){
   modal('Trocar senha',`<label>Nova senha (mínimo 6 caracteres)<span class="pw"><input name="s1" type="password" minlength="6" required autocomplete="new-password">${olho()}</span></label><label>Repita a nova senha<span class="pw"><input name="s2" type="password" minlength="6" required autocomplete="new-password">${olho()}</span></label>`,
   async f=>{
     if(f.s1!==f.s2)throw new Error('As senhas não conferem.');
+    await sessaoOk();
     const {error}=await sb.auth.updateUser({password:f.s1});
-    if(error)throw new Error(error.message);
+    if(error)throw new Error(ptErro(error));
     setTimeout(()=>aviso('Senha alterada.'),200);
   });
 }
@@ -192,10 +226,8 @@ const pedDesatual=o=>(o.itens||[]).some(i=>Math.abs(precoAtual(i)-(+i.preco||0))
 
 (async()=>{
   const {data:{session}}=await sb.auth.getSession();
-  if(!session){
-    $('#app').innerHTML=`<form class="c" style="max-width:360px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2><label>E-mail<input name="email" type="email" required autocomplete="username"></label><label>Senha<span class="pw"><input name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
-    return;
-  }
+  const {data:{user}}=session?await sb.auth.getUser():{data:{}};
+  if(!session||!user){if(session)await sb.auth.signOut({scope:'local'});mostraLogin();return}
   db=sbDb();
   if(db){
     let n=0;
@@ -375,13 +407,13 @@ async function importar(){
         }
       }
       texto=texto.slice(0,20000);
-    }catch(e){st.textContent='Não consegui abrir o PDF ('+(e.message||'erro')+'). Tente enviar um print da página.';return}
+    }catch(e){st.textContent='Não consegui abrir o PDF ('+ptErro(e.message||'erro')+'). Tente enviar um print da página.';return}
   }else texto=(await f.text()).slice(0,20000);
   const cat=S.produtos.map(p=>({ref:p.ref,nome:p.nome,cor:p.cor}));
   const prompt='Você extrai pedidos de venda de uma fábrica de shorts masculinos. '+(texto?'O texto abaixo é um pedido de um cliente.':'A imagem anexada é um pedido de um cliente.')+' Referências cadastradas (JSON): '+JSON.stringify(cat)+'. Cores padrão: '+CORES_BASE.join(', ')+'. Identifique no documento cada REFERÊNCIA de produto (código numérico) com a quantidade pedida em cada COR e TAMANHO. Responda SOMENTE com JSON no formato {"cliente":string|null,"representante":string|null,"data":"AAAA-MM-DD"|null,"itens":[{"ref":"somente dígitos da referência, como aparece no documento","cor":"nome da cor, preferindo um dos nomes padrão (ex.: azul marinho = Marinho); null se o documento não informar cor","tam":"P|M|G|GG|G1|G2|G3|G4","qtd":number}]}. Os tamanhos podem vir em colunas, linhas ou abreviados (XG1 = G1, XG2 = G2 e assim por diante). Se o documento tiver uma única referência (por exemplo no cabeçalho), use-a em todos os itens. Se a referência não aparecer, use null em ref, mas continue extraindo cor, tamanho e quantidade. Gere um item para cada combinação referência + cor + tamanho com quantidade maior que zero. Não invente itens que não estejam no documento.'+(texto?'\n\nPEDIDO:\n'+texto:'');
   st.textContent='Lendo o arquivo…';
   try{preencher(await sample.json(prompt,opts))}
-  catch(e){st.textContent='Não consegui ler o arquivo ('+(e.message||e.code||'erro')+'). Tente uma imagem mais nítida.'}
+  catch(e){st.textContent='Não consegui ler o arquivo ('+ptErro(e.message||e.code||'erro')+'). Tente uma imagem mais nítida.'}
 }
 const ABERTOS=['Pendente','Faturado'];
 const kItem=i=>i.prodId+'|'+(i.cor||'Sem cor')+'|'+i.tam;
@@ -562,6 +594,7 @@ function fEntrada(id){
 }
 
 function aviso(msg){
+  msg=ptErro(msg);
   const d=document.querySelector('dialog[open]');
   if(d){let e=d.querySelector('.err');if(!e){e=document.createElement('div');e.className='alert err';d.prepend(e)}e.textContent=msg;return}
   const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',5000);
