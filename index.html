@@ -299,7 +299,7 @@ function fProd(id){
   <label>Preço G1 ao G4 (R$)<input name="precoG" type="number" step="0.01" min="0" required value="${p.precoG??p.preco??''}"></label>
   <label>Custo manual (R$)<input name="custo" type="number" step="0.01" min="0" value="${p.custo??''}" title="Usado só se o produto não tiver tecido na ficha técnica"></label></div>
   <fieldset style="border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:8px 0"><legend style="padding:0 6px;font-weight:600">Ficha técnica</legend>
-  <label>Tecido<select name="tecidoId"><option value="">— sem ficha (usar custo manual) —</option>${S.materiais.filter(m=>m.tipo==='tecido').sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(m=>`<option value="${m.id}"${m.id===p.tecidoId?' selected':''}>${esc(m.nome)}${m.cor?' · '+esc(m.cor):''} (${brl4(matCusto(m))}/m)</option>`).join('')}</select></label>
+  <label>Tecido<select name="tecidoId"><option value="">— sem ficha (usar custo manual) —</option>${S.materiais.filter(m=>m.tipo==='tecido').sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(m=>`<option value="${m.id}"${m.id===p.tecidoId?' selected':''}>${esc(m.nome)}${m.comp?' · '+esc(m.comp):''}${m.cor?' · '+esc(m.cor):''} (${brl4(matCusto(m))}/m)</option>`).join('')}</select></label>
   <div class="g2"><label>Consumo de tecido P–GG (m por peça)<input name="cons" type="number" step="0.001" min="0" value="${p.cons??''}"></label>
   <label>Consumo de tecido G1–G4 (m por peça)<input name="consG" type="number" step="0.001" min="0" value="${p.consG??''}" placeholder="igual ao P–GG"></label>
   <label>Custo extra (R$ por peça)<input name="extra" type="number" step="0.01" min="0" value="${p.extra??''}"></label></div>
@@ -316,7 +316,7 @@ const brl4=n=>(+n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',mi
 const nf=(n,d=3)=>(+n||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const mat=id=>S.materiais.find(m=>m.id===id);
 const matUn=m=>m.tipo==='tecido'?'MT':(m.un||'UN');
-const matCusto=m=>!m?0:m.tipo==='tecido'?((+m.rend>0)?(+m.preco||0)/(+m.rend):0):(+m.preco||0)/((+m.qtdC)>0?+m.qtdC:1);
+const matCusto=m=>!m?0:m.tipo==='tecido'?(m.cobr==='mt'?(+m.preco||0):(+m.rend>0)?(+m.preco||0)/(+m.rend):0):(+m.preco||0)/((+m.qtdC)>0?+m.qtdC:1);
 const fichaDoc=()=>S.config.find(x=>x.tipo==='ficha');
 const fichaPad=()=>fichaDoc()||{itens:[],mo:0,fixo:0};
 function custoFicha(p,g){
@@ -330,12 +330,12 @@ function custoFicha(p,g){
 const custoP=(p,g)=>p.tecidoId?custoFicha(p,g).total:(+p.custo||0);
 function materia(){
   const ms=S.materiais.slice().sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='tecido'?-1:1)||(a.nome||'').localeCompare(b.nome||''));
-  const r=ms.map(m=>`<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td>${m.tipo==='tecido'?'Tecido':'Aviamento'}</td><td class="n">${m.tipo==='tecido'?brl(m.preco)+'/kg':brl(m.preco)+((+m.qtdC||1)!==1?' / '+nf(m.qtdC,0)+' '+esc(matUn(m)):' / '+esc(matUn(m)))}</td><td class="n">${m.tipo==='tecido'?(+m.rend?nf(m.rend,2)+' m/kg':'<span class="low">informe</span>'):''}</td><td class="n"><b>${brl4(matCusto(m))}</b>/${esc(matUn(m))}</td><td><button class="sm" onclick="fMat('${m.id}')">Editar</button><button class="sm del" onclick="del('materiais','${m.id}')">Excluir</button></td></tr>`).join('');
+  const r=ms.map(m=>`<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td>${m.tipo==='tecido'?'Tecido':'Aviamento'}</td><td>${esc([m.comp,+m.gram?m.gram+' g/m²':''].filter(Boolean).join(' · '))}</td><td>${esc(m.forn)}</td><td class="n">${m.tipo==='tecido'?brl(m.preco)+(m.cobr==='mt'?'/m':'/kg'):brl(m.preco)+((+m.qtdC||1)!==1?' / '+nf(m.qtdC,0)+' '+esc(matUn(m)):' / '+esc(matUn(m)))}</td><td class="n">${m.tipo==='tecido'?m.cobr==='mt'?'—':(+m.rend?nf(m.rend,2)+' m/kg':'<span class="low">informe</span>'):''}</td><td class="n"><b>${brl4(matCusto(m))}</b>/${esc(matUn(m))}</td><td><button class="sm" onclick="fMat('${m.id}')">Editar</button><button class="sm del" onclick="del('materiais','${m.id}')">Excluir</button></td></tr>`).join('');
   const f=fichaPad();
   const fr=(f.itens||[]).map(i=>{const m=mat(i.matId);if(!m)return '';const cu=matCusto(m);return `<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td class="n">${nf(i.qtd)}</td><td>${esc(matUn(m))}</td><td class="n">${brl4(cu)}</td><td class="n">${brl4(cu*(+i.qtd||0))}</td></tr>`}).join('');
   const sub=(f.itens||[]).reduce((a,i)=>a+matCusto(mat(i.matId))*(+i.qtd||0),0);
   return `<div class="bar"><h2>Matéria-prima</h2><button class="pri" onclick="fMat()">+ Nova matéria-prima</button></div>
-  <div class="tw"><table><tr><th>Nome</th><th>Cor</th><th>Tipo</th><th class="n">Preço de compra</th><th class="n">Rendimento</th><th class="n">Custo de uso</th><th></th></tr>${r||'<tr><td colspan="7" class="empty">Nenhuma matéria-prima cadastrada.</td></tr>'}</table></div>
+  <div class="tw"><table><tr><th>Nome</th><th>Cor</th><th>Tipo</th><th>Composição / gramatura</th><th>Fornecedor</th><th class="n">Preço de compra</th><th class="n">Rendimento</th><th class="n">Custo de uso</th><th></th></tr>${r||'<tr><td colspan="9" class="empty">Nenhuma matéria-prima cadastrada.</td></tr>'}</table></div>
   <div class="bar"><h2>Ficha técnica padrão</h2><button class="pri" onclick="fFicha()">Editar ficha padrão</button></div>
   <p style="color:var(--mut);margin-top:0">Itens iguais em todas as referências. O tecido e o consumo de cada referência são informados no cadastro do produto.</p>
   <div class="tw"><table><tr><th>Item</th><th>Cor</th><th class="n">Qtde</th><th>Un</th><th class="n">Custo un.</th><th class="n">Custo total</th></tr>${fr||'<tr><td colspan="6" class="empty">Nenhum item na ficha padrão.</td></tr>'}
@@ -348,15 +348,19 @@ function fMat(id){
   <label>Cor<input name="cor" value="${esc(m.cor)}" placeholder="Ex.: BC, PR"></label>
   <label>Tipo<select name="tipo" onchange="matTipo(this.form)"><option value="aviamento"${m.tipo!=='tecido'?' selected':''}>Aviamento</option><option value="tecido"${m.tipo==='tecido'?' selected':''}>Tecido</option></select></label>
   <label class="av">Unidade de uso<select name="un" onchange="matPrev(this.form)">${['UN','MT','KG','PC','CX','RL','PAR'].map(u=>`<option${(m.un||'UN')===u?' selected':''}>${u}</option>`).join('')}</select></label></div>
-  <div class="g2"><label><span class="tc">Preço do tecido (R$ por kg)</span><span class="av">Preço pago (R$)</span><input name="preco" type="number" step="0.0001" min="0" value="${m.preco??''}" oninput="matPrev(this.form)"></label>
-  <label class="tc">Rendimento (metros por kg)<input name="rend" type="number" step="0.01" min="0" value="${m.rend??''}" oninput="matPrev(this.form)"></label>
+  <div class="g2"><label class="tc">Composição<input name="comp" list="comps" value="${esc(m.comp)}" placeholder="Ex.: 100% Poliéster"></label><datalist id="comps">${[...new Set(['100% Poliéster','92% Poliéster 8% Elastano',...S.materiais.map(x=>x.comp).filter(Boolean)])].map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
+  <label class="tc">Gramatura (g/m²)<input name="gram" type="number" step="1" min="0" value="${m.gram??''}"></label>
+  <label class="tc">Cobrança do fornecedor<select name="cobr" onchange="matTipo(this.form)"><option value="kg"${m.cobr!=='mt'?' selected':''}>Por kg</option><option value="mt"${m.cobr==='mt'?' selected':''}>Por metro</option></select></label>
+  <label>Fornecedor<input name="forn" value="${esc(m.forn)}"></label></div>
+  <div class="g2"><label><span class="tc tck">Preço do tecido (R$ por kg)</span><span class="tc tcm">Preço do tecido (R$ por metro)</span><span class="av">Preço pago (R$)</span><input name="preco" type="number" step="0.0001" min="0" value="${m.preco??''}" oninput="matPrev(this.form)"></label>
+  <label class="tc tck">Rendimento (metros por kg)<input name="rend" type="number" step="0.01" min="0" value="${m.rend??''}" oninput="matPrev(this.form)"></label>
   <label class="av">Quantidade que vem nesse preço<input name="qtdC" type="number" step="0.001" min="0" value="${m.qtdC??1}" oninput="matPrev(this.form)" title="Ex.: cone de linha com 4000 m, milheiro de ilhós = 1000"></label></div>
   <div id="matprev" class="alert" style="background:#eef6ee;border-color:#cfe3cf;color:#234"></div>`,
-  async f=>{const d={...m};delete d.id;Object.assign(d,{nome:f.nome.trim(),cor:(f.cor||'').trim(),tipo:f.tipo,un:f.tipo==='tecido'?'MT':f.un,preco:+f.preco||0,rend:+f.rend||0,qtdC:+f.qtdC||1});id?await db.doc('materiais/'+id).set(d):await db.collection('materiais').add(d)});
+  async f=>{const d={...m};delete d.id;Object.assign(d,{nome:f.nome.trim(),cor:(f.cor||'').trim(),tipo:f.tipo,un:f.tipo==='tecido'?'MT':f.un,forn:(f.forn||'').trim(),comp:f.tipo==='tecido'?(f.comp||'').trim():'',gram:f.tipo==='tecido'?+f.gram||0:0,cobr:f.tipo==='tecido'?f.cobr:'',preco:+f.preco||0,rend:+f.rend||0,qtdC:+f.qtdC||1});id?await db.doc('materiais/'+id).set(d):await db.collection('materiais').add(d)});
   matTipo($('#dlg form'));
 }
-function matTipo(fm){const t=fm.tipo.value==='tecido';fm.querySelectorAll('.tc').forEach(e=>e.style.display=t?'':'none');fm.querySelectorAll('.av').forEach(e=>e.style.display=t?'none':'');matPrev(fm)}
-function matPrev(fm){const m={tipo:fm.tipo.value,un:fm.un.value,preco:fm.preco.value,rend:fm.rend.value,qtdC:fm.qtdC.value};$('#matprev').textContent='Custo de uso: '+brl4(matCusto(m))+' por '+matUn(m)+(m.tipo==='tecido'&&!(+m.rend>0)?' (informe o rendimento)':'')}
+function matTipo(fm){const t=fm.tipo.value==='tecido';fm.querySelectorAll('.tc').forEach(e=>e.style.display=t?'':'none');fm.querySelectorAll('.av').forEach(e=>e.style.display=t?'none':'');const k=fm.cobr.value==='kg';fm.querySelectorAll('.tck').forEach(e=>e.style.display=t&&k?'':'none');fm.querySelectorAll('.tcm').forEach(e=>e.style.display=t&&!k?'':'none');matPrev(fm)}
+function matPrev(fm){const m={tipo:fm.tipo.value,cobr:fm.cobr.value,un:fm.un.value,preco:fm.preco.value,rend:fm.rend.value,qtdC:fm.qtdC.value};$('#matprev').textContent='Custo de uso: '+brl4(matCusto(m))+' por '+matUn(m)+(m.tipo==='tecido'&&m.cobr==='kg'&&!(+m.rend>0)?' (informe o rendimento)':'')}
 function fichaLinha(i){return `<div class="fr" style="display:grid;grid-template-columns:1fr 110px auto;gap:6px;margin-bottom:6px"><select>${S.materiais.filter(m=>m.tipo!=='tecido').sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(m=>`<option value="${m.id}"${m.id===i.matId?' selected':''}>${esc(m.nome)}${m.cor?' · '+esc(m.cor):''} (${esc(matUn(m))})</option>`).join('')}</select><input type="number" step="0.001" min="0" value="${i.qtd??1}" placeholder="Qtde"><button type="button" class="sm del" onclick="this.parentNode.remove()">×</button></div>`}
 function fFicha(){
   if(!S.materiais.some(m=>m.tipo!=='tecido')){aviso('Cadastre os aviamentos antes de montar a ficha padrão.');return}
