@@ -54,26 +54,26 @@ dialog h3{margin:0 0 12px}
 .imp{border:1px dashed var(--bd);border-radius:10px;padding:10px;margin-bottom:12px}.imp small{display:block;color:var(--mut);margin-top:6px}.imp .r{display:flex;gap:8px;align-items:center}
 table.keep td:first-child,table.keep th:first-child{position:sticky;left:0;background:var(--card)}
 @media (max-width:640px){
- main{padding:12px}
- header{padding:12px 12px 0}
- input,select{font-size:16px}
- button.pri,button.ghost{min-height:42px}
- button.sm{padding:7px 12px;font-size:14px}
- .tw table:not(.keep),table:not(.keep) tbody{display:block;min-width:0}
- table:not(.keep) tr{display:block;padding:10px 12px;border-bottom:1px solid var(--bd)}
- table:not(.keep) tr.hd{display:none}
- table:not(.keep) td{display:flex;justify-content:space-between;align-items:center;gap:12px;border:0;padding:4px 0;white-space:normal;text-align:right}
- table:not(.keep) td[data-l]::before{content:attr(data-l);color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.3px;text-align:left;flex:none}
- table:not(.keep) td[data-l=""]{justify-content:flex-start;flex-wrap:wrap;gap:6px;padding-top:8px}
- table:not(.keep) td[data-l=""]::before{display:none}
- table:not(.keep) td.empty{display:block}
- table:not(.keep) td select{width:auto;max-width:60%}
- .cards{grid-template-columns:repeat(2,1fr)}
- dialog{width:100vw;max-width:100vw;max-height:92dvh;margin:auto 0 0;border-radius:14px 14px 0 0;overflow:auto;padding:16px 14px calc(16px + env(safe-area-inset-bottom,0px))}
- .it{grid-template-columns:1fr 1fr auto}
- .it select[name=p]{grid-column:1/-1}
- .imp .r{flex-wrap:wrap}
- .imp .r button{width:100%}
+main{padding:12px}
+header{padding:12px 12px 0}
+input,select{font-size:16px}
+button.pri,button.ghost{min-height:42px}
+button.sm{padding:7px 12px;font-size:14px}
+.tw table:not(.keep),table:not(.keep) tbody{display:block;min-width:0}
+table:not(.keep) tr{display:block;padding:10px 12px;border-bottom:1px solid var(--bd)}
+table:not(.keep) tr.hd{display:none}
+table:not(.keep) td{display:flex;justify-content:space-between;align-items:center;gap:12px;border:0;padding:4px 0;white-space:normal;text-align:right}
+table:not(.keep) td[data-l]::before{content:attr(data-l);color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.3px;text-align:left;flex:none}
+table:not(.keep) td[data-l=""]{justify-content:flex-start;flex-wrap:wrap;gap:6px;padding-top:8px}
+table:not(.keep) td[data-l=""]::before{display:none}
+table:not(.keep) td.empty{display:block}
+table:not(.keep) td select{width:auto;max-width:60%}
+.cards{grid-template-columns:repeat(2,1fr)}
+dialog{width:100vw;max-width:100vw;max-height:92dvh;margin:auto 0 0;border-radius:14px 14px 0 0;overflow:auto;padding:16px 14px calc(16px + env(safe-area-inset-bottom,0px))}
+.it{grid-template-columns:1fr 1fr auto}
+.it select[name=p]{grid-column:1/-1}
+.imp .r{flex-wrap:wrap}
+.imp .r button{width:100%}
 }
 @media (max-width:420px){.g2{grid-template-columns:1fr}.g5{gap:4px}.c b{font-size:19px}.bar h2{font-size:16px}}
 .qi{width:54px;padding:6px 4px;text-align:center}
@@ -94,89 +94,116 @@ table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
 <script>
 const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
 const sb=supabase.createClient(SB_URL,SB_KEY);
+const DOM_USUARIO='@fabrica.interno';
 const ERROS=[
-  [/auth session missing|session.*(not found|expired)|jwt expired|invalid jwt|refresh token/i,'Sua sessão expirou. Entre novamente.'],
-  [/invalid login credentials/i,'E-mail ou senha incorretos.'],
-  [/should be different from the old password/i,'A nova senha precisa ser diferente da senha atual.'],
-  [/password should be at least (\d+)/i,m=>'A senha precisa ter pelo menos '+m[1]+' caracteres.'],
-  [/weak password|password is too weak|known to be weak/i,'Senha muito fraca. Use letras e números.'],
-  [/email not confirmed/i,'E-mail ainda não confirmado.'],
-  [/quota|resource.?exhausted/i,'Limite gratuito da leitura automática atingido. Tente de novo mais tarde.'],
-  [/model is overloaded|unavailable|high demand|resposta inválida da ia|non-2xx|edge function/i,'A leitura automática está sobrecarregada. Tente de novo em alguns minutos.'],
-  [/api key not valid|api_key_invalid|referer|chave da ia não configurada/i,'A leitura automática não está configurada corretamente.'],
-  [/rate limit|too many requests/i,'Muitas tentativas. Aguarde alguns minutos e tente de novo.'],
-  [/failed to fetch|networkerror|network request|load failed/i,'Sem conexão com o servidor. Verifique sua internet e tente de novo.'],
-  [/row-level security|permission denied|not authorized|unauthorized/i,'Sem permissão. Entre novamente.'],
-  [/duplicate key/i,'Este registro já existe.']
+[/auth session missing|session.*(not found|expired)|jwt expired|invalid jwt|refresh token/i,'Sua sessão expirou. Entre novamente.'],
+[/invalid login credentials/i,'Usuário ou senha incorretos.'],
+[/should be different from the old password/i,'A nova senha precisa ser diferente da senha atual.'],
+[/password should be at least (\d+)/i,m=>'A senha precisa ter pelo menos '+m[1]+' caracteres.'],
+[/password should contain at least one character/i,'A senha precisa ter letra maiúscula, minúscula, número e caractere especial.'],
+[/weak password|password is too weak|known to be weak|pwned|compromised|leaked/i,'Senha fraca ou já vazada em ataques. Escolha outra, com letras e números.'],
+[/email not confirmed/i,'Usuário ainda não liberado.'],
+[/quota|resource.?exhausted/i,'Limite gratuito da leitura automática atingido. Tente de novo mais tarde.'],
+[/model is overloaded|unavailable|high demand|resposta inválida da ia|non-2xx|edge function/i,'A leitura automática está sobrecarregada. Tente de novo em alguns minutos.'],
+[/api key not valid|api_key_invalid|referer|chave da ia não configurada/i,'A leitura automática não está configurada corretamente.'],
+[/rate limit|too many requests/i,'Muitas tentativas. Aguarde alguns minutos e tente de novo.'],
+[/failed to fetch|networkerror|network request|load failed/i,'Sem conexão com o servidor. Verifique sua internet e tente de novo.'],
+[/row-level security|permission denied|not authorized|unauthorized/i,'Sem permissão. Entre novamente.'],
+[/duplicate key/i,'Este registro já existe.']
 ];
 function ptErro(m){
-  m=String((m&&m.message)||m||'');
-  for(const [re,t] of ERROS){const x=m.match(re);if(x)return typeof t==='function'?t(x):t}
-  return /\b(the|is|are|not|error|invalid|failed|missing|unable|cannot|could|from|blocked|denied|request|requests|please|try|unexpected|internal|server)\b/i.test(m)&&!/[ãçéêíóôõú]/i.test(m)?'Ocorreu um erro. Tente novamente.':m;
+m=String((m&&m.message)||m||'');
+for(const [re,t] of ERROS){const x=m.match(re);if(x)return typeof t==='function'?t(x):t}
+return /\b(the|is|are|not|error|invalid|failed|missing|unable|cannot|could|from|blocked|denied|request|requests|please|try|unexpected|internal|server)\b/i.test(m)&&!/[ãçéêíóôõú]/i.test(m)?'Ocorreu um erro. Tente novamente.':m;
 }
 async function sessaoOk(){
-  const {data:{session}}=await sb.auth.getSession();
-  if(!session){sessaoExpirada();throw new Error('Sua sessão expirou. Entre novamente.')}
+const {data:{session}}=await sb.auth.getSession();
+if(!session){sessaoExpirada();throw new Error('Sua sessão expirou. Entre novamente.')}
 }
 let saindo=false;
 function sessaoExpirada(){
-  if(saindo)return;saindo=true;
-  try{document.querySelectorAll('dialog[open]').forEach(d=>d.close())}catch(e){}
-  mostraLogin('Sua sessão expirou. Entre novamente.');
+if(saindo)return;saindo=true;
+try{document.querySelectorAll('dialog[open]').forEach(d=>d.close())}catch(e){}
+mostraLogin('Sua sessão expirou. Entre novamente.');
 }
 function mostraLogin(msg){
-  $('#nav').innerHTML='';
-  $('#app').innerHTML=`<form class="c" style="max-width:360px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<label>E-mail<input name="email" type="email" required autocomplete="username"></label><label>Senha<span class="pw"><input name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
+$('#nav').innerHTML='';
+$('#app').innerHTML=`<form class="c" style="max-width:360px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<label>Usuário<input name="usuario" type="text" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label><label>Senha<span class="pw"><input name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
 }
 sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&db)sessaoExpirada()});
 function sbDb(){
-  const cache={},subs={};
-  const snap=k=>({docs:(cache[k]||[]).map(r=>({id:r.id,data:()=>r.data}))});
-  async function load(k){
-    await sessaoOk();
-    const {data,error}=await sb.from('docs').select('id,data').eq('col',k).order('created_at');
-    if(error)throw error;
-    cache[k]=data;(subs[k]||[]).forEach(f=>f(snap(k)));
-  }
-  const ok=r=>{if(r.error)throw r.error;return r};
-  return {
-    collection:k=>({
-      onSnapshot(cb,err){
-        (subs[k]=subs[k]||[]).push(cb);
-        load(k).catch(err||console.error);
-        sb.channel('docs-'+k).on('postgres_changes',{event:'*',schema:'public',table:'docs',filter:'col=eq.'+k},()=>load(k).catch(console.error)).subscribe();
-      },
-      async add(d){await sessaoOk();ok(await sb.from('docs').insert({col:k,data:d}));await load(k)}
-    }),
-    doc(p){
-      const [k,id]=p.split('/');
-      return {
-        async set(d){await sessaoOk();ok(await sb.from('docs').update({data:d}).eq('id',id));await load(k)},
-        async update(d){await sessaoOk();const cur=(cache[k]||[]).find(r=>r.id===id);ok(await sb.from('docs').update({data:{...(cur?cur.data:{}),...d}}).eq('id',id));await load(k)},
-        async delete(){await sessaoOk();ok(await sb.from('docs').delete().eq('id',id));await load(k)}
-      };
-    }
-  };
+const cache={},subs={};
+const snap=k=>({docs:(cache[k]||[]).map(r=>({id:r.id,data:()=>r.data}))});
+async function load(k){
+await sessaoOk();
+const {data,error}=await sb.from('docs').select('id,data').eq('col',k).order('created_at');
+if(error)throw error;
+cache[k]=data;(subs[k]||[]).forEach(f=>f(snap(k)));
+}
+const ok=r=>{if(r.error)throw r.error;return r};
+return {
+collection:k=>({
+onSnapshot(cb,err){
+(subs[k]=subs[k]||[]).push(cb);
+load(k).catch(err||console.error);
+sb.channel('docs-'+k).on('postgres_changes',{event:'*',schema:'public',table:'docs',filter:'col=eq.'+k},()=>load(k).catch(console.error)).subscribe();
+},
+async add(d){await sessaoOk();ok(await sb.from('docs').insert({col:k,data:d}));await load(k)}
+}),
+doc(p){
+const [k,id]=p.split('/');
+return {
+async set(d){await sessaoOk();ok(await sb.from('docs').update({data:d}).eq('id',id));await load(k)},
+async update(d){await sessaoOk();const cur=(cache[k]||[]).find(r=>r.id===id);ok(await sb.from('docs').update({data:{...(cur?cur.data:{}),...d}}).eq('id',id));await load(k)},
+async delete(){await sessaoOk();ok(await sb.from('docs').delete().eq('id',id));await load(k)}
+};
+}
+};
 }
 async function entrar(e){
-  e.preventDefault();
-  const f=new FormData(e.target),m=$('#loginmsg');m.textContent='Entrando…';
-  const {error}=await sb.auth.signInWithPassword({email:f.get('email'),password:f.get('senha')});
-  if(error){m.textContent=ptErro(error);return}
-  location.reload();
+e.preventDefault();
+const f=new FormData(e.target),m=$('#loginmsg');m.textContent='Entrando…';
+const usu=String(f.get('usuario')||'').trim().toLowerCase();
+if(!usu||/[@\s]/.test(usu)){m.textContent='Digite só o nome de usuário (sem @ e sem espaços).';return}
+const {error}=await sb.auth.signInWithPassword({email:usu+DOM_USUARIO,password:f.get('senha')});
+if(error){m.textContent=ptErro(error);return}
+location.reload();
 }
 const olho=()=>`<button type="button" class="ghost olho" title="Mostrar/ocultar senha" onclick="verSenha(this)">👁</button>`;
 function verSenha(b){const i=b.previousElementSibling,v=i.type==='password';i.type=v?'text':'password';b.textContent=v?'🙈':'👁'}
 async function sair(){await sb.auth.signOut();location.reload()}
+async function senhaVazada(s){
+try{
+const b=await crypto.subtle.digest('SHA-1',new TextEncoder().encode(s));
+const hx=[...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join('').toUpperCase();
+const r=await fetch('https://api.pwnedpasswords.com/range/'+hx.slice(0,5),{headers:{'Add-Padding':'true'}});
+if(!r.ok)return 0;
+const t=await r.text(),suf=hx.slice(5);
+for(const l of t.split(/\r?\n/)){const [a,n]=l.split(':');if(a===suf)return +n||0}
+return 0;
+}catch(e){return 0}
+}
+function regrasSenha(s){
+const f=[];
+if(s.length<8)f.push('no mínimo 8 caracteres');
+if(!/[A-ZÀ-Ý]/.test(s))f.push('uma letra maiúscula');
+if(!/[0-9]/.test(s))f.push('um número');
+if(!/[^A-Za-z0-9À-ÿ\s]/.test(s))f.push('um caractere especial (ex.: ! @ # $ %)');
+return f;
+}
 function trocarSenha(){
-  modal('Trocar senha',`<label>Nova senha (mínimo 6 caracteres)<span class="pw"><input name="s1" type="password" minlength="6" required autocomplete="new-password">${olho()}</span></label><label>Repita a nova senha<span class="pw"><input name="s2" type="password" minlength="6" required autocomplete="new-password">${olho()}</span></label>`,
-  async f=>{
-    if(f.s1!==f.s2)throw new Error('As senhas não conferem.');
-    await sessaoOk();
-    const {error}=await sb.auth.updateUser({password:f.s1});
-    if(error)throw new Error(ptErro(error));
-    setTimeout(()=>aviso('Senha alterada.'),200);
-  });
+modal('Trocar senha',`<label>Nova senha (mín. 8 caracteres, com letra maiúscula, número e caractere especial)<span class="pw"><input name="s1" type="password" minlength="8" required autocomplete="new-password">${olho()}</span></label><label>Repita a nova senha<span class="pw"><input name="s2" type="password" minlength="8" required autocomplete="new-password">${olho()}</span></label>`,
+async f=>{
+if(f.s1!==f.s2)throw new Error('As senhas não conferem.');
+const fal=regrasSenha(f.s1);
+if(fal.length)throw new Error('A senha precisa ter '+fal.join(', ')+'.');
+const vz=await senhaVazada(f.s1);
+if(vz>0)throw new Error('Esta senha já apareceu em vazamentos de dados ('+vz.toLocaleString('pt-BR')+' vezes). Escolha outra.');
+await sessaoOk();
+const {error}=await sb.auth.updateUser({password:f.s1});
+if(error)throw new Error(ptErro(error));
+setTimeout(()=>aviso('Senha alterada.'),200);
+});
 }
 </script>
 <script>
@@ -193,123 +220,123 @@ const tot=p=>Object.values(ests(p)).reduce((a,c)=>a+SZ.reduce((b,s)=>b+(+c[s]||0
 function ests(p){const e=(p&&p.est)||{};return Object.values(e).some(x=>typeof x==='number')?{'Sem cor':e}:e}
 function estQ(p,c,t){return +((ests(p)[c]||{})[t])||0}
 function coresDe(p,extra=[]){
-  const e=ests(p),L=[...CORES_BASE];
-  Object.keys(e).forEach(c=>{const s=SZ.reduce((a,t)=>a+(+(e[c]||{})[t]||0),0);if(!L.includes(c)&&(c!=='Sem cor'||s>0))L.push(c)});
-  extra.forEach(c=>{if(!L.includes(c))L.push(c)});
-  return L;
+const e=ests(p),L=[...CORES_BASE];
+Object.keys(e).forEach(c=>{const s=SZ.reduce((a,t)=>a+(+(e[c]||{})[t]||0),0);if(!L.includes(c)&&(c!=='Sem cor'||s>0))L.push(c)});
+extra.forEach(c=>{if(!L.includes(c))L.push(c)});
+return L;
 }
 function normCor(c){
-  const x=String(c||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
-  if(!x)return 'Sem cor';
-  const m=[['preto','Preto'],['marinho','Marinho'],['chumbo','Chumbo'],['petroleo','Petróleo'],['verde','Verde militar'],['gelo','Gelo']];
-  for(const [k,v] of m)if(x.includes(k))return v;
-  return String(c).trim();
+const x=String(c||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+if(!x)return 'Sem cor';
+const m=[['preto','Preto'],['marinho','Marinho'],['chumbo','Chumbo'],['petroleo','Petróleo'],['verde','Verde militar'],['gelo','Gelo']];
+for(const [k,v] of m)if(x.includes(k))return v;
+return String(c).trim();
 }
 function linhaCor(c,get,neg){return `<tr><td>${esc(c)}</td>${SZ.map(s=>`<td><input class="qi" type="number" ${neg?'':'min="0"'} data-c="${esc(c)}" data-t="${s}" value="${get(c,s)||''}"></td>`).join('')}</tr>`}
 function grade(cores,get,neg){return `<div class="tw" style="margin:0 0 8px"><table class="keep gr"><tr><th>Cor</th>${SZ.map(s=>`<th class="n">${s}</th>`).join('')}</tr>${cores.map(c=>linhaCor(c,get,neg)).join('')}</table></div>`}
 function addCor(){
-  const i=$('#novacor'),c=(i.value||'').trim();if(!c)return;
-  const t=document.querySelector('#gp table');
-  if(![...t.querySelectorAll('tr td:first-child')].some(td=>td.textContent.toLowerCase()===c.toLowerCase()))t.insertAdjacentHTML('beforeend',linhaCor(c,()=>0));
-  i.value='';
+const i=$('#novacor'),c=(i.value||'').trim();if(!c)return;
+const t=document.querySelector('#gp table');
+if(![...t.querySelectorAll('tr td:first-child')].some(td=>td.textContent.toLowerCase()===c.toLowerCase()))t.insertAdjacentHTML('beforeend',linhaCor(c,()=>0));
+i.value='';
 }
 function lerEst(root){
-  const est={};
-  root.querySelectorAll('input.qi').forEach(i=>{(est[i.dataset.c]=est[i.dataset.c]||{})[i.dataset.t]=+i.value||0});
-  if(est['Sem cor']&&!Object.values(est['Sem cor']).some(v=>v))delete est['Sem cor'];
-  return est;
+const est={};
+root.querySelectorAll('input.qi').forEach(i=>{(est[i.dataset.c]=est[i.dataset.c]||{})[i.dataset.t]=+i.value||0});
+if(est['Sem cor']&&!Object.values(est['Sem cor']).some(v=>v))delete est['Sem cor'];
+return est;
 }
 const prod=id=>S.produtos.find(p=>p.id===id);
 const rep=id=>S.reps.find(r=>r.id===id);
 const precoG=p=>+((p&&p.precoG!=null)?p.precoG:(p&&p.preco))||0;
 const precoDe=(p,t)=>SZ.indexOf(t)>=4?precoG(p):(+p.preco||0);
 const pedTotal=o=>(o.itens||[]).reduce((a,i)=>a+i.qtd*i.preco,0);
-const precoAtual=i=>{const p=prod(i.prodId);return p?precoDe(p,i.tam):i.preco};
-const pedDesatual=o=>(o.itens||[]).some(i=>Math.abs(precoAtual(i)-(+i.preco||0))>=0.005);
+const precoAtual=i=>{const p=prod(i.prodId);const np=p?precoDe(p,i.tam):0;return np>0?np:(+i.preco||0)};
+const pedDesatual=o=>['Pendente','Faturado'].includes(o.status)&&(o.itens||[]).some(i=>Math.abs(precoAtual(i)-(+i.preco||0))>=0.005);
 
 (async()=>{
-  const {data:{session}}=await sb.auth.getSession();
-  const {data:{user}}=session?await sb.auth.getUser():{data:{}};
-  if(!session||!user){if(session)await sb.auth.signOut({scope:'local'});mostraLogin();return}
-  db=sbDb();
-  if(db){
-    let n=0;
-    const COLS=['produtos','reps','pedidos','materiais','config'];
-    for(const k of COLS){
-      db.collection(k).onSnapshot(s=>{S[k]=s.docs.map(d=>({id:d.id,...d.data()}));if(++n>=COLS.length)ready=true;render()},e=>{console.error(e);ready=true;render()});
-    }
-  }else ready=true;
-  render();
+const {data:{session}}=await sb.auth.getSession();
+const {data:{user}}=session?await sb.auth.getUser():{data:{}};
+if(!session||!user){if(session)await sb.auth.signOut({scope:'local'});mostraLogin();return}
+db=sbDb();
+if(db){
+let n=0;
+const COLS=['produtos','reps','pedidos','materiais','config'];
+for(const k of COLS){
+db.collection(k).onSnapshot(s=>{S[k]=s.docs.map(d=>({id:d.id,...d.data()}));if(++n>=COLS.length)ready=true;render()},e=>{console.error(e);ready=true;render()});
+}
+}else ready=true;
+render();
 })();
 
 function render(){
-  $('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';render()">${l}</button>`).join('');
-  const a=$('#app');
-  if(!db&&ready){a.innerHTML='<div class="alert">Não foi possível conectar ao banco de dados. Verifique sua internet e recarregue a página.</div>';return}
-  a.innerHTML=({painel,produtos,materia,pedidos,fabricar,reps,estoque})[tab]();
-  rotula(a);
+$('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';render()">${l}</button>`).join('');
+const a=$('#app');
+if(!db&&ready){a.innerHTML='<div class="alert">Não foi possível conectar ao banco de dados. Verifique sua internet e recarregue a página.</div>';return}
+a.innerHTML=({painel,produtos,materia,pedidos,fabricar,reps,estoque})[tab]();
+rotula(a);
 }
 
 function rotula(root){
-  root.querySelectorAll('table').forEach(t=>{
-    if(t.classList.contains('keep'))return;
-    const hr=t.rows[0];if(!hr||!hr.querySelector('th'))return;
-    hr.classList.add('hd');
-    const hs=[...hr.cells].map(c=>c.textContent.trim());
-    [...t.rows].slice(1).forEach(r=>[...r.cells].forEach((c,i)=>{if(c.colSpan<2)c.setAttribute('data-l',hs[i]||'')}));
-  });
+root.querySelectorAll('table').forEach(t=>{
+if(t.classList.contains('keep'))return;
+const hr=t.rows[0];if(!hr||!hr.querySelector('th'))return;
+hr.classList.add('hd');
+const hs=[...hr.cells].map(c=>c.textContent.trim());
+[...t.rows].slice(1).forEach(r=>[...r.cells].forEach((c,i)=>{if(c.colSpan<2)c.setAttribute('data-l',hs[i]||'')}));
+});
 }
 new MutationObserver(()=>rotula($('#dlg'))).observe($('#dlg'),{childList:true});
 
 function painel(){
-  const ok=S.pedidos.filter(o=>o.status!=='Cancelado');
-  const fat=ok.reduce((a,o)=>a+pedTotal(o),0);
-  const pecas=S.produtos.reduce((a,p)=>a+tot(p),0);
-  const baixos=S.produtos.filter(p=>tot(p)<=(+p.min||0));
-  const pend=S.pedidos.filter(o=>o.status==='Pendente').length;
-  const sc=ok.filter(o=>!rep(o.repId)).length;
-  const fab=fabricarLista().reduce((a,x)=>a+x.f,0);
-  const linhas=S.reps.map(r=>{const v=ok.filter(o=>o.repId===r.id).reduce((a,o)=>a+pedTotal(o),0);return `<tr><td>${esc(r.nome)}</td><td>${esc(r.regiao)}</td><td class="n">${brl(v)}</td><td class="n">${r.com||0}%</td><td class="n">${brl(v*(r.com||0)/100)}</td></tr>`}).join('');
-  return `<div class="cards">
-  <div class="c"><small>Faturamento (sem cancelados)</small><b>${brl(fat)}</b></div>
-  <div class="c"><small>Pedidos pendentes</small><b>${pend}</b></div>
-  <div class="c"><small>Peças em estoque</small><b>${pecas}</b></div>
-  <div class="c"><small>Produtos com estoque baixo</small><b class="${baixos.length?'low':''}">${baixos.length}</b></div>
-  <div class="c"><small>Peças a fabricar</small><b class="${fab?'low':''}">${fab}</b></div></div>
-  ${baixos.length?`<div class="alert">⚠ Estoque baixo: ${baixos.map(p=>esc(p.ref+' '+p.nome)+' ('+tot(p)+')').join(', ')}</div>`:''}
-  ${sc?`<div class="alert">⚠ ${sc} pedido(s) com representante sem cadastro não entram na comissão. Cadastre o representante e corrija o pedido na aba Pedidos.</div>`:''}
-  <div class="bar"><h2>Vendas e comissões por representante</h2></div>
-  <div class="tw"><table><tr><th>Representante</th><th>Região</th><th class="n">Vendas</th><th class="n">Comissão %</th><th class="n">A pagar</th></tr>${linhas||'<tr><td colspan="5" class="empty">Cadastre representantes e pedidos para ver os números.</td></tr>'}</table></div>`;
+const ok=S.pedidos.filter(o=>o.status!=='Cancelado');
+const fat=ok.reduce((a,o)=>a+pedTotal(o),0);
+const pecas=S.produtos.reduce((a,p)=>a+tot(p),0);
+const baixos=S.produtos.filter(p=>tot(p)<=(+p.min||0));
+const pend=S.pedidos.filter(o=>o.status==='Pendente').length;
+const sc=ok.filter(o=>!rep(o.repId)).length;
+const fab=fabricarLista().reduce((a,x)=>a+x.f,0);
+const linhas=S.reps.map(r=>{const v=ok.filter(o=>o.repId===r.id).reduce((a,o)=>a+pedTotal(o),0);return `<tr><td>${esc(r.nome)}</td><td>${esc(r.regiao)}</td><td class="n">${brl(v)}</td><td class="n">${r.com||0}%</td><td class="n">${brl(v*(r.com||0)/100)}</td></tr>`}).join('');
+return `<div class="cards">
+ <div class="c"><small>Faturamento (sem cancelados)</small><b>${brl(fat)}</b></div>
+ <div class="c"><small>Pedidos pendentes</small><b>${pend}</b></div>
+ <div class="c"><small>Peças em estoque</small><b>${pecas}</b></div>
+ <div class="c"><small>Produtos com estoque baixo</small><b class="${baixos.length?'low':''}">${baixos.length}</b></div>
+ <div class="c"><small>Peças a fabricar</small><b class="${fab?'low':''}">${fab}</b></div></div>
+ ${baixos.length?`<div class="alert">⚠ Estoque baixo: ${baixos.map(p=>esc(p.ref+' '+p.nome)+' ('+tot(p)+')').join(', ')}</div>`:''}
+ ${sc?`<div class="alert">⚠ ${sc} pedido(s) com representante sem cadastro não entram na comissão. Cadastre o representante e corrija o pedido na aba Pedidos.</div>`:''}
+ <div class="bar"><h2>Vendas e comissões por representante</h2></div>
+ <div class="tw"><table><tr><th>Representante</th><th>Região</th><th class="n">Vendas</th><th class="n">Comissão %</th><th class="n">A pagar</th></tr>${linhas||'<tr><td colspan="5" class="empty">Cadastre representantes e pedidos para ver os números.</td></tr>'}</table></div>`;
 }
 
 function produtos(){
-  const pct=(c,v)=>v>0?Math.round((v-c)/v*100)+'%':'—';
-  const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>{const c=custoP(p,false),cg=custoP(p,true);return `<tr><td>${esc(p.ref)}</td><td>${esc(p.nome)}${p.tecidoId?`<small>${esc(mat(p.tecidoId)?.nome||'')}</small>`:''}</td><td class="n">${brl(c)}</td><td class="n">${brl(cg)}</td><td class="n">${brl(p.preco)}</td><td class="n">${brl(precoG(p))}</td><td class="n">${pct(c,+p.preco)} / ${pct(cg,precoG(p))}</td><td class="n ${tot(p)<=(+p.min||0)?'low':''}">${tot(p)}</td><td><button class="sm" onclick="verFicha('${p.id}')">Ficha</button><button class="sm" onclick="fProd('${p.id}')">Editar</button><button class="sm del" onclick="del('produtos','${p.id}')">Excluir</button></td></tr>`}).join('');
-  return `<div class="bar"><h2>Produtos</h2><button class="pri" onclick="fProd()">+ Novo produto</button></div>
-  <div class="tw"><table><tr><th>Ref.</th><th>Descrição</th><th class="n">Custo P–GG</th><th class="n">Custo G1–G4</th><th class="n">Preço P–GG</th><th class="n">Preço G1–G4</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>${r||'<tr><td colspan="9" class="empty">Nenhum produto cadastrado.</td></tr>'}</table></div>
-  <p style="color:var(--mut)">O custo vem da ficha técnica (tecido do produto + ficha padrão da aba Matéria-prima). Produtos sem tecido escolhido usam o custo manual.</p>`;
+const pct=(c,v)=>v>0?Math.round((v-c)/v*100)+'%':'—';
+const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>{const c=custoP(p,false),cg=custoP(p,true);return `<tr><td>${esc(p.ref)}</td><td>${esc(p.nome)}${p.tecidoId?`<small>${esc(mat(p.tecidoId)?.nome||'')}</small>`:''}</td><td class="n">${brl(c)}</td><td class="n">${brl(cg)}</td><td class="n">${brl(p.preco)}</td><td class="n">${brl(precoG(p))}</td><td class="n">${pct(c,+p.preco)} / ${pct(cg,precoG(p))}</td><td class="n ${tot(p)<=(+p.min||0)?'low':''}">${tot(p)}</td><td><button class="sm" onclick="verFicha('${p.id}')">Ficha</button><button class="sm" onclick="fProd('${p.id}')">Editar</button><button class="sm del" onclick="del('produtos','${p.id}')">Excluir</button></td></tr>`}).join('');
+return `<div class="bar"><h2>Produtos</h2><button class="pri" onclick="fProd()">+ Novo produto</button></div>
+ <div class="tw"><table><tr><th>Ref.</th><th>Descrição</th><th class="n">Custo P–GG</th><th class="n">Custo G1–G4</th><th class="n">Preço P–GG</th><th class="n">Preço G1–G4</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>${r||'<tr><td colspan="9" class="empty">Nenhum produto cadastrado.</td></tr>'}</table></div>
+ <p style="color:var(--mut)">O custo vem da ficha técnica (tecido do produto + ficha padrão da aba Matéria-prima). Produtos sem tecido escolhido usam o custo manual.</p>`;
 }
 function fProd(id){
-  const p=id?prod(id):{};
-  modal(id?'Editar produto':'Novo produto',`
-  <div class="g2"><label>Referência<input name="ref" required inputmode="numeric" pattern="[0-9]+" title="Somente números" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="${esc(p.ref)}"></label>
-  <label>Descrição<input name="nome" required placeholder="Short tactel" value="${esc(p.nome)}"></label>
-  <label>Estoque mínimo (peças)<input name="min" type="number" min="0" value="${p.min??0}"></label>
-  <label>Preço P ao GG (R$)<input name="preco" type="number" step="0.01" min="0" required value="${p.preco??''}"></label>
-  <label>Preço G1 ao G4 (R$)<input name="precoG" type="number" step="0.01" min="0" required value="${p.precoG??p.preco??''}"></label>
-  <label>Custo manual (R$)<input name="custo" type="number" step="0.01" min="0" value="${p.custo??''}" title="Usado só se o produto não tiver tecido na ficha técnica"></label></div>
-  <fieldset style="border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:8px 0"><legend style="padding:0 6px;font-weight:600">Ficha técnica</legend>
+const p=id?prod(id):{};
+modal(id?'Editar produto':'Novo produto',`
+ <div class="g2"><label>Referência<input name="ref" required inputmode="numeric" pattern="[0-9]+" title="Somente números" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="${esc(p.ref)}"></label>
+ <label>Descrição<input name="nome" required placeholder="Short tactel" value="${esc(p.nome)}"></label>
+ <label>Estoque mínimo (peças)<input name="min" type="number" min="0" value="${p.min??0}"></label>
+ <label>Preço P ao GG (R$)<input name="preco" type="number" step="0.01" min="0" required value="${p.preco??''}"></label>
+ <label>Preço G1 ao G4 (R$)<input name="precoG" type="number" step="0.01" min="0" required value="${p.precoG??p.preco??''}"></label>
+ <label>Custo manual (R$)<input name="custo" type="number" step="0.01" min="0" value="${p.custo??''}" title="Usado só se o produto não tiver tecido na ficha técnica"></label></div>
+ <fieldset style="border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:8px 0"><legend style="padding:0 6px;font-weight:600">Ficha técnica</legend>
   <label>Tecido<select name="tecidoId"><option value="">— sem ficha (usar custo manual) —</option>${S.materiais.filter(m=>m.tipo==='tecido').sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(m=>`<option value="${m.id}"${m.id===p.tecidoId?' selected':''}>${esc(m.nome)}${m.comp?' · '+esc(m.comp):''}${m.cor?' · '+esc(m.cor):''} (${brl4(matCusto(m))}/m)</option>`).join('')}</select></label>
-  <div class="g2"><label>Consumo de tecido P–GG (m por peça)<input name="cons" type="number" step="0.001" min="0" value="${p.cons??''}"></label>
-  <label>Consumo de tecido G1–G4 (m por peça)<input name="consG" type="number" step="0.001" min="0" value="${p.consG??''}" placeholder="igual ao P–GG"></label>
-  <label>Custo extra (R$ por peça)<input name="extra" type="number" step="0.01" min="0" value="${p.extra??''}"></label></div>
-  <small>Os aviamentos, a mão de obra e o custo fixo vêm da ficha padrão (aba Matéria-prima).</small></fieldset>
-  <label>Estoque por cor e tamanho (peças que você tem hoje)</label><div id="gp">${grade(coresDe(p),(c,s)=>estQ(p,c,s))}</div>
-  <div class="r2"><input id="novacor" placeholder="Outra cor (ex.: Bege)"><button type="button" class="ghost" onclick="addCor()">+ Cor</button></div>`,
-  async(f,form)=>{
-    const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.preco||0,precoG:+f.precoG||0,est:lerEst(form),tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0};delete d.id;
-    id?await db.doc('produtos/'+id).set(d):await db.collection('produtos').add(d);
-  });
+ <div class="g2"><label>Consumo de tecido P–GG (m por peça)<input name="cons" type="number" step="0.001" min="0" value="${p.cons??''}"></label>
+ <label>Consumo de tecido G1–G4 (m por peça)<input name="consG" type="number" step="0.001" min="0" value="${p.consG??''}" placeholder="igual ao P–GG"></label>
+ <label>Custo extra (R$ por peça)<input name="extra" type="number" step="0.01" min="0" value="${p.extra??''}"></label></div>
+ <small>Os aviamentos, a mão de obra e o custo fixo vêm da ficha padrão (aba Matéria-prima).</small></fieldset>
+ <label>Estoque por cor e tamanho (peças que você tem hoje)</label><div id="gp">${grade(coresDe(p),(c,s)=>estQ(p,c,s))}</div>
+ <div class="r2"><input id="novacor" placeholder="Outra cor (ex.: Bege)"><button type="button" class="ghost" onclick="addCor()">+ Cor</button></div>`,
+async(f,form)=>{
+const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.preco||0,precoG:+f.precoG||0,est:lerEst(form),tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0};delete d.id;
+id?await db.doc('produtos/'+id).set(d):await db.collection('produtos').add(d);
+});
 }
 
 const brl4=n=>(+n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL',minimumFractionDigits:2,maximumFractionDigits:4});
@@ -320,445 +347,445 @@ const matCusto=m=>!m?0:m.tipo==='tecido'?(m.cobr==='mt'?(+m.preco||0):(+m.rend>0
 const fichaDoc=()=>S.config.find(x=>x.tipo==='ficha');
 const fichaPad=()=>fichaDoc()||{itens:[],mo:0,fixo:0};
 function custoFicha(p,g){
-  const f=fichaPad(),linhas=[];
-  (f.itens||[]).forEach(i=>{const m=mat(i.matId);if(!m)return;const cu=matCusto(m);linhas.push({nome:m.nome,cor:m.cor||'',q:+i.qtd||0,un:matUn(m),cu,ct:cu*(+i.qtd||0)})});
-  const t=mat(p.tecidoId);
-  if(t){const q=g&&p.consG!==''&&p.consG!=null?+p.consG:+p.cons||0;const cu=matCusto(t);linhas.push({nome:'Tecido: '+t.nome,cor:t.cor||'Cor do produto',q,un:'MT',cu,ct:cu*q,tec:true})}
-  const mp=linhas.reduce((a,x)=>a+x.ct,0),mo=+f.mo||0,fixo=+f.fixo||0,extra=+p.extra||0;
-  return {linhas,mp,mo,fixo,extra,total:mp+mo+fixo+extra};
+const f=fichaPad(),linhas=[];
+(f.itens||[]).forEach(i=>{const m=mat(i.matId);if(!m)return;const cu=matCusto(m);linhas.push({nome:m.nome,cor:m.cor||'',q:+i.qtd||0,un:matUn(m),cu,ct:cu*(+i.qtd||0)})});
+const t=mat(p.tecidoId);
+if(t){const q=g&&p.consG!==''&&p.consG!=null?+p.consG:+p.cons||0;const cu=matCusto(t);linhas.push({nome:'Tecido: '+t.nome,cor:t.cor||'Cor do produto',q,un:'MT',cu,ct:cu*q,tec:true})}
+const mp=linhas.reduce((a,x)=>a+x.ct,0),mo=+f.mo||0,fixo=+f.fixo||0,extra=+p.extra||0;
+return {linhas,mp,mo,fixo,extra,total:mp+mo+fixo+extra};
 }
 const custoP=(p,g)=>p.tecidoId?custoFicha(p,g).total:(+p.custo||0);
 function materia(){
-  const ms=S.materiais.slice().sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='tecido'?-1:1)||(a.nome||'').localeCompare(b.nome||''));
+const ms=S.materiais.slice().sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='tecido'?-1:1)||(a.nome||'').localeCompare(b.nome||''));
   const r=ms.map(m=>`<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td>${m.tipo==='tecido'?'Tecido':'Aviamento'}</td><td>${esc([m.comp,+m.gram?m.gram+' g/m²':''].filter(Boolean).join(' · '))}</td><td>${esc(m.forn)}</td><td class="n">${m.tipo==='tecido'?brl(m.preco)+(m.cobr==='mt'?'/m':'/kg'):brl(m.preco)+((+m.qtdC||1)!==1?' / '+nf(m.qtdC,0)+' '+esc(matUn(m)):' / '+esc(matUn(m)))}</td><td class="n">${m.tipo==='tecido'?m.cobr==='mt'?'—':(+m.rend?nf(m.rend,2)+' m/kg':'<span class="low">informe</span>'):''}</td><td class="n"><b>${brl4(matCusto(m))}</b>/${esc(matUn(m))}</td><td><button class="sm" onclick="fMat('${m.id}')">Editar</button><button class="sm del" onclick="del('materiais','${m.id}')">Excluir</button></td></tr>`).join('');
-  const f=fichaPad();
-  const fr=(f.itens||[]).map(i=>{const m=mat(i.matId);if(!m)return '';const cu=matCusto(m);return `<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td class="n">${nf(i.qtd)}</td><td>${esc(matUn(m))}</td><td class="n">${brl4(cu)}</td><td class="n">${brl4(cu*(+i.qtd||0))}</td></tr>`}).join('');
-  const sub=(f.itens||[]).reduce((a,i)=>a+matCusto(mat(i.matId))*(+i.qtd||0),0);
-  return `<div class="bar"><h2>Matéria-prima</h2><button class="pri" onclick="fMat()">+ Nova matéria-prima</button></div>
+const f=fichaPad();
+const fr=(f.itens||[]).map(i=>{const m=mat(i.matId);if(!m)return '';const cu=matCusto(m);return `<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td class="n">${nf(i.qtd)}</td><td>${esc(matUn(m))}</td><td class="n">${brl4(cu)}</td><td class="n">${brl4(cu*(+i.qtd||0))}</td></tr>`}).join('');
+const sub=(f.itens||[]).reduce((a,i)=>a+matCusto(mat(i.matId))*(+i.qtd||0),0);
+return `<div class="bar"><h2>Matéria-prima</h2><button class="pri" onclick="fMat()">+ Nova matéria-prima</button></div>
   <div class="tw"><table><tr><th>Nome</th><th>Cor</th><th>Tipo</th><th>Composição / gramatura</th><th>Fornecedor</th><th class="n">Preço de compra</th><th class="n">Rendimento</th><th class="n">Custo de uso</th><th></th></tr>${r||'<tr><td colspan="9" class="empty">Nenhuma matéria-prima cadastrada.</td></tr>'}</table></div>
-  <div class="bar"><h2>Ficha técnica padrão</h2><button class="pri" onclick="fFicha()">Editar ficha padrão</button></div>
-  <p style="color:var(--mut);margin-top:0">Itens iguais em todas as referências. O tecido e o consumo de cada referência são informados no cadastro do produto.</p>
-  <div class="tw"><table><tr><th>Item</th><th>Cor</th><th class="n">Qtde</th><th>Un</th><th class="n">Custo un.</th><th class="n">Custo total</th></tr>${fr||'<tr><td colspan="6" class="empty">Nenhum item na ficha padrão.</td></tr>'}
-  <tr><th colspan="5">Aviamentos</th><th class="n">${brl4(sub)}</th></tr><tr><td colspan="5">Mão de obra (por peça)</td><td class="n">${brl(f.mo)}</td></tr><tr><td colspan="5">Custo fixo (por peça)</td><td class="n">${brl(f.fixo)}</td></tr></table></div>`;
+ <div class="bar"><h2>Ficha técnica padrão</h2><button class="pri" onclick="fFicha()">Editar ficha padrão</button></div>
+ <p style="color:var(--mut);margin-top:0">Itens iguais em todas as referências. O tecido e o consumo de cada referência são informados no cadastro do produto.</p>
+ <div class="tw"><table><tr><th>Item</th><th>Cor</th><th class="n">Qtde</th><th>Un</th><th class="n">Custo un.</th><th class="n">Custo total</th></tr>${fr||'<tr><td colspan="6" class="empty">Nenhum item na ficha padrão.</td></tr>'}
+ <tr><th colspan="5">Aviamentos</th><th class="n">${brl4(sub)}</th></tr><tr><td colspan="5">Mão de obra (por peça)</td><td class="n">${brl(f.mo)}</td></tr><tr><td colspan="5">Custo fixo (por peça)</td><td class="n">${brl(f.fixo)}</td></tr></table></div>`;
 }
 function fMat(id){
-  const m=id?mat(id):{tipo:'aviamento',un:'UN',qtdC:1};
-  modal(id?'Editar matéria-prima':'Nova matéria-prima',`
-  <div class="g2"><label>Nome<input name="nome" required value="${esc(m.nome)}" placeholder="Ex.: Elástico 40mm"></label>
-  <label>Cor<input name="cor" value="${esc(m.cor)}" placeholder="Ex.: BC, PR"></label>
-  <label>Tipo<select name="tipo" onchange="matTipo(this.form)"><option value="aviamento"${m.tipo!=='tecido'?' selected':''}>Aviamento</option><option value="tecido"${m.tipo==='tecido'?' selected':''}>Tecido</option></select></label>
-  <label class="av">Unidade de uso<select name="un" onchange="matPrev(this.form)">${['UN','MT','KG','PC','CX','RL','PAR'].map(u=>`<option${(m.un||'UN')===u?' selected':''}>${u}</option>`).join('')}</select></label></div>
+const m=id?mat(id):{tipo:'aviamento',un:'UN',qtdC:1};
+modal(id?'Editar matéria-prima':'Nova matéria-prima',`
+ <div class="g2"><label>Nome<input name="nome" required value="${esc(m.nome)}" placeholder="Ex.: Elástico 40mm"></label>
+ <label>Cor<input name="cor" value="${esc(m.cor)}" placeholder="Ex.: BC, PR"></label>
+ <label>Tipo<select name="tipo" onchange="matTipo(this.form)"><option value="aviamento"${m.tipo!=='tecido'?' selected':''}>Aviamento</option><option value="tecido"${m.tipo==='tecido'?' selected':''}>Tecido</option></select></label>
+ <label class="av">Unidade de uso<select name="un" onchange="matPrev(this.form)">${['UN','MT','KG','PC','CX','RL','PAR'].map(u=>`<option${(m.un||'UN')===u?' selected':''}>${u}</option>`).join('')}</select></label></div>
   <div class="g2"><label class="tc">Composição<input name="comp" list="comps" value="${esc(m.comp)}" placeholder="Ex.: 100% Poliéster"></label><datalist id="comps">${[...new Set(['100% Poliéster','92% Poliéster 8% Elastano',...S.materiais.map(x=>x.comp).filter(Boolean)])].map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
   <label class="tc">Gramatura (g/m²)<input name="gram" type="number" step="1" min="0" value="${m.gram??''}"></label>
   <label class="tc">Cobrança do fornecedor<select name="cobr" onchange="matTipo(this.form)"><option value="kg"${m.cobr!=='mt'?' selected':''}>Por kg</option><option value="mt"${m.cobr==='mt'?' selected':''}>Por metro</option></select></label>
   <label>Fornecedor<input name="forn" value="${esc(m.forn)}"></label></div>
   <div class="g2"><label><span class="tc tck">Preço do tecido (R$ por kg)</span><span class="tc tcm">Preço do tecido (R$ por metro)</span><span class="av">Preço pago (R$)</span><input name="preco" type="number" step="0.0001" min="0" value="${m.preco??''}" oninput="matPrev(this.form)"></label>
   <label class="tc tck">Rendimento (metros por kg)<input name="rend" type="number" step="0.01" min="0" value="${m.rend??''}" oninput="matPrev(this.form)"></label>
-  <label class="av">Quantidade que vem nesse preço<input name="qtdC" type="number" step="0.001" min="0" value="${m.qtdC??1}" oninput="matPrev(this.form)" title="Ex.: cone de linha com 4000 m, milheiro de ilhós = 1000"></label></div>
-  <div id="matprev" class="alert" style="background:#eef6ee;border-color:#cfe3cf;color:#234"></div>`,
+ <label class="av">Quantidade que vem nesse preço<input name="qtdC" type="number" step="0.001" min="0" value="${m.qtdC??1}" oninput="matPrev(this.form)" title="Ex.: cone de linha com 4000 m, milheiro de ilhós = 1000"></label></div>
+ <div id="matprev" class="alert" style="background:#eef6ee;border-color:#cfe3cf;color:#234"></div>`,
   async f=>{const d={...m};delete d.id;Object.assign(d,{nome:f.nome.trim(),cor:(f.cor||'').trim(),tipo:f.tipo,un:f.tipo==='tecido'?'MT':f.un,forn:(f.forn||'').trim(),comp:f.tipo==='tecido'?(f.comp||'').trim():'',gram:f.tipo==='tecido'?+f.gram||0:0,cobr:f.tipo==='tecido'?f.cobr:'',preco:+f.preco||0,rend:+f.rend||0,qtdC:+f.qtdC||1});id?await db.doc('materiais/'+id).set(d):await db.collection('materiais').add(d)});
-  matTipo($('#dlg form'));
+matTipo($('#dlg form'));
 }
 function matTipo(fm){const t=fm.tipo.value==='tecido';fm.querySelectorAll('.tc').forEach(e=>e.style.display=t?'':'none');fm.querySelectorAll('.av').forEach(e=>e.style.display=t?'none':'');const k=fm.cobr.value==='kg';fm.querySelectorAll('.tck').forEach(e=>e.style.display=t&&k?'':'none');fm.querySelectorAll('.tcm').forEach(e=>e.style.display=t&&!k?'':'none');matPrev(fm)}
 function matPrev(fm){const m={tipo:fm.tipo.value,cobr:fm.cobr.value,un:fm.un.value,preco:fm.preco.value,rend:fm.rend.value,qtdC:fm.qtdC.value};$('#matprev').textContent='Custo de uso: '+brl4(matCusto(m))+' por '+matUn(m)+(m.tipo==='tecido'&&m.cobr==='kg'&&!(+m.rend>0)?' (informe o rendimento)':'')}
 function fichaLinha(i){return `<div class="fr" style="display:grid;grid-template-columns:1fr 110px auto;gap:6px;margin-bottom:6px"><select>${S.materiais.filter(m=>m.tipo!=='tecido').sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(m=>`<option value="${m.id}"${m.id===i.matId?' selected':''}>${esc(m.nome)}${m.cor?' · '+esc(m.cor):''} (${esc(matUn(m))})</option>`).join('')}</select><input type="number" step="0.001" min="0" value="${i.qtd??1}" placeholder="Qtde"><button type="button" class="sm del" onclick="this.parentNode.remove()">×</button></div>`}
 function fFicha(){
-  if(!S.materiais.some(m=>m.tipo!=='tecido')){aviso('Cadastre os aviamentos antes de montar a ficha padrão.');return}
-  const f=fichaPad(),d0=fichaDoc();
-  modal('Ficha técnica padrão',`<label>Aviamentos e quantidade por peça</label><div id="fitens">${(f.itens||[]).map(fichaLinha).join('')}</div>
-  <button type="button" class="ghost" onclick="$('#fitens').insertAdjacentHTML('beforeend',fichaLinha({}))">+ Item</button>
-  <div class="g2" style="margin-top:10px"><label>Mão de obra (R$ por peça)<input name="mo" type="number" step="0.01" min="0" value="${f.mo??''}"></label>
-  <label>Custo fixo (R$ por peça)<input name="fixo" type="number" step="0.01" min="0" value="${f.fixo??''}"></label></div>`,
-  async(v,form)=>{const itens=[...form.querySelectorAll('.fr')].map(r=>({matId:r.querySelector('select').value,qtd:+r.querySelector('input').value||0})).filter(i=>i.matId&&i.qtd>0);
-    const d={tipo:'ficha',itens,mo:+v.mo||0,fixo:+v.fixo||0};d0?await db.doc('config/'+d0.id).set(d):await db.collection('config').add(d)});
+if(!S.materiais.some(m=>m.tipo!=='tecido')){aviso('Cadastre os aviamentos antes de montar a ficha padrão.');return}
+const f=fichaPad(),d0=fichaDoc();
+modal('Ficha técnica padrão',`<label>Aviamentos e quantidade por peça</label><div id="fitens">${(f.itens||[]).map(fichaLinha).join('')}</div>
+ <button type="button" class="ghost" onclick="$('#fitens').insertAdjacentHTML('beforeend',fichaLinha({}))">+ Item</button>
+ <div class="g2" style="margin-top:10px"><label>Mão de obra (R$ por peça)<input name="mo" type="number" step="0.01" min="0" value="${f.mo??''}"></label>
+ <label>Custo fixo (R$ por peça)<input name="fixo" type="number" step="0.01" min="0" value="${f.fixo??''}"></label></div>`,
+async(v,form)=>{const itens=[...form.querySelectorAll('.fr')].map(r=>({matId:r.querySelector('select').value,qtd:+r.querySelector('input').value||0})).filter(i=>i.matId&&i.qtd>0);
+const d={tipo:'ficha',itens,mo:+v.mo||0,fixo:+v.fixo||0};d0?await db.doc('config/'+d0.id).set(d):await db.collection('config').add(d)});
 }
 function verFicha(id){
-  const p=prod(id);if(!p)return;
-  if(!p.tecidoId){aviso('Escolha o tecido e o consumo na ficha técnica do produto (botão Editar).');return}
-  const a=custoFicha(p,false),b=custoFicha(p,true);
-  const mg=(c,v)=>v>0?brl(v-c)+' ('+Math.round((v-c)/v*100)+'%)':'—';
-  const rows=a.linhas.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.cor)}</td><td class="n">${nf(x.q)}</td><td>${x.un}</td><td class="n">${brl4(x.cu)}</td><td class="n">${brl4(x.ct)}</td></tr>`).join('');
-  const d=$('#dlg');
-  d.innerHTML=`<form method="dialog"><h3>Ficha técnica · Ref. ${esc(p.ref)} · ${esc(p.nome)}</h3><div class="tw"><table><tr><th>Item</th><th>Cor</th><th class="n">Qtde</th><th>Un</th><th class="n">Custo un.</th><th class="n">Custo total</th></tr>${rows}</table></div>
-  <div class="tw"><table><tr><th></th><th class="n">P–GG</th><th class="n">G1–G4</th></tr>
-  <tr><td>Custo matéria-prima</td><td class="n">${brl(a.mp)}</td><td class="n">${brl(b.mp)}</td></tr>
-  <tr><td>Custo mão de obra</td><td class="n">${brl(a.mo)}</td><td class="n">${brl(b.mo)}</td></tr>
-  <tr><td>Custo fixo</td><td class="n">${brl(a.fixo)}</td><td class="n">${brl(b.fixo)}</td></tr>
-  <tr><td>Custo extra</td><td class="n">${brl(a.extra)}</td><td class="n">${brl(b.extra)}</td></tr>
-  <tr><th>Preço de custo</th><th class="n">${brl(a.total)}</th><th class="n">${brl(b.total)}</th></tr>
-  <tr><td>Preço de venda</td><td class="n">${brl(p.preco)}</td><td class="n">${brl(precoG(p))}</td></tr>
-  <tr><td>Margem</td><td class="n">${mg(a.total,+p.preco)}</td><td class="n">${mg(b.total,precoG(p))}</td></tr></table></div>
-  <small>Consumo de tecido: ${nf(p.cons)} m (P–GG) · ${nf(p.consG!==''&&p.consG!=null?p.consG:p.cons)} m (G1–G4)</small>
-  <div class="row end"><button type="button" class="ghost" onclick="dlg.close();fProd('${p.id}')">Editar</button><button class="pri">Fechar</button></div></form>`;
-  d.showModal();
+const p=prod(id);if(!p)return;
+if(!p.tecidoId){aviso('Escolha o tecido e o consumo na ficha técnica do produto (botão Editar).');return}
+const a=custoFicha(p,false),b=custoFicha(p,true);
+const mg=(c,v)=>v>0?brl(v-c)+' ('+Math.round((v-c)/v*100)+'%)':'—';
+const rows=a.linhas.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.cor)}</td><td class="n">${nf(x.q)}</td><td>${x.un}</td><td class="n">${brl4(x.cu)}</td><td class="n">${brl4(x.ct)}</td></tr>`).join('');
+const d=$('#dlg');
+d.innerHTML=`<form method="dialog"><h3>Ficha técnica · Ref. ${esc(p.ref)} · ${esc(p.nome)}</h3><div class="tw"><table><tr><th>Item</th><th>Cor</th><th class="n">Qtde</th><th>Un</th><th class="n">Custo un.</th><th class="n">Custo total</th></tr>${rows}</table></div>
+ <div class="tw"><table><tr><th></th><th class="n">P–GG</th><th class="n">G1–G4</th></tr>
+ <tr><td>Custo matéria-prima</td><td class="n">${brl(a.mp)}</td><td class="n">${brl(b.mp)}</td></tr>
+ <tr><td>Custo mão de obra</td><td class="n">${brl(a.mo)}</td><td class="n">${brl(b.mo)}</td></tr>
+ <tr><td>Custo fixo</td><td class="n">${brl(a.fixo)}</td><td class="n">${brl(b.fixo)}</td></tr>
+ <tr><td>Custo extra</td><td class="n">${brl(a.extra)}</td><td class="n">${brl(b.extra)}</td></tr>
+ <tr><th>Preço de custo</th><th class="n">${brl(a.total)}</th><th class="n">${brl(b.total)}</th></tr>
+ <tr><td>Preço de venda</td><td class="n">${brl(p.preco)}</td><td class="n">${brl(precoG(p))}</td></tr>
+ <tr><td>Margem</td><td class="n">${mg(a.total,+p.preco)}</td><td class="n">${mg(b.total,precoG(p))}</td></tr></table></div>
+ <small>Consumo de tecido: ${nf(p.cons)} m (P–GG) · ${nf(p.consG!==''&&p.consG!=null?p.consG:p.cons)} m (G1–G4)</small>
+ <div class="row end"><button type="button" class="ghost" onclick="dlg.close();fProd('${p.id}')">Editar</button><button class="pri">Fechar</button></div></form>`;
+d.showModal();
 }
 function reps(){
-  const r=S.reps.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.fone)}</td><td>${esc(x.email)}</td><td>${esc([x.cidade,x.uf].filter(Boolean).join('/'))}</td><td>${esc(x.regiao)}</td><td class="n">${x.com||0}%</td><td><button class="sm" onclick="fRep('${x.id}')">Editar</button><button class="sm del" onclick="del('reps','${x.id}')">Excluir</button></td></tr>`).join('');
-  return `<div class="bar"><h2>Representantes</h2><button class="pri" onclick="fRep()">+ Novo representante</button></div>
-  <div class="tw"><table><tr><th>Nome</th><th>Celular</th><th>E-mail</th><th>Cidade/UF</th><th>Região</th><th class="n">Comissão</th><th></th></tr>${r||'<tr><td colspan="7" class="empty">Nenhum representante cadastrado.</td></tr>'}</table></div>`;
+const r=S.reps.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.fone)}</td><td>${esc(x.email)}</td><td>${esc([x.cidade,x.uf].filter(Boolean).join('/'))}</td><td>${esc(x.regiao)}</td><td class="n">${x.com||0}%</td><td><button class="sm" onclick="fRep('${x.id}')">Editar</button><button class="sm del" onclick="del('reps','${x.id}')">Excluir</button></td></tr>`).join('');
+return `<div class="bar"><h2>Representantes</h2><button class="pri" onclick="fRep()">+ Novo representante</button></div>
+ <div class="tw"><table><tr><th>Nome</th><th>Celular</th><th>E-mail</th><th>Cidade/UF</th><th>Região</th><th class="n">Comissão</th><th></th></tr>${r||'<tr><td colspan="7" class="empty">Nenhum representante cadastrado.</td></tr>'}</table></div>`;
 }
 const REP_CAMPOS=['nome','cpf','fone','email','endereco','bairro','cidade','uf','cep','regiao'];
 function fRep(id){
-  const x=id?rep(id):{};
-  modal(id?'Editar representante':'Novo representante',`
-  <label>Nome<input name="nome" required value="${esc(x.nome)}"></label>
-  <div class="g2"><label>CPF<input name="cpf" inputmode="numeric" placeholder="000.000.000-00" value="${esc(x.cpf)}"></label>
-  <label>Celular<input name="fone" type="tel" placeholder="(00) 00000-0000" value="${esc(x.fone)}"></label></div>
-  <label>E-mail<input name="email" type="email" value="${esc(x.email)}"></label>
-  <label>Endereço (rua e número)<input name="endereco" value="${esc(x.endereco)}"></label>
-  <div class="g2"><label>Bairro<input name="bairro" value="${esc(x.bairro)}"></label>
-  <label>CEP<input name="cep" inputmode="numeric" placeholder="00.000-000" value="${esc(x.cep)}"></label></div>
-  <div class="g2"><label>Cidade<input name="cidade" value="${esc(x.cidade)}"></label>
-  <label>UF<input name="uf" maxlength="2" style="text-transform:uppercase" value="${esc(x.uf)}"></label></div>
-  <div class="g2"><label>Região<input name="regiao" value="${esc(x.regiao)}"></label>
-  <label>Comissão (%)<input name="com" type="number" step="0.1" min="0" max="100" value="${x.com??5}"></label></div>`,
-  async f=>{const d={...x};delete d.id;REP_CAMPOS.forEach(k=>d[k]=(f[k]||'').trim());d.uf=d.uf.toUpperCase();d.com=+f.com||0;id?await db.doc('reps/'+id).set(d):await db.collection('reps').add(d)});
+const x=id?rep(id):{};
+modal(id?'Editar representante':'Novo representante',`
+ <label>Nome<input name="nome" required value="${esc(x.nome)}"></label>
+ <div class="g2"><label>CPF<input name="cpf" inputmode="numeric" placeholder="000.000.000-00" value="${esc(x.cpf)}"></label>
+ <label>Celular<input name="fone" type="tel" placeholder="(00) 00000-0000" value="${esc(x.fone)}"></label></div>
+ <label>E-mail<input name="email" type="email" value="${esc(x.email)}"></label>
+ <label>Endereço (rua e número)<input name="endereco" value="${esc(x.endereco)}"></label>
+ <div class="g2"><label>Bairro<input name="bairro" value="${esc(x.bairro)}"></label>
+ <label>CEP<input name="cep" inputmode="numeric" placeholder="00.000-000" value="${esc(x.cep)}"></label></div>
+ <div class="g2"><label>Cidade<input name="cidade" value="${esc(x.cidade)}"></label>
+ <label>UF<input name="uf" maxlength="2" style="text-transform:uppercase" value="${esc(x.uf)}"></label></div>
+ <div class="g2"><label>Região<input name="regiao" value="${esc(x.regiao)}"></label>
+ <label>Comissão (%)<input name="com" type="number" step="0.1" min="0" max="100" value="${x.com??5}"></label></div>`,
+async f=>{const d={...x};delete d.id;REP_CAMPOS.forEach(k=>d[k]=(f[k]||'').trim());d.uf=d.uf.toUpperCase();d.com=+f.com||0;id?await db.doc('reps/'+id).set(d):await db.collection('reps').add(d)});
 }
 
 function pedidos(){
-  const r=S.pedidos.slice().sort((a,b)=>(b.numero||0)-(a.numero||0)).map(o=>`<tr><td>#${o.numero}</td><td>${esc((o.data||'').split('-').reverse().join('/'))}</td><td>${esc(o.cliente)}</td><td>${esc(rep(o.repId)?.nome||o.repNome||'—')}${rep(o.repId)?'':' <span class="tag">sem cadastro</span>'}</td><td class="n">${(o.itens||[]).reduce((a,i)=>a+i.qtd,0)}</td><td class="n">${pedDesatual(o)?'<span class="tag" title="Preço diferente do cadastro do produto">desatualizado</span> ':''}${brl(pedTotal(o))}</td>
-  <td><select onchange="setSt('${o.id}',this.value)">${ST.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></td>
-  <td><button class="sm" onclick="verPed('${o.id}')">Itens</button><button class="sm" onclick="fRepPed('${o.id}')">Representante</button><button class="sm del" onclick="delPed('${o.id}')">Excluir</button></td></tr>`).join('');
-  return `<div class="bar"><h2>Pedidos</h2><div class="r2" style="margin:0">${S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></div></div>
-  <div class="tw"><table><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Representante</th><th class="n">Peças</th><th class="n">Total</th><th>Status</th><th></th></tr>${r||'<tr><td colspan="8" class="empty">Nenhum pedido lançado.</td></tr>'}</table></div>`;
+const r=S.pedidos.slice().sort((a,b)=>(b.numero||0)-(a.numero||0)).map(o=>`<tr><td>#${o.numero}</td><td>${esc((o.data||'').split('-').reverse().join('/'))}</td><td>${esc(o.cliente)}</td><td>${esc(rep(o.repId)?.nome||o.repNome||'—')}${rep(o.repId)?'':' <span class="tag">sem cadastro</span>'}</td><td class="n">${(o.itens||[]).reduce((a,i)=>a+i.qtd,0)}</td><td class="n">${pedDesatual(o)?'<span class="tag" title="Preço diferente do cadastro do produto">desatualizado</span> ':''}${brl(pedTotal(o))}</td>
+ <td><select onchange="setSt('${o.id}',this.value)">${ST.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></td>
+ <td><button class="sm" onclick="verPed('${o.id}')">Itens</button><button class="sm" onclick="fRepPed('${o.id}')">Representante</button><button class="sm del" onclick="delPed('${o.id}')">Excluir</button></td></tr>`).join('');
+return `<div class="bar"><h2>Pedidos</h2><div class="r2" style="margin:0">${S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></div></div>
+ <div class="tw"><table><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Representante</th><th class="n">Peças</th><th class="n">Total</th><th>Status</th><th></th></tr>${r||'<tr><td colspan="8" class="empty">Nenhum pedido lançado.</td></tr>'}</table></div>`;
 }
 
 function semProd(extra){return [...CORES_BASE,...(extra||[]).filter(c=>!CORES_BASE.includes(c))]}
 function bloco(pid,get,extra,lida){
-  const p=pid===undefined?S.produtos[0]:(pid?prod(pid):null);
-  const opts=(p?'':'<option value="" selected>— escolha a referência —</option>')+S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(x=>`<option value="${x.id}" ${p&&x.id===p.id?'selected':''}>${esc(x.ref)} · ${esc(x.nome)}</option>`).join('');
-  const cores=p?coresDe(p,extra||[]):semProd(extra);
-  return `<div class="blk${p?'':' need'}"><div class="r2"><select class="selp" onchange="trocaProd(this)">${opts}</select><button type="button" class="sm del" onclick="this.closest('.blk').remove();checaFalta()">✕</button></div>${lida?`<small class="mut">Referência lida no arquivo: ${esc(lida)}</small>`:''}<div class="gw">${grade(cores,get||(()=>0))}</div></div>`;
+const p=pid===undefined?S.produtos[0]:(pid?prod(pid):null);
+const opts=(p?'':'<option value="" selected>— escolha a referência —</option>')+S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(x=>`<option value="${x.id}" ${p&&x.id===p.id?'selected':''}>${esc(x.ref)} · ${esc(x.nome)}</option>`).join('');
+const cores=p?coresDe(p,extra||[]):semProd(extra);
+return `<div class="blk${p?'':' need'}"><div class="r2"><select class="selp" onchange="trocaProd(this)">${opts}</select><button type="button" class="sm del" onclick="this.closest('.blk').remove();checaFalta()">✕</button></div>${lida?`<small class="mut">Referência lida no arquivo: ${esc(lida)}</small>`:''}<div class="gw">${grade(cores,get||(()=>0))}</div></div>`;
 }
 function trocaProd(sel){
-  const b=sel.closest('.blk');
-  const val={};
-  b.querySelectorAll('input.qi').forEach(i=>{if(+i.value)(val[i.dataset.c]=val[i.dataset.c]||{})[i.dataset.t]=i.value});
-  const p=prod(sel.value),extra=Object.keys(val);
-  b.querySelector('.gw').innerHTML=grade(p?coresDe(p,extra):semProd(extra),(c,s)=>(val[c]||{})[s]);
-  b.classList.toggle('need',!p);
-  checaFalta();
+const b=sel.closest('.blk');
+const val={};
+b.querySelectorAll('input.qi').forEach(i=>{if(+i.value)(val[i.dataset.c]=val[i.dataset.c]||{})[i.dataset.t]=i.value});
+const p=prod(sel.value),extra=Object.keys(val);
+b.querySelector('.gw').innerHTML=grade(p?coresDe(p,extra):semProd(extra),(c,s)=>(val[c]||{})[s]);
+b.classList.toggle('need',!p);
+checaFalta();
 }
 function pendentes(root){let n=0;root.querySelectorAll('.blk').forEach(b=>{if(!prod(b.querySelector('.selp').value)&&[...b.querySelectorAll('input.qi')].some(i=>+i.value>0))n++});return n}
 function addItem(){$('#itens').insertAdjacentHTML('beforeend',bloco());checaFalta()}
 function lerItens(root){
-  const r=[];
-  root.querySelectorAll('.blk').forEach(b=>{
-    const p=prod(b.querySelector('.selp').value);if(!p)return;
-    b.querySelectorAll('input.qi').forEach(i=>{const q=+i.value||0;if(q>0)r.push({prodId:p.id,desc:p.ref+' '+p.nome,cor:i.dataset.c,tam:i.dataset.t,qtd:q,preco:precoDe(p,i.dataset.t)})});
-  });
-  return r;
+const r=[];
+root.querySelectorAll('.blk').forEach(b=>{
+const p=prod(b.querySelector('.selp').value);if(!p)return;
+b.querySelectorAll('input.qi').forEach(i=>{const q=+i.value||0;if(q>0)r.push({prodId:p.id,desc:p.ref+' '+p.nome,cor:i.dataset.c,tam:i.dataset.t,qtd:q,preco:precoDe(p,i.dataset.t)})});
+});
+return r;
 }
 
 function fPed(){
-  if(!S.produtos.length){aviso('Cadastre ao menos um produto antes de lançar pedidos.');tab='produtos';render();return}
-  modal('Novo pedido',`
-  <div class="imp"><div class="r"><input type="file" id="arq" onchange="importar()" accept="image/*,.pdf,application/pdf,.txt,.csv"><button type="button" class="pri" onclick="importar()">Ler arquivo</button></div><small id="impst">Anexe o pedido (PDF, foto, print, CSV ou TXT): o sistema lê sozinho e preenche cliente, representante, referências, cores, tamanhos e quantidades.</small></div>
-  <div class="g2"><label>Cliente (loja)<input name="cliente" required></label>
-  <label>Data<input name="data" type="date" required value="${new Date().toISOString().slice(0,10)}"></label></div>
-  <label>Representante (obrigatório)<input name="repNome" required list="replist" autocomplete="off" placeholder="Escolha da lista ou digite o nome"><datalist id="replist">${S.reps.map(r=>`<option value="${esc(r.nome)}">`).join('')}</datalist></label>
-  <label>Produtos (informe a quantidade de cada cor e tamanho)</label><div id="itens" oninput="checaFalta()" onchange="checaFalta()">${bloco()}</div><div id="falta"></div>
-  <button type="button" class="ghost sm" onclick="addItem()">+ Adicionar produto</button>`,
-  async(f,form)=>{
-    if(pendentes(form))throw new Error('Escolha a referência do produto nos blocos destacados em laranja.');
-    const itens=lerItens(form);
-    if(!itens.length)throw new Error('Informe a quantidade de ao menos um item.');
-    const rn=(f.repNome||'').trim();
-    if(!rn)throw new Error('Informe o representante.');
-    const rp=achaRep(rn);
-    const fl=faltas(itens);
-    const numero=Math.max(0,...S.pedidos.map(o=>o.numero||0))+1;
-    await db.collection('pedidos').add({numero,cliente:f.cliente,data:f.data,repId:rp?rp.id:'',repNome:rp?rp.nome:rn,itens,status:'Pendente'});
-    if(fl.length)setTimeout(()=>aviso('Pedido salvo. Itens enviados para a aba Fabricar: '+txtFalta(fl)+'.'),200);
-  });
+if(!S.produtos.length){aviso('Cadastre ao menos um produto antes de lançar pedidos.');tab='produtos';render();return}
+modal('Novo pedido',`
+ <div class="imp"><div class="r"><input type="file" id="arq" onchange="importar()" accept="image/*,.pdf,application/pdf,.txt,.csv"><button type="button" class="pri" onclick="importar()">Ler arquivo</button></div><small id="impst">Anexe o pedido (PDF, foto, print, CSV ou TXT): o sistema lê sozinho e preenche cliente, representante, referências, cores, tamanhos e quantidades.</small></div>
+ <div class="g2"><label>Cliente (loja)<input name="cliente" required></label>
+ <label>Data<input name="data" type="date" required value="${new Date().toISOString().slice(0,10)}"></label></div>
+ <label>Representante (obrigatório)<input name="repNome" required list="replist" autocomplete="off" placeholder="Escolha da lista ou digite o nome"><datalist id="replist">${S.reps.map(r=>`<option value="${esc(r.nome)}">`).join('')}</datalist></label>
+ <label>Produtos (informe a quantidade de cada cor e tamanho)</label><div id="itens" oninput="checaFalta()" onchange="checaFalta()">${bloco()}</div><div id="falta"></div>
+ <button type="button" class="ghost sm" onclick="addItem()">+ Adicionar produto</button>`,
+async(f,form)=>{
+if(pendentes(form))throw new Error('Escolha a referência do produto nos blocos destacados em laranja.');
+const itens=lerItens(form);
+if(!itens.length)throw new Error('Informe a quantidade de ao menos um item.');
+const rn=(f.repNome||'').trim();
+if(!rn)throw new Error('Informe o representante.');
+const rp=achaRep(rn);
+const fl=faltas(itens);
+const numero=Math.max(0,...S.pedidos.map(o=>o.numero||0))+1;
+await db.collection('pedidos').add({numero,cliente:f.cliente,data:f.data,repId:rp?rp.id:'',repNome:rp?rp.nome:rn,itens,status:'Pendente'});
+if(fl.length)setTimeout(()=>aviso('Pedido salvo. Itens enviados para a aba Fabricar: '+txtFalta(fl)+'.'),200);
+});
 }
 
 const IA={
-  limits:async()=>({images:{maxCount:4}}),
-  async json(prompt,opts){
-    await sessaoOk();
-    const images=[];for(const b of (opts.images||[]))images.push(await img64(b));
-    let data,error;
-    for(let t=0;t<2;t++){
-      ({data,error}=await sb.functions.invoke('ler-pedido',{body:{prompt,images}}));
-      if(!error&&data&&!data.error)break;
-    }
-    if(error){let m=error.message;try{const c=await error.context.json();m=c.error||m}catch(e){}throw new Error(m)}
-    if(!data||data.error)throw new Error((data&&data.error)||'Resposta vazia da IA.');
-    return data.result;
-  }
+limits:async()=>({images:{maxCount:4}}),
+async json(prompt,opts){
+await sessaoOk();
+const images=[];for(const b of (opts.images||[]))images.push(await img64(b));
+let data,error;
+for(let t=0;t<2;t++){
+({data,error}=await sb.functions.invoke('ler-pedido',{body:{prompt,images}}));
+if(!error&&data&&!data.error)break;
+}
+if(error){let m=error.message;try{const c=await error.context.json();m=c.error||m}catch(e){}throw new Error(m)}
+if(!data||data.error)throw new Error((data&&data.error)||'Resposta vazia da IA.');
+return data.result;
+}
 };
 async function img64(b){
-  const bmp=await createImageBitmap(b);const k=Math.min(1,2000/Math.max(bmp.width,bmp.height));
-  const c=document.createElement('canvas');c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);
-  c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
-  const u=c.toDataURL('image/jpeg',.85);return {mime:'image/jpeg',data:u.slice(u.indexOf(',')+1)};
+const bmp=await createImageBitmap(b);const k=Math.min(1,2000/Math.max(bmp.width,bmp.height));
+const c=document.createElement('canvas');c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);
+c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
+const u=c.toDataURL('image/jpeg',.85);return {mime:'image/jpeg',data:u.slice(u.indexOf(',')+1)};
 }
 async function importar(){
-  const st=$('#impst'),f=$('#arq').files[0];
-  if(!f){st.textContent='Escolha um arquivo primeiro.';return}
-  if(!S.produtos.length){st.textContent='Cadastre os produtos antes de importar.';return}
-  const isPdf=/pdf/i.test(f.type)||/\.pdf$/i.test(f.name);
-  const sample=IA;
-  const opts={};let texto='';
-  if(f.type.startsWith('image/')){
-    const lim=await sample.limits().catch(()=>null);
-    if(!lim||!lim.images){st.textContent='O envio de imagens não está liberado nesta visualização.';return}
-    opts.images=[f];
-  }else if(isPdf){
-    st.textContent='Abrindo o PDF…';
-    try{
-      if(!window.pdfjsLib)throw new Error('biblioteca de PDF indisponível');
-      const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;
-      const n=Math.min(pdf.numPages,10);
-      for(let i=1;i<=n;i++){const pg=await pdf.getPage(i);const tc=await pg.getTextContent();texto+=tc.items.map(x=>x.str+(x.hasEOL?'\n':' ')).join('')+'\n\n'}
-      if(texto.trim().length<80){
-        texto='';
-        const lim=await sample.limits().catch(()=>null);
-        if(!lim||!lim.images){st.textContent='Este PDF parece ser escaneado e o envio de imagens não está liberado aqui.';return}
-        const mx=Math.min(n,lim.images.maxCount||4);
-        opts.images=[];
-        for(let i=1;i<=mx;i++){
-          const pg=await pdf.getPage(i);const vp=pg.getViewport({scale:1.6});
-          const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
-          await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
-          opts.images.push(await new Promise(r=>c.toBlob(r,'image/jpeg',.85)));
-        }
-      }
-      texto=texto.slice(0,20000);
-    }catch(e){st.textContent='Não consegui abrir o PDF ('+ptErro(e.message||'erro')+'). Tente enviar um print da página.';return}
-  }else texto=(await f.text()).slice(0,20000);
-  const cat=S.produtos.map(p=>({ref:p.ref,nome:p.nome,cor:p.cor}));
-  const prompt='Você extrai pedidos de venda de uma fábrica de shorts masculinos. '+(texto?'O texto abaixo é um pedido de um cliente.':'A imagem anexada é um pedido de um cliente.')+' Referências cadastradas (JSON): '+JSON.stringify(cat)+'. Cores padrão: '+CORES_BASE.join(', ')+'. Identifique no documento cada REFERÊNCIA de produto (código numérico) com a quantidade pedida em cada COR e TAMANHO. Responda SOMENTE com JSON no formato {"cliente":string|null,"representante":string|null,"data":"AAAA-MM-DD"|null,"itens":[{"ref":"somente dígitos da referência, como aparece no documento","cor":"nome da cor, preferindo um dos nomes padrão (ex.: azul marinho = Marinho); null se o documento não informar cor","tam":"P|M|G|GG|G1|G2|G3|G4","qtd":number}]}. Os tamanhos podem vir em colunas, linhas ou abreviados (XG1 = G1, XG2 = G2 e assim por diante). Se o documento tiver uma única referência (por exemplo no cabeçalho), use-a em todos os itens. Se a referência não aparecer, use null em ref, mas continue extraindo cor, tamanho e quantidade. Gere um item para cada combinação referência + cor + tamanho com quantidade maior que zero. Não invente itens que não estejam no documento.'+(texto?'\n\nPEDIDO:\n'+texto:'');
-  st.textContent='Lendo o arquivo…';
-  const fm0=$('#dlg form');
-  try{const r=await sample.json(prompt,opts);if($('#dlg form')!==fm0||!$('#dlg').open)return;preencher(r)}
-  catch(e){if($('#dlg form')!==fm0)return;console.error(e);st.textContent='Não consegui ler o arquivo: '+ptErro(e.message||e.code||'erro')+' Se continuar, tente uma imagem mais nítida ou preencha manualmente.'}
+const st=$('#impst'),f=$('#arq').files[0];
+if(!f){st.textContent='Escolha um arquivo primeiro.';return}
+if(!S.produtos.length){st.textContent='Cadastre os produtos antes de importar.';return}
+const isPdf=/pdf/i.test(f.type)||/\.pdf$/i.test(f.name);
+const sample=IA;
+const opts={};let texto='';
+if(f.type.startsWith('image/')){
+const lim=await sample.limits().catch(()=>null);
+if(!lim||!lim.images){st.textContent='O envio de imagens não está liberado nesta visualização.';return}
+opts.images=[f];
+}else if(isPdf){
+st.textContent='Abrindo o PDF…';
+try{
+if(!window.pdfjsLib)throw new Error('biblioteca de PDF indisponível');
+const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;
+const n=Math.min(pdf.numPages,10);
+for(let i=1;i<=n;i++){const pg=await pdf.getPage(i);const tc=await pg.getTextContent();texto+=tc.items.map(x=>x.str+(x.hasEOL?'\n':' ')).join('')+'\n\n'}
+if(texto.trim().length<80){
+texto='';
+const lim=await sample.limits().catch(()=>null);
+if(!lim||!lim.images){st.textContent='Este PDF parece ser escaneado e o envio de imagens não está liberado aqui.';return}
+const mx=Math.min(n,lim.images.maxCount||4);
+opts.images=[];
+for(let i=1;i<=mx;i++){
+const pg=await pdf.getPage(i);const vp=pg.getViewport({scale:1.6});
+const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+opts.images.push(await new Promise(r=>c.toBlob(r,'image/jpeg',.85)));
+}
+}
+texto=texto.slice(0,20000);
+}catch(e){st.textContent='Não consegui abrir o PDF ('+ptErro(e.message||'erro')+'). Tente enviar um print da página.';return}
+}else texto=(await f.text()).slice(0,20000);
+const cat=S.produtos.map(p=>({ref:p.ref,nome:p.nome,cor:p.cor}));
+const prompt='Você extrai pedidos de venda de uma fábrica de shorts masculinos. '+(texto?'O texto abaixo é um pedido de um cliente.':'A imagem anexada é um pedido de um cliente.')+' Referências cadastradas (JSON): '+JSON.stringify(cat)+'. Cores padrão: '+CORES_BASE.join(', ')+'. Identifique no documento cada REFERÊNCIA de produto (código numérico) com a quantidade pedida em cada COR e TAMANHO. Responda SOMENTE com JSON no formato {"cliente":string|null,"representante":string|null,"data":"AAAA-MM-DD"|null,"itens":[{"ref":"somente dígitos da referência, como aparece no documento","cor":"nome da cor, preferindo um dos nomes padrão (ex.: azul marinho = Marinho); null se o documento não informar cor","tam":"P|M|G|GG|G1|G2|G3|G4","qtd":number}]}. Os tamanhos podem vir em colunas, linhas ou abreviados (XG1 = G1, XG2 = G2 e assim por diante). Se o documento tiver uma única referência (por exemplo no cabeçalho), use-a em todos os itens. Se a referência não aparecer, use null em ref, mas continue extraindo cor, tamanho e quantidade. Gere um item para cada combinação referência + cor + tamanho com quantidade maior que zero. Não invente itens que não estejam no documento.'+(texto?'\n\nPEDIDO:\n'+texto:'');
+st.textContent='Lendo o arquivo…';
+const fm0=$('#dlg form');
+try{const r=await sample.json(prompt,opts);if($('#dlg form')!==fm0||!$('#dlg').open)return;preencher(r)}
+catch(e){if($('#dlg form')!==fm0)return;console.error(e);st.textContent='Não consegui ler o arquivo: '+ptErro(e.message||e.code||'erro')+' Se continuar, tente uma imagem mais nítida ou preencha manualmente.'}
 }
 const ABERTOS=['Pendente','Faturado'];
 const kItem=i=>i.prodId+'|'+(i.cor||'Sem cor')+'|'+i.tam;
 function demanda(){
-  const m={};
-  S.pedidos.filter(o=>ABERTOS.includes(o.status)).forEach(o=>(o.itens||[]).forEach(i=>{const k=kItem(i);m[k]=(m[k]||0)+i.qtd}));
-  return m;
+const m={};
+S.pedidos.filter(o=>ABERTOS.includes(o.status)).forEach(o=>(o.itens||[]).forEach(i=>{const k=kItem(i);m[k]=(m[k]||0)+i.qtd}));
+return m;
 }
 function ordLinha(x,y){return String(x.ref).localeCompare(String(y.ref))||coresIdx(x.c)-coresIdx(y.c)||SZ.indexOf(x.t)-SZ.indexOf(y.t)}
 function coresIdx(c){const i=CORES_BASE.indexOf(c);return i<0?99:i}
 function fabricarPedidos(){
-  const rem={},out=[];
-  const ped=S.pedidos.filter(o=>ABERTOS.includes(o.status)).sort((a,b)=>(a.numero||0)-(b.numero||0));
-  ped.forEach(o=>{
-    const ag={};
-    (o.itens||[]).forEach(i=>{const k=kItem(i);ag[k]=(ag[k]||0)+i.qtd});
-    const linhas=[];
-    for(const k in ag){
-      const [id,c,t]=k.split('|');const p=prod(id);if(!p)continue;
-      if(!(k in rem))rem[k]=Math.max(estQ(p,c,t),0);
-      const a=Math.min(rem[k],ag[k]);rem[k]-=a;
-      if(ag[k]-a>0)linhas.push({ref:p.ref,nome:p.nome,c,t,d:ag[k],a,f:ag[k]-a,num:o.numero});
-    }
-    linhas.sort(ordLinha);
-    out.push({o,linhas});
-  });
-  return out;
+const rem={},out=[];
+const ped=S.pedidos.filter(o=>ABERTOS.includes(o.status)).sort((a,b)=>(a.numero||0)-(b.numero||0));
+ped.forEach(o=>{
+const ag={};
+(o.itens||[]).forEach(i=>{const k=kItem(i);ag[k]=(ag[k]||0)+i.qtd});
+const linhas=[];
+for(const k in ag){
+const [id,c,t]=k.split('|');const p=prod(id);if(!p)continue;
+if(!(k in rem))rem[k]=Math.max(estQ(p,c,t),0);
+const a=Math.min(rem[k],ag[k]);rem[k]-=a;
+if(ag[k]-a>0)linhas.push({ref:p.ref,nome:p.nome,c,t,d:ag[k],a,f:ag[k]-a,num:o.numero});
+}
+linhas.sort(ordLinha);
+out.push({o,linhas});
+});
+return out;
 }
 function fabricarLista(){return fabricarPedidos().flatMap(x=>x.linhas)}
 let fabVista=(()=>{try{return localStorage.getItem('fabVista')}catch(e){return null}})()||'pedido';
 function fabricar(){
-  const P=fabricarPedidos();
-  const com=P.filter(x=>x.linhas.length),sem=P.filter(x=>!x.linhas.length);
-  const todas=com.flatMap(x=>x.linhas);
-  const total=todas.reduce((a,x)=>a+x.f,0);
-  const blocos=com.map(({o,linhas})=>{
-    const sub=linhas.reduce((a,x)=>a+x.f,0);
-    const rows=linhas.map(x=>`<tr><td>${esc(x.ref)} · ${esc(x.nome)}</td><td>${esc(x.c)}</td><td>${x.t}</td><td class="n">${x.d}</td><td class="n">${x.a}</td><td class="n low">${x.f}</td></tr>`).join('');
-    return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padding:12px 14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><strong style="font-size:16px">Pedido #${o.numero} · ${esc(o.cliente)}</strong><small>${esc(rep(o.repId)?.nome||o.repNome||'—')} · ${esc((o.data||'').split('-').reverse().join('/'))} · ${esc(o.status)}</small></div><div class="low"><strong style="font-size:16px">${sub}</strong> peças a fabricar</div></div><div class="tw" style="margin:0;border:0;border-top:1px solid var(--bd);border-radius:0"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Pedido</th><th class="n">Do estoque</th><th class="n">Fabricar</th></tr>${rows}</table></div></section>`;
-  }).join('');
-  const g={};
-  todas.forEach(x=>{const k=x.ref+'|'+x.c+'|'+x.t;const e=g[k]=g[k]||{ref:x.ref,nome:x.nome,c:x.c,t:x.t,f:0,de:[]};e.f+=x.f;e.de.push('#'+x.num+' ('+x.f+')')});
-  const resumo=Object.values(g).sort(ordLinha).map(e=>`<tr><td>${esc(e.ref)} · ${esc(e.nome)}</td><td>${esc(e.c)}</td><td>${e.t}</td><td class="n low">${e.f}</td><td>${esc(e.de.join(', '))}</td></tr>`).join('');
-  const pr={};
-  todas.forEach(x=>{const e=pr[x.ref]=pr[x.ref]||{ref:x.ref,nome:x.nome,cel:{},cores:[],peds:[],f:0};const k=x.c+'|'+x.t;e.cel[k]=(e.cel[k]||0)+x.f;e.f+=x.f;if(!e.cores.includes(x.c))e.cores.push(x.c);if(!e.peds.includes(x.num))e.peds.push(x.num)});
-  const porRef=Object.values(pr).sort((x,y)=>String(x.ref).localeCompare(String(y.ref))).map(e=>{
-    const cores=e.cores.sort((x,y)=>coresIdx(x)-coresIdx(y)||x.localeCompare(y));
-    const rows=cores.map(c=>`<tr><td>${esc(c)}</td>${SZ.map(t=>`<td class="n">${e.cel[c+'|'+t]||''}</td>`).join('')}<td class="n low">${SZ.reduce((a,t)=>a+(e.cel[c+'|'+t]||0),0)}</td></tr>`).join('');
-    const tot=`<tr><th>Total</th>${SZ.map(t=>`<th class="n">${cores.reduce((a,c)=>a+(e.cel[c+'|'+t]||0),0)||''}</th>`).join('')}<th class="n">${e.f}</th></tr>`;
-    return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padding:12px 14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><strong style="font-size:16px">Ref. ${esc(e.ref)} · ${esc(e.nome)}</strong><small>Pedidos: ${e.peds.sort((x,y)=>x-y).map(n=>'#'+n).join(', ')}</small></div><strong class="low">${e.f} peças</strong></div><div class="tw" style="border:0;border-radius:0"><table><tr><th>Cor</th>${SZ.map(t=>`<th class="n">${t}</th>`).join('')}<th class="n">Total</th></tr>${rows}${tot}</table></div></section>`;
-  }).join('');
-  const VISTAS=[['pedido','Por pedido'],['referencia','Por referência'],['lista','Lista detalhada (cor e tamanho)']];
-  if(!VISTAS.some(v=>v[0]===fabVista))fabVista='pedido';
-  const vazio='<div class="c empty">Nada a fabricar: o estoque cobre todos os pedidos em aberto.</div>';
-  const corpo=fabVista==='referencia'?(porRef||vazio)
-    :fabVista==='lista'?(resumo?`<div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Total</th><th>De quais pedidos</th></tr>${resumo}</table></div>`:vazio)
-    :(blocos||vazio)+(sem.length?`<p style="color:var(--mut)">Já cobertos pelo estoque: ${sem.map(x=>'#'+x.o.numero).join(', ')}.</p>`:'');
-  return `<div class="cards"><div class="c"><small>Peças a fabricar</small><b>${total}</b></div><div class="c"><small>Pedidos com itens a fabricar</small><b>${com.length}</b></div></div>
-  <div class="bar"><h2>Fabricar</h2><label style="margin:0;display:flex;align-items:center;gap:8px">Mostrar<select id="fabvista" style="width:auto" onchange="fabVista=this.value;try{localStorage.setItem('fabVista',fabVista)}catch(e){};render()">${VISTAS.map(([k,l])=>`<option value="${k}"${k===fabVista?' selected':''}>${l}</option>`).join('')}</select></label></div>
-  ${corpo}
-  <p style="color:var(--mut)">Considera pedidos Pendente ou Faturado. O estoque (por cor e tamanho) é reservado primeiro para os pedidos mais antigos. Os pedidos não alteram o estoque: quando a produção ficar pronta, lance a entrada na aba Estoque.</p>`;
+const P=fabricarPedidos();
+const com=P.filter(x=>x.linhas.length),sem=P.filter(x=>!x.linhas.length);
+const todas=com.flatMap(x=>x.linhas);
+const total=todas.reduce((a,x)=>a+x.f,0);
+const blocos=com.map(({o,linhas})=>{
+const sub=linhas.reduce((a,x)=>a+x.f,0);
+const rows=linhas.map(x=>`<tr><td>${esc(x.ref)} · ${esc(x.nome)}</td><td>${esc(x.c)}</td><td>${x.t}</td><td class="n">${x.d}</td><td class="n">${x.a}</td><td class="n low">${x.f}</td></tr>`).join('');
+return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padding:12px 14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><strong style="font-size:16px">Pedido #${o.numero} · ${esc(o.cliente)}</strong><small>${esc(rep(o.repId)?.nome||o.repNome||'—')} · ${esc((o.data||'').split('-').reverse().join('/'))} · ${esc(o.status)}</small></div><div class="low"><strong style="font-size:16px">${sub}</strong> peças a fabricar</div></div><div class="tw" style="margin:0;border:0;border-top:1px solid var(--bd);border-radius:0"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Pedido</th><th class="n">Do estoque</th><th class="n">Fabricar</th></tr>${rows}</table></div></section>`;
+}).join('');
+const g={};
+todas.forEach(x=>{const k=x.ref+'|'+x.c+'|'+x.t;const e=g[k]=g[k]||{ref:x.ref,nome:x.nome,c:x.c,t:x.t,f:0,de:[]};e.f+=x.f;e.de.push('#'+x.num+' ('+x.f+')')});
+const resumo=Object.values(g).sort(ordLinha).map(e=>`<tr><td>${esc(e.ref)} · ${esc(e.nome)}</td><td>${esc(e.c)}</td><td>${e.t}</td><td class="n low">${e.f}</td><td>${esc(e.de.join(', '))}</td></tr>`).join('');
+const pr={};
+todas.forEach(x=>{const e=pr[x.ref]=pr[x.ref]||{ref:x.ref,nome:x.nome,cel:{},cores:[],peds:[],f:0};const k=x.c+'|'+x.t;e.cel[k]=(e.cel[k]||0)+x.f;e.f+=x.f;if(!e.cores.includes(x.c))e.cores.push(x.c);if(!e.peds.includes(x.num))e.peds.push(x.num)});
+const porRef=Object.values(pr).sort((x,y)=>String(x.ref).localeCompare(String(y.ref))).map(e=>{
+const cores=e.cores.sort((x,y)=>coresIdx(x)-coresIdx(y)||x.localeCompare(y));
+const rows=cores.map(c=>`<tr><td>${esc(c)}</td>${SZ.map(t=>`<td class="n">${e.cel[c+'|'+t]||''}</td>`).join('')}<td class="n low">${SZ.reduce((a,t)=>a+(e.cel[c+'|'+t]||0),0)}</td></tr>`).join('');
+const tot=`<tr><th>Total</th>${SZ.map(t=>`<th class="n">${cores.reduce((a,c)=>a+(e.cel[c+'|'+t]||0),0)||''}</th>`).join('')}<th class="n">${e.f}</th></tr>`;
+return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padding:12px 14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><strong style="font-size:16px">Ref. ${esc(e.ref)} · ${esc(e.nome)}</strong><small>Pedidos: ${e.peds.sort((x,y)=>x-y).map(n=>'#'+n).join(', ')}</small></div><strong class="low">${e.f} peças</strong></div><div class="tw" style="border:0;border-radius:0"><table><tr><th>Cor</th>${SZ.map(t=>`<th class="n">${t}</th>`).join('')}<th class="n">Total</th></tr>${rows}${tot}</table></div></section>`;
+}).join('');
+const VISTAS=[['pedido','Por pedido'],['referencia','Por referência'],['lista','Lista detalhada (cor e tamanho)']];
+if(!VISTAS.some(v=>v[0]===fabVista))fabVista='pedido';
+const vazio='<div class="c empty">Nada a fabricar: o estoque cobre todos os pedidos em aberto.</div>';
+const corpo=fabVista==='referencia'?(porRef||vazio)
+:fabVista==='lista'?(resumo?`<div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Total</th><th>De quais pedidos</th></tr>${resumo}</table></div>`:vazio)
+:(blocos||vazio)+(sem.length?`<p style="color:var(--mut)">Já cobertos pelo estoque: ${sem.map(x=>'#'+x.o.numero).join(', ')}.</p>`:'');
+return `<div class="cards"><div class="c"><small>Peças a fabricar</small><b>${total}</b></div><div class="c"><small>Pedidos com itens a fabricar</small><b>${com.length}</b></div></div>
+ <div class="bar"><h2>Fabricar</h2><label style="margin:0;display:flex;align-items:center;gap:8px">Mostrar<select id="fabvista" style="width:auto" onchange="fabVista=this.value;try{localStorage.setItem('fabVista',fabVista)}catch(e){};render()">${VISTAS.map(([k,l])=>`<option value="${k}"${k===fabVista?' selected':''}>${l}</option>`).join('')}</select></label></div>
+ ${corpo}
+ <p style="color:var(--mut)">Considera pedidos Pendente ou Faturado. O estoque (por cor e tamanho) é reservado primeiro para os pedidos mais antigos. Os pedidos não alteram o estoque: quando a produção ficar pronta, lance a entrada na aba Estoque.</p>`;
 }
 function faltas(itens){
-  const base=demanda(),add={};
-  itens.forEach(i=>{const k=kItem(i);add[k]=(add[k]||0)+i.qtd});
-  const r=[];
-  for(const k in add){
-    const [id,c,t]=k.split('|');const p=prod(id);if(!p)continue;
-    const est=Math.max(estQ(p,c,t),0);const b=base[k]||0;
-    const falta=Math.max(0,b+add[k]-est)-Math.max(0,b-est);
-    if(falta>0)r.push({ref:p.ref,cor:c,tam:t,falta});
-  }
-  return r;
+const base=demanda(),add={};
+itens.forEach(i=>{const k=kItem(i);add[k]=(add[k]||0)+i.qtd});
+const r=[];
+for(const k in add){
+const [id,c,t]=k.split('|');const p=prod(id);if(!p)continue;
+const est=Math.max(estQ(p,c,t),0);const b=base[k]||0;
+const falta=Math.max(0,b+add[k]-est)-Math.max(0,b-est);
+if(falta>0)r.push({ref:p.ref,cor:c,tam:t,falta});
+}
+return r;
 }
 function txtFalta(fl){return fl.map(x=>x.ref+' '+x.cor+' '+x.tam+' ('+x.falta+' a fabricar)').join('; ')}
 function checaFalta(){
-  const box=$('#falta');if(!box)return;
-  const fl=faltas(lerItens($('#dlg')));
-  box.innerHTML=fl.length?'<div class="alert">⚠ Sem estoque suficiente: '+esc(txtFalta(fl))+'. Esses itens irão para a aba Fabricar. Você pode salvar mesmo assim.</div>':'';
+const box=$('#falta');if(!box)return;
+const fl=faltas(lerItens($('#dlg')));
+box.innerHTML=fl.length?'<div class="alert">⚠ Sem estoque suficiente: '+esc(txtFalta(fl))+'. Esses itens irão para a aba Fabricar. Você pode salvar mesmo assim.</div>':'';
 }
 function achaProd(ref){const d=String(ref||'').replace(/\D/g,'');return d?S.produtos.find(p=>String(p.ref).replace(/\D/g,'')===d):null}
 const REFINP=`<div class="r2" style="margin-top:8px"><input id="refman" inputmode="numeric" placeholder="Digite a referência (ex.: 5060)" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter'){event.preventDefault();aplicaRef()}"><button type="button" class="pri" onclick="aplicaRef()">Aplicar</button></div>`;
 function aplicaRef(){
-  const i=$('#refman');if(!i||!i.value.trim())return;
-  const p=achaProd(i.value);
-  if(!p){aviso('A referência '+i.value+' não está cadastrada. Cadastre o produto antes ou digite outra referência.');return}
-  document.querySelectorAll('#itens .blk.need .selp').forEach(sel=>{sel.value=p.id;trocaProd(sel)});
-  $('#impst').innerHTML='Referência '+esc(p.ref)+' aplicada aos itens do arquivo. As cores, tamanhos e quantidades foram mantidos.';
+const i=$('#refman');if(!i||!i.value.trim())return;
+const p=achaProd(i.value);
+if(!p){aviso('A referência '+i.value+' não está cadastrada. Cadastre o produto antes ou digite outra referência.');return}
+document.querySelectorAll('#itens .blk.need .selp').forEach(sel=>{sel.value=p.id;trocaProd(sel)});
+$('#impst').innerHTML='Referência '+esc(p.ref)+' aplicada aos itens do arquivo. As cores, tamanhos e quantidades foram mantidos.';
 }
 function preencher(r){
-  const fm=$('#dlg form');
-  if(r.cliente)fm.cliente.value=r.cliente;
-  if(r.representante)fm.repNome.value=r.representante;
-  if(/^\d{4}-\d{2}-\d{2}$/.test(r.data||''))fm.data.value=r.data;
-  const por={},pend={},semTam=[];let n=0;
-  (r.itens||[]).forEach(i=>{
-    const q=+i.qtd;if(!(q>0))return;
-    const t=String(i.tam||'').toUpperCase().replace(/\s/g,'').replace(/^XG(\d)$/,'G$1');
-    if(!SZ.includes(t)){semTam.push(i);return}
-    const p=achaProd(i.ref);
-    const c=normCor(i.cor);
-    const alvo=p?(por[p.id]=por[p.id]||{cel:{},cores:[]}):(pend[String(i.ref||'').trim()]=pend[String(i.ref||'').trim()]||{cel:{},cores:[]});
-    const k=c+'|'+t;alvo.cel[k]=(alvo.cel[k]||0)+q;
-    if(!alvo.cores.includes(c))alvo.cores.push(c);
-    if(p)n++;
-  });
-  const idsOk=Object.keys(por),idsPend=Object.keys(pend);
-  if(idsOk.length||idsPend.length){
-    $('#itens').innerHTML=
-      idsOk.map(id=>{const e=por[id];return bloco(id,(c,s)=>e.cel[c+'|'+s],e.cores)}).join('')+
-      idsPend.map(ref=>{const e=pend[ref];return bloco('',(c,s)=>e.cel[c+'|'+s],e.cores,ref||'não identificada')}).join('');
-  }
-  const AL='<div class="alert" style="margin:8px 0 0">⚠ ';
-  let m=n?'Arquivo lido.':'';
-  if(idsPend.length){
-    const lidas=idsPend.filter(x=>x);
-    m+=(m?'<br>':'')+AL+(idsPend.includes('')?'Não foi possível identificar a referência de alguns itens do arquivo. ':'')+(lidas.length?'Referência(s) não cadastrada(s): '+lidas.map(esc).join(', ')+'. ':'')+'Digite a referência abaixo (vale para todos os itens) ou escolha nos blocos destacados.</div>'+REFINP;
-  }
-  if(semTam.length)m+=(m?'<br>':'')+AL+'Não foi possível identificar o tamanho de '+semTam.length+' item(ns). Adicione-os manualmente.</div>';
-  if(!n&&!idsPend.length&&!semTam.length)m=AL+'Não foi possível identificar a referência no arquivo. Selecione a referência do produto manualmente e informe as quantidades.</div>';
-  $('#impst').innerHTML=m;
-  checaFalta();
+const fm=$('#dlg form');
+if(r.cliente)fm.cliente.value=r.cliente;
+if(r.representante)fm.repNome.value=r.representante;
+if(/^\d{4}-\d{2}-\d{2}$/.test(r.data||''))fm.data.value=r.data;
+const por={},pend={},semTam=[];let n=0;
+(r.itens||[]).forEach(i=>{
+const q=+i.qtd;if(!(q>0))return;
+const t=String(i.tam||'').toUpperCase().replace(/\s/g,'').replace(/^XG(\d)$/,'G$1');
+if(!SZ.includes(t)){semTam.push(i);return}
+const p=achaProd(i.ref);
+const c=normCor(i.cor);
+const alvo=p?(por[p.id]=por[p.id]||{cel:{},cores:[]}):(pend[String(i.ref||'').trim()]=pend[String(i.ref||'').trim()]||{cel:{},cores:[]});
+const k=c+'|'+t;alvo.cel[k]=(alvo.cel[k]||0)+q;
+if(!alvo.cores.includes(c))alvo.cores.push(c);
+if(p)n++;
+});
+const idsOk=Object.keys(por),idsPend=Object.keys(pend);
+if(idsOk.length||idsPend.length){
+$('#itens').innerHTML=
+idsOk.map(id=>{const e=por[id];return bloco(id,(c,s)=>e.cel[c+'|'+s],e.cores)}).join('')+
+idsPend.map(ref=>{const e=pend[ref];return bloco('',(c,s)=>e.cel[c+'|'+s],e.cores,ref||'não identificada')}).join('');
+}
+const AL='<div class="alert" style="margin:8px 0 0">⚠ ';
+let m=n?'Arquivo lido.':'';
+if(idsPend.length){
+const lidas=idsPend.filter(x=>x);
+m+=(m?'<br>':'')+AL+(idsPend.includes('')?'Não foi possível identificar a referência de alguns itens do arquivo. ':'')+(lidas.length?'Referência(s) não cadastrada(s): '+lidas.map(esc).join(', ')+'. ':'')+'Digite a referência abaixo (vale para todos os itens) ou escolha nos blocos destacados.</div>'+REFINP;
+}
+if(semTam.length)m+=(m?'<br>':'')+AL+'Não foi possível identificar o tamanho de '+semTam.length+' item(ns). Adicione-os manualmente.</div>';
+if(!n&&!idsPend.length&&!semTam.length)m=AL+'Não foi possível identificar a referência no arquivo. Selecione a referência do produto manualmente e informe as quantidades.</div>';
+$('#impst').innerHTML=m;
+checaFalta();
 }
 
 const normNome=v=>String(v||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 function achaRep(nome){
-  const n=normNome(nome);if(!n)return;
-  const ex=S.reps.find(x=>normNome(x.nome)===n);if(ex)return ex;
-  const c=S.reps.filter(x=>{const r=normNome(x.nome);return r.startsWith(n+' ')||n.startsWith(r+' ')});
-  return c.length===1?c[0]:undefined;
+const n=normNome(nome);if(!n)return;
+const ex=S.reps.find(x=>normNome(x.nome)===n);if(ex)return ex;
+const c=S.reps.filter(x=>{const r=normNome(x.nome);return r.startsWith(n+' ')||n.startsWith(r+' ')});
+return c.length===1?c[0]:undefined;
 }
 function fRepPed(id){
-  const o=S.pedidos.find(x=>x.id===id);
-  modal('Representante do pedido #'+o.numero,`<label>Representante<input name="repNome" required list="replist" autocomplete="off" value="${esc(rep(o.repId)?.nome||o.repNome||'')}"><datalist id="replist">${S.reps.map(r=>`<option value="${esc(r.nome)}">`).join('')}</datalist></label><small style="color:var(--mut)">Escolha um representante cadastrado para o pedido entrar na comissão dele.</small>`,
-  async f=>{
-    const rn=(f.repNome||'').trim();
-    if(!rn)throw new Error('Informe o representante.');
-    const rp=achaRep(rn);
-    await db.doc('pedidos/'+id).update({repId:rp?rp.id:'',repNome:rp?rp.nome:rn});
-  });
+const o=S.pedidos.find(x=>x.id===id);
+modal('Representante do pedido #'+o.numero,`<label>Representante<input name="repNome" required list="replist" autocomplete="off" value="${esc(rep(o.repId)?.nome||o.repNome||'')}"><datalist id="replist">${S.reps.map(r=>`<option value="${esc(r.nome)}">`).join('')}</datalist></label><small style="color:var(--mut)">Escolha um representante cadastrado para o pedido entrar na comissão dele.</small>`,
+async f=>{
+const rn=(f.repNome||'').trim();
+if(!rn)throw new Error('Informe o representante.');
+const rp=achaRep(rn);
+await db.doc('pedidos/'+id).update({repId:rp?rp.id:'',repNome:rp?rp.nome:rn});
+});
 }
 
 
 async function atualizarPrecos(){
-  const L=S.pedidos.filter(pedDesatual);
-  if(!L.length){aviso('Todos os pedidos já estão com os preços atuais dos produtos.');return}
-  const dif=L.reduce((a,o)=>a+(o.itens||[]).reduce((b,i)=>b+i.qtd*precoAtual(i),0)-pedTotal(o),0);
-  if(!await confirma(`Atualizar ${L.length} pedido(s) com os preços atuais dos produtos? Diferença no total: ${dif>=0?'+':''}${brl(dif)}.`))return;
-  try{
-    for(const o of L)await db.doc('pedidos/'+o.id).update({itens:o.itens.map(i=>({...i,preco:precoAtual(i)}))});
-    aviso(L.length+' pedido(s) atualizado(s).');
-  }catch(e){aviso(e.message||'Erro ao atualizar preços')}
+const L=S.pedidos.filter(pedDesatual);
+if(!L.length){aviso('Os pedidos Pendente e Faturado já estão com os preços atuais dos produtos.');return}
+const dif=L.reduce((a,o)=>a+(o.itens||[]).reduce((b,i)=>b+i.qtd*precoAtual(i),0)-pedTotal(o),0);
+if(!await confirma(`Atualizar ${L.length} pedido(s) Pendente/Faturado com os preços atuais dos produtos? Pedidos Enviado, Entregue e Cancelado não mudam. Diferença no total: ${dif>=0?'+':''}${brl(dif)}.`))return;
+try{
+for(const o of L)await db.doc('pedidos/'+o.id).update({itens:o.itens.map(i=>({...i,preco:precoAtual(i)}))});
+aviso(L.length+' pedido(s) atualizado(s).');
+}catch(e){aviso(e.message||'Erro ao atualizar preços')}
 }
 async function setSt(id,s){
-  const o=S.pedidos.find(x=>x.id===id);if(!o||o.status===s)return;
-  try{
-    await db.doc('pedidos/'+id).update({status:s});
-  }catch(e){aviso(e.message);render()}
+const o=S.pedidos.find(x=>x.id===id);if(!o||o.status===s)return;
+try{
+await db.doc('pedidos/'+id).update({status:s});
+}catch(e){aviso(e.message);render()}
 }
 async function delPed(id){
-  const o=S.pedidos.find(x=>x.id===id);
-  if(!await confirma('Excluir o pedido #'+o.numero+'?'))return;
-  await db.doc('pedidos/'+id).delete();
+const o=S.pedidos.find(x=>x.id===id);
+if(!await confirma('Excluir o pedido #'+o.numero+'?'))return;
+await db.doc('pedidos/'+id).delete();
 }
 function verPed(id){
-  const o=S.pedidos.find(x=>x.id===id);
-  const d=$('#dlg');
-  d.innerHTML=`<h3>Pedido #${o.numero} · ${esc(o.cliente)}</h3><div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Qtd</th><th class="n">Unit.</th><th class="n">Subtotal</th></tr>${o.itens.map(i=>`<tr><td>${esc(i.desc)}</td><td>${esc(i.cor||'—')}</td><td>${i.tam}</td><td class="n">${i.qtd}</td><td class="n">${brl(i.preco)}</td><td class="n">${brl(i.qtd*i.preco)}</td></tr>`).join('')}</table></div><p><b>Total: ${brl(pedTotal(o))}</b></p><div class="row end"><button class="pri" onclick="dlg.close()">Fechar</button></div>`;
-  d.showModal();
+const o=S.pedidos.find(x=>x.id===id);
+const d=$('#dlg');
+d.innerHTML=`<h3>Pedido #${o.numero} · ${esc(o.cliente)}</h3><div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Qtd</th><th class="n">Unit.</th><th class="n">Subtotal</th></tr>${o.itens.map(i=>`<tr><td>${esc(i.desc)}</td><td>${esc(i.cor||'—')}</td><td>${i.tam}</td><td class="n">${i.qtd}</td><td class="n">${brl(i.preco)}</td><td class="n">${brl(i.qtd*i.preco)}</td></tr>`).join('')}</table></div><p><b>Total: ${brl(pedTotal(o))}</b></p><div class="row end"><button class="pri" onclick="dlg.close()">Fechar</button></div>`;
+d.showModal();
 }
 
 function estoque(){
-  const rows=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>{
-    const cores=coresDe(p);
-    const lin=cores.map((c,k)=>`<tr><td>${k?'':esc(p.ref)+' · '+esc(p.nome)}</td><td>${esc(c)}</td>${SZ.map(s=>{const v=estQ(p,c,s);return `<td class="n ${v<=0?'mut':''}">${v}</td>`}).join('')}<td class="n">${SZ.reduce((a,s)=>a+estQ(p,c,s),0)}</td><td>${k?'':`<button class="sm" onclick="fEntrada('${p.id}')">Entrada / ajuste</button>`}</td></tr>`).join('');
-    const sub=`<tr><td></td><td><b>Total</b></td>${SZ.map(s=>`<td class="n"><b>${cores.reduce((a,c)=>a+estQ(p,c,s),0)}</b></td>`).join('')}<td class="n ${tot(p)<=(+p.min||0)?'low':''}"><b>${tot(p)}</b></td><td></td></tr>`;
-    return lin+sub;
-  }).join('');
-  return `<div class="bar"><h2>Estoque por cor e tamanho</h2></div>
-  <div class="tw"><table class="keep"><tr><th>Produto</th><th>Cor</th>${SZ.map(s=>`<th class="n">${s}</th>`).join('')}<th class="n">Total</th><th></th></tr>${rows||'<tr><td colspan="12" class="empty">Cadastre produtos para controlar o estoque.</td></tr>'}</table></div>
-  <p style="color:var(--mut)">Os pedidos não alteram o estoque. Use “Entrada / ajuste” para lançar produção pronta (valores positivos) ou saídas e perdas (negativos). Para mudar as quantidades de uma vez, use Editar na aba Produtos. O que falta aparece na aba Fabricar.</p>`;
+const rows=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>{
+const cores=coresDe(p);
+const lin=cores.map((c,k)=>`<tr><td>${k?'':esc(p.ref)+' · '+esc(p.nome)}</td><td>${esc(c)}</td>${SZ.map(s=>{const v=estQ(p,c,s);return `<td class="n ${v<=0?'mut':''}">${v}</td>`}).join('')}<td class="n">${SZ.reduce((a,s)=>a+estQ(p,c,s),0)}</td><td>${k?'':`<button class="sm" onclick="fEntrada('${p.id}')">Entrada / ajuste</button>`}</td></tr>`).join('');
+const sub=`<tr><td></td><td><b>Total</b></td>${SZ.map(s=>`<td class="n"><b>${cores.reduce((a,c)=>a+estQ(p,c,s),0)}</b></td>`).join('')}<td class="n ${tot(p)<=(+p.min||0)?'low':''}"><b>${tot(p)}</b></td><td></td></tr>`;
+return lin+sub;
+}).join('');
+return `<div class="bar"><h2>Estoque por cor e tamanho</h2></div>
+ <div class="tw"><table class="keep"><tr><th>Produto</th><th>Cor</th>${SZ.map(s=>`<th class="n">${s}</th>`).join('')}<th class="n">Total</th><th></th></tr>${rows||'<tr><td colspan="12" class="empty">Cadastre produtos para controlar o estoque.</td></tr>'}</table></div>
+ <p style="color:var(--mut)">Os pedidos não alteram o estoque. Use “Entrada / ajuste” para lançar produção pronta (valores positivos) ou saídas e perdas (negativos). Para mudar as quantidades de uma vez, use Editar na aba Produtos. O que falta aparece na aba Fabricar.</p>`;
 }
 function fEntrada(id){
-  const p=prod(id);
-  modal('Entrada / ajuste · '+p.ref+' '+p.nome,`<label>Quantidade a somar por cor e tamanho (use negativo para retirar)</label><div id="gp">${grade(coresDe(p),()=>0,true)}</div>`,
-  async(f,form)=>{
-    const est=JSON.parse(JSON.stringify(ests(p)));
-    form.querySelectorAll('input.qi').forEach(i=>{
-      const d=+i.value||0;if(!d)return;
-      const c=i.dataset.c,t=i.dataset.t;est[c]=est[c]||{};
-      const v=(+est[c][t]||0)+d;
-      if(v<0)throw new Error('O estoque de '+c+' '+t+' ficaria negativo.');
-      est[c][t]=v;
-    });
-    await db.doc('produtos/'+id).update({est});
-  });
+const p=prod(id);
+modal('Entrada / ajuste · '+p.ref+' '+p.nome,`<label>Quantidade a somar por cor e tamanho (use negativo para retirar)</label><div id="gp">${grade(coresDe(p),()=>0,true)}</div>`,
+async(f,form)=>{
+const est=JSON.parse(JSON.stringify(ests(p)));
+form.querySelectorAll('input.qi').forEach(i=>{
+const d=+i.value||0;if(!d)return;
+const c=i.dataset.c,t=i.dataset.t;est[c]=est[c]||{};
+const v=(+est[c][t]||0)+d;
+if(v<0)throw new Error('O estoque de '+c+' '+t+' ficaria negativo.');
+est[c][t]=v;
+});
+await db.doc('produtos/'+id).update({est});
+});
 }
 
 function aviso(msg){
-  msg=ptErro(msg);
-  const d=document.querySelector('dialog[open]');
-  if(d){let e=d.querySelector('.err');if(!e){e=document.createElement('div');e.className='alert err';d.prepend(e)}e.textContent=msg;return}
-  const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',5000);
+msg=ptErro(msg);
+const d=document.querySelector('dialog[open]');
+if(d){let e=d.querySelector('.err');if(!e){e=document.createElement('div');e.className='alert err';d.prepend(e)}e.textContent=msg;return}
+const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',5000);
 }
 function confirma(msg){
-  return new Promise(res=>{
-    const d=$('#cdlg');
-    d.innerHTML=`<p>${esc(msg)}</p><div class="row end"><button class="ghost" id="cn">Cancelar</button><button class="pri" id="cs">Confirmar</button></div>`;
-    d.querySelector('#cs').onclick=()=>{res(true);d.close()};
-    d.querySelector('#cn').onclick=()=>d.close();
-    d.onclose=()=>res(false);
-    d.showModal();
-  });
+return new Promise(res=>{
+const d=$('#cdlg');
+d.innerHTML=`<p>${esc(msg)}</p><div class="row end"><button class="ghost" id="cn">Cancelar</button><button class="pri" id="cs">Confirmar</button></div>`;
+d.querySelector('#cs').onclick=()=>{res(true);d.close()};
+d.querySelector('#cn').onclick=()=>d.close();
+d.onclose=()=>res(false);
+d.showModal();
+});
 }
 async function del(col,id){if(await confirma('Excluir este registro?'))await db.doc(col+'/'+id).delete()}
 
 function modal(title,body,onOk){
-  const d=$('#dlg');
-  d.innerHTML=`<form method="dialog"><h3>${title}</h3>${body}<div class="row end"><button type="button" class="ghost" onclick="dlg.close()">Cancelar</button><button class="pri">Salvar</button></div></form>`;
-  d.querySelector('form').onsubmit=async e=>{
-    e.preventDefault();
-    try{await onOk(Object.fromEntries(new FormData(e.target)),e.target)}catch(err){aviso(err.message||'Erro ao salvar');return}
-    d.close();
-  };
-  d.showModal();
+const d=$('#dlg');
+d.innerHTML=`<form method="dialog"><h3>${title}</h3>${body}<div class="row end"><button type="button" class="ghost" onclick="dlg.close()">Cancelar</button><button class="pri">Salvar</button></div></form>`;
+d.querySelector('form').onsubmit=async e=>{
+e.preventDefault();
+try{await onOk(Object.fromEntries(new FormData(e.target)),e.target)}catch(err){aviso(err.message||'Erro ao salvar');return}
+d.close();
+};
+d.showModal();
 }
 </script>
 </body>
