@@ -86,7 +86,7 @@ table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
 </style>
 </head>
 <body>
-<header><h1 style="display:flex;justify-content:space-between;align-items:center">🩳 Gestão da Fábrica de Shorts<button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="sair()">Sair</button></h1>
+<header><h1 style="display:flex;justify-content:space-between;align-items:center">🩳 Gestão da Fábrica de Shorts<span><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="trocarSenha()">Trocar senha</button><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="sair()">Sair</button></span></h1>
 <nav id="nav"></nav></header>
 <main id="app"></main>
 <dialog id="dlg"></dialog><dialog id="cdlg"></dialog><div id="toast"></div>
@@ -129,6 +129,15 @@ async function entrar(e){
   location.reload();
 }
 async function sair(){await sb.auth.signOut();location.reload()}
+function trocarSenha(){
+  modal('Trocar senha',`<label>Nova senha (mínimo 6 caracteres)<input name="s1" type="password" minlength="6" required autocomplete="new-password"></label><label>Repita a nova senha<input name="s2" type="password" minlength="6" required autocomplete="new-password"></label>`,
+  async f=>{
+    if(f.s1!==f.s2)throw new Error('As senhas não conferem.');
+    const {error}=await sb.auth.updateUser({password:f.s1});
+    if(error)throw new Error(error.message);
+    setTimeout(()=>aviso('Senha alterada.'),200);
+  });
+}
 </script>
 <script>
 const S={produtos:[],reps:[],pedidos:[]};
