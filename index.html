@@ -83,6 +83,7 @@ table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
 .blk{border:1px solid var(--bd);border-radius:10px;padding:10px;margin-bottom:10px}
 .r2{display:flex;gap:8px;margin-bottom:8px;align-items:center}
 .r2 select,.r2 input{flex:1;width:auto;min-width:0}
+.pw{display:flex;gap:6px;align-items:center}.pw input{flex:1;min-width:0}.olho{padding:6px 10px!important}
 </style>
 </head>
 <body>
@@ -128,9 +129,11 @@ async function entrar(e){
   if(error){m.textContent='E-mail ou senha incorretos.';return}
   location.reload();
 }
+const olho=()=>`<button type="button" class="ghost olho" title="Mostrar/ocultar senha" onclick="verSenha(this)">👁</button>`;
+function verSenha(b){const i=b.previousElementSibling,v=i.type==='password';i.type=v?'text':'password';b.textContent=v?'🙈':'👁'}
 async function sair(){await sb.auth.signOut();location.reload()}
 function trocarSenha(){
-  modal('Trocar senha',`<label>Nova senha (mínimo 6 caracteres)<input name="s1" type="password" minlength="6" required autocomplete="new-password"></label><label>Repita a nova senha<input name="s2" type="password" minlength="6" required autocomplete="new-password"></label>`,
+  modal('Trocar senha',`<label>Nova senha (mínimo 6 caracteres)<span class="pw"><input name="s1" type="password" minlength="6" required autocomplete="new-password">${olho()}</span></label><label>Repita a nova senha<span class="pw"><input name="s2" type="password" minlength="6" required autocomplete="new-password">${olho()}</span></label>`,
   async f=>{
     if(f.s1!==f.s2)throw new Error('As senhas não conferem.');
     const {error}=await sb.auth.updateUser({password:f.s1});
@@ -190,7 +193,7 @@ const pedDesatual=o=>(o.itens||[]).some(i=>Math.abs(precoAtual(i)-(+i.preco||0))
 (async()=>{
   const {data:{session}}=await sb.auth.getSession();
   if(!session){
-    $('#app').innerHTML=`<form class="c" style="max-width:360px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2><label>E-mail<input name="email" type="email" required autocomplete="username"></label><label>Senha<input name="senha" type="password" required autocomplete="current-password"></label><div class="row end"><button class="pri">Entrar</button></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
+    $('#app').innerHTML=`<form class="c" style="max-width:360px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2><label>E-mail<input name="email" type="email" required autocomplete="username"></label><label>Senha<span class="pw"><input name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
     return;
   }
   db=sbDb();
