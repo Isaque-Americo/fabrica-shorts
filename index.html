@@ -435,8 +435,9 @@ async function importar(){
   const cat=S.produtos.map(p=>({ref:p.ref,nome:p.nome,cor:p.cor}));
   const prompt='Você extrai pedidos de venda de uma fábrica de shorts masculinos. '+(texto?'O texto abaixo é um pedido de um cliente.':'A imagem anexada é um pedido de um cliente.')+' Referências cadastradas (JSON): '+JSON.stringify(cat)+'. Cores padrão: '+CORES_BASE.join(', ')+'. Identifique no documento cada REFERÊNCIA de produto (código numérico) com a quantidade pedida em cada COR e TAMANHO. Responda SOMENTE com JSON no formato {"cliente":string|null,"representante":string|null,"data":"AAAA-MM-DD"|null,"itens":[{"ref":"somente dígitos da referência, como aparece no documento","cor":"nome da cor, preferindo um dos nomes padrão (ex.: azul marinho = Marinho); null se o documento não informar cor","tam":"P|M|G|GG|G1|G2|G3|G4","qtd":number}]}. Os tamanhos podem vir em colunas, linhas ou abreviados (XG1 = G1, XG2 = G2 e assim por diante). Se o documento tiver uma única referência (por exemplo no cabeçalho), use-a em todos os itens. Se a referência não aparecer, use null em ref, mas continue extraindo cor, tamanho e quantidade. Gere um item para cada combinação referência + cor + tamanho com quantidade maior que zero. Não invente itens que não estejam no documento.'+(texto?'\n\nPEDIDO:\n'+texto:'');
   st.textContent='Lendo o arquivo…';
-  try{preencher(await sample.json(prompt,opts))}
-  catch(e){console.error(e);st.textContent='Não consegui ler o arquivo: '+ptErro(e.message||e.code||'erro')+' Se continuar, tente uma imagem mais nítida ou preencha manualmente.'}
+  const fm0=$('#dlg form');
+  try{const r=await sample.json(prompt,opts);if($('#dlg form')!==fm0||!$('#dlg').open)return;preencher(r)}
+  catch(e){if($('#dlg form')!==fm0)return;console.error(e);st.textContent='Não consegui ler o arquivo: '+ptErro(e.message||e.code||'erro')+' Se continuar, tente uma imagem mais nítida ou preencha manualmente.'}
 }
 const ABERTOS=['Pendente','Faturado'];
 const kItem=i=>i.prodId+'|'+(i.cor||'Sem cor')+'|'+i.tam;
