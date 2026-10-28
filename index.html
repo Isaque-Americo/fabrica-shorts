@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Gestão da Fábrica de Shorts</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<style>
+:root{--bg:#f6f5f2;--card:#fff;--tx:#1d2330;--mut:#667085;--bd:#e3e1db;--ac:#1f4e8c;--acx:#fff;--ok:#1a7f4b;--warn:#b54708;--bad:#b42318;--hd:#16233a;
+color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--hd);color:#fff;padding:14px 16px 0}
+header h1{margin:0 0 10px;font-size:18px;letter-spacing:.2px}
+nav{display:flex;gap:4px;overflow-x:auto}
+nav button{background:none;border:0;color:#b8c4d9;padding:10px 14px;font:inherit;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
+nav button.on{color:#fff;border-color:#6ea8fe;font-weight:600}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.bar h2{margin:0;font-size:18px}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
+.c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px}
+.c small{color:var(--mut);display:block}.c b{font-size:22px}
+.tw{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:10px;margin-bottom:16px}
+table{border-collapse:collapse;width:100%;min-width:560px}
+th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--bd);white-space:nowrap}
+th{font-size:12px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut)}
+tr:last-child td{border-bottom:0}
+td.n,th.n{text-align:right}
+button.pri,button.ghost,button.sm{font:inherit;border-radius:8px;cursor:pointer;padding:8px 14px;border:1px solid var(--ac)}
+button.pri{background:var(--ac);color:var(--acx)}
+button.ghost,button.sm{background:none;color:var(--ac)}
+button.sm{padding:3px 9px;font-size:13px;margin-right:4px}
+button.sm.del{color:var(--bad);border-color:var(--bad)}
+input,select{font:inherit;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}
+label{display:block;font-size:13px;color:var(--mut);margin-bottom:10px}
+dialog{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx);width:min(680px,94vw);padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h3{margin:0 0 12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 10px}
+.g5{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.row.end{display:flex;justify-content:flex-end;gap:8px;margin-top:8px}
+.it{display:grid;grid-template-columns:3fr 1fr 1fr auto;gap:6px;margin-bottom:6px}
+.tag{padding:2px 8px;border-radius:99px;font-size:12px;background:var(--bd)}
+.low{color:var(--bad);font-weight:600}.ok{color:var(--ok)}
+.empty{padding:24px;text-align:center;color:var(--mut)}
+.alert{background:var(--card);border:1px solid var(--warn);color:var(--warn);padding:12px;border-radius:10px;margin-bottom:12px}
+#toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--hd);color:#fff;padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
+.imp{border:1px dashed var(--bd);border-radius:10px;padding:10px;margin-bottom:12px}.imp small{display:block;color:var(--mut);margin-top:6px}.imp .r{display:flex;gap:8px;align-items:center}
+table.keep td:first-child,table.keep th:first-child{position:sticky;left:0;background:var(--card)}
+@media (max-width:640px){
+ main{padding:12px}
+ header{padding:12px 12px 0}
+ input,select{font-size:16px}
+ button.pri,button.ghost{min-height:42px}
+ button.sm{padding:7px 12px;font-size:14px}
+ .tw table:not(.keep),table:not(.keep) tbody{display:block;min-width:0}
+ table:not(.keep) tr{display:block;padding:10px 12px;border-bottom:1px solid var(--bd)}
+ table:not(.keep) tr.hd{display:none}
+ table:not(.keep) td{display:flex;justify-content:space-between;align-items:center;gap:12px;border:0;padding:4px 0;white-space:normal;text-align:right}
+ table:not(.keep) td[data-l]::before{content:attr(data-l);color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.3px;text-align:left;flex:none}
+ table:not(.keep) td[data-l=""]{justify-content:flex-start;flex-wrap:wrap;gap:6px;padding-top:8px}
+ table:not(.keep) td[data-l=""]::before{display:none}
+ table:not(.keep) td.empty{display:block}
+ table:not(.keep) td select{width:auto;max-width:60%}
+ .cards{grid-template-columns:repeat(2,1fr)}
+ dialog{width:100vw;max-width:100vw;max-height:92dvh;margin:auto 0 0;border-radius:14px 14px 0 0;overflow:auto;padding:16px 14px calc(16px + env(safe-area-inset-bottom,0px))}
+ .it{grid-template-columns:1fr 1fr auto}
+ .it select[name=p]{grid-column:1/-1}
+ .imp .r{flex-wrap:wrap}
+ .imp .r button{width:100%}
+}
+@media (max-width:420px){.g2{grid-template-columns:1fr}.g5{gap:4px}.c b{font-size:19px}.bar h2{font-size:16px}}
+.qi{width:54px;padding:6px 4px;text-align:center}
+table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
+.mut{color:var(--mut)}
+.blk.need{border-color:var(--warn)}
+.blk{border:1px solid var(--bd);border-radius:10px;padding:10px;margin-bottom:10px}
+.r2{display:flex;gap:8px;margin-bottom:8px;align-items:center}
+.r2 select,.r2 input{flex:1;width:auto;min-width:0}
+</style>
+</head>
+<body>
+<header><h1 style="display:flex;justify-content:space-between;align-items:center">🩳 Gestão da Fábrica de Shorts<button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="sair()">Sair</button></h1>
+<nav id="nav"></nav></header>
+<main id="app"></main>
+<dialog id="dlg"></dialog><dialog id="cdlg"></dialog><div id="toast"></div>
+<script>
+const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
+const sb=supabase.createClient(SB_URL,SB_KEY);
+function sbDb(){
+  const cache={},subs={};
+  const snap=k=>({docs:(cache[k]||[]).map(r=>({id:r.id,data:()=>r.data}))});
+  async function load(k){
+    const {data,error}=await sb.from('docs').select('id,data').eq('col',k).order('created_at');
+    if(error)throw error;
+    cache[k]=data;(subs[k]||[]).forEach(f=>f(snap(k)));
+  }
+  const ok=r=>{if(r.error)throw r.error;return r};
+  return {
+    collection:k=>({
+      onSnapshot(cb,err){
+        (subs[k]=subs[k]||[]).push(cb);
+        load(k).catch(err||console.error);
+        sb.channel('docs-'+k).on('postgres_changes',{event:'*',schema:'public',table:'docs',filter:'col=eq.'+k},()=>load(k).catch(console.error)).subscribe();
+      },
+      async add(d){ok(await sb.from('docs').insert({col:k,data:d}));await load(k)}
+    }),
+    doc(p){
+      const [k,id]=p.split('/');
+      return {
+        async set(d){ok(await sb.from('docs').update({data:d}).eq('id',id));await load(k)},
+        async update(d){const cur=(cache[k]||[]).find(r=>r.id===id);ok(await sb.from('docs').update({data:{...(cur?cur.data:{}),...d}}).eq('id',id));await load(k)},
+        async delete(){ok(await sb.from('docs').delete().eq('id',id));await load(k)}
+      };
+    }
+  };
+}
+async function entrar(e){
+  e.preventDefault();
+  const f=new FormData(e.target),m=$('#loginmsg');m.textContent='Entrando…';
+  const {error}=await sb.auth.signInWithPassword({email:f.get('email'),password:f.get('senha')});
+  if(error){m.textContent='E-mail ou senha incorretos.';return}
+  location.reload();
+}
+async function sair(){await sb.auth.signOut();location.reload()}
+</script>
+<script>
+const S={produtos:[],reps:[],pedidos:[]};
+const SZ=['P','M','G','GG','G1','G2','G3','G4'];
+const ST=['Pendente','Faturado','Enviado','Entregue','Cancelado'];
+const TABS=[['painel','Painel'],['produtos','Produtos'],['pedidos','Pedidos'],['fabricar','Fabricar'],['reps','Representantes'],['estoque','Estoque']];
+let db=null,tab='painel',ready=false;
+const $=s=>document.querySelector(s);
+const brl=n=>(+n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const CORES_BASE=['Preto','Marinho','Chumbo','Petróleo','Verde militar','Gelo'];
+const tot=p=>Object.values(ests(p)).reduce((a,c)=>a+SZ.reduce((b,s)=>b+(+c[s]||0),0),0);
+function ests(p){const e=(p&&p.est)||{};return Object.values(e).some(x=>typeof x==='number')?{'Sem cor':e}:e}
+function estQ(p,c,t){return +((ests(p)[c]||{})[t])||0}
+function coresDe(p,extra=[]){
+  const e=ests(p),L=[...CORES_BASE];
+  Object.keys(e).forEach(c=>{const s=SZ.reduce((a,t)=>a+(+(e[c]||{})[t]||0),0);if(!L.includes(c)&&(c!=='Sem cor'||s>0))L.push(c)});
+  extra.forEach(c=>{if(!L.includes(c))L.push(c)});
+  return L;
+}
+function normCor(c){
+  const x=String(c||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().trim();
+  if(!x)return 'Sem cor';
+  const m=[['preto','Preto'],['marinho','Marinho'],['chumbo','Chumbo'],['petroleo','Petróleo'],['verde','Verde militar'],['gelo','Gelo']];
+  for(const [k,v] of m)if(x.includes(k))return v;
+  return String(c).trim();
+}
+function linhaCor(c,get,neg){return `<tr><td>${esc(c)}</td>${SZ.map(s=>`<td><input class="qi" type="number" ${neg?'':'min="0"'} data-c="${esc(c)}" data-t="${s}" value="${get(c,s)||''}"></td>`).join('')}</tr>`}
+function grade(cores,get,neg){return `<div class="tw" style="margin:0 0 8px"><table class="keep gr"><tr><th>Cor</th>${SZ.map(s=>`<th class="n">${s}</th>`).join('')}</tr>${cores.map(c=>linhaCor(c,get,neg)).join('')}</table></div>`}
+function addCor(){
+  const i=$('#novacor'),c=(i.value||'').trim();if(!c)return;
+  const t=document.querySelector('#gp table');
+  if(![...t.querySelectorAll('tr td:first-child')].some(td=>td.textContent.toLowerCase()===c.toLowerCase()))t.insertAdjacentHTML('beforeend',linhaCor(c,()=>0));
+  i.value='';
+}
+function lerEst(root){
+  const est={};
+  root.querySelectorAll('input.qi').forEach(i=>{(est[i.dataset.c]=est[i.dataset.c]||{})[i.dataset.t]=+i.value||0});
+  if(est['Sem cor']&&!Object.values(est['Sem cor']).some(v=>v))delete est['Sem cor'];
+  return est;
+}
+const prod=id=>S.produtos.find(p=>p.id===id);
+const rep=id=>S.reps.find(r=>r.id===id);
+const precoG=p=>+((p&&p.precoG!=null)?p.precoG:(p&&p.preco))||0;
+const precoDe=(p,t)=>SZ.indexOf(t)>=4?precoG(p):(+p.preco||0);
+const pedTotal=o=>(o.itens||[]).reduce((a,i)=>a+i.qtd*i.preco,0);
+const precoAtual=i=>{const p=prod(i.prodId);return p?precoDe(p,i.tam):i.preco};
+const pedDesatual=o=>(o.itens||[]).some(i=>Math.abs(precoAtual(i)-(+i.preco||0))>=0.005);
+
+(async()=>{
+  const {data:{session}}=await sb.auth.getSession();
+  if(!session){
+    $('#app').innerHTML=`<form class="c" style="max-width:360px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2><label>E-mail<input name="email" type="email" required autocomplete="username"></label><label>Senha<input name="senha" type="password" required autocomplete="current-password"></label><div class="row end"><button class="pri">Entrar</button></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
+    return;
+  }
+  db=sbDb();
+  if(db){
+    let n=0;
+    for(const k of ['produtos','reps','pedidos']){
+      db.collection(k).onSnapshot(s=>{S[k]=s.docs.map(d=>({id:d.id,...d.data()}));if(++n>=3)ready=true;render()},e=>{console.error(e);ready=true;render()});
+    }
+  }else ready=true;
+  render();
+})();
+
+function render(){
+  $('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';render()">${l}</button>`).join('');
+  const a=$('#app');
+  if(!db&&ready){a.innerHTML='<div class="alert">Não foi possível conectar ao banco de dados. Verifique sua internet e recarregue a página.</div>';return}
+  a.innerHTML=({painel,produtos,pedidos,fabricar,reps,estoque})[tab]();
+  rotula(a);
+}
+
+function rotula(root){
+  root.querySelectorAll('table').forEach(t=>{
+    if(t.classList.contains('keep'))return;
+    const hr=t.rows[0];if(!hr||!hr.querySelector('th'))return;
+    hr.classList.add('hd');
+    const hs=[...hr.cells].map(c=>c.textContent.trim());
+    [...t.rows].slice(1).forEach(r=>[...r.cells].forEach((c,i)=>{if(c.colSpan<2)c.setAttribute('data-l',hs[i]||'')}));
+  });
+}
+new MutationObserver(()=>rotula($('#dlg'))).observe($('#dlg'),{childList:true});
+
+function painel(){
+  const ok=S.pedidos.filter(o=>o.status!=='Cancelado');
+  const fat=ok.reduce((a,o)=>a+pedTotal(o),0);
+  const pecas=S.produtos.reduce((a,p)=>a+tot(p),0);
+  const baixos=S.produtos.filter(p=>tot(p)<=(+p.min||0));
+  const pend=S.pedidos.filter(o=>o.status==='Pendente').length;
+  const sc=ok.filter(o=>!rep(o.repId)).length;
+  const fab=fabricarLista().reduce((a,x)=>a+x.f,0);
+  const linhas=S.reps.map(r=>{const v=ok.filter(o=>o.repId===r.id).reduce((a,o)=>a+pedTotal(o),0);return `<tr><td>${esc(r.nome)}</td><td>${esc(r.regiao)}</td><td class="n">${brl(v)}</td><td class="n">${r.com||0}%</td><td class="n">${brl(v*(r.com||0)/100)}</td></tr>`}).join('');
+  return `<div class="cards">
+  <div class="c"><small>Faturamento (sem cancelados)</small><b>${brl(fat)}</b></div>
+  <div class="c"><small>Pedidos pendentes</small><b>${pend}</b></div>
+  <div class="c"><small>Peças em estoque</small><b>${pecas}</b></div>
+  <div class="c"><small>Produtos com estoque baixo</small><b class="${baixos.length?'low':''}">${baixos.length}</b></div>
+  <div class="c"><small>Peças a fabricar</small><b class="${fab?'low':''}">${fab}</b></div></div>
+  ${baixos.length?`<div class="alert">⚠ Estoque baixo: ${baixos.map(p=>esc(p.ref+' '+p.nome)+' ('+tot(p)+')').join(', ')}</div>`:''}
+  ${sc?`<div class="alert">⚠ ${sc} pedido(s) com representante sem cadastro não entram na comissão. Cadastre o representante e corrija o pedido na aba Pedidos.</div>`:''}
+  <div class="bar"><h2>Vendas e comissões por representante</h2></div>
+  <div class="tw"><table><tr><th>Representante</th><th>Região</th><th class="n">Vendas</th><th class="n">Comissão %</th><th class="n">A pagar</th></tr>${linhas||'<tr><td colspan="5" class="empty">Cadastre representantes e pedidos para ver os números.</td></tr>'}</table></div>`;
+}
+
+function produtos(){
+  const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>`<tr><td>${esc(p.ref)}</td><td>${esc(p.nome)}</td><td class="n">${brl(p.custo)}</td><td class="n">${brl(p.preco)}</td><td class="n">${brl(precoG(p))}</td><td class="n ${tot(p)<=(+p.min||0)?'low':''}">${tot(p)}</td><td><button class="sm" onclick="fProd('${p.id}')">Editar</button><button class="sm del" onclick="del('produtos','${p.id}')">Excluir</button></td></tr>`).join('');
+  return `<div class="bar"><h2>Produtos</h2><button class="pri" onclick="fProd()">+ Novo produto</button></div>
+  <div class="tw"><table><tr><th>Ref.</th><th>Descrição</th><th class="n">Custo</th><th class="n">Preço P–GG</th><th class="n">Preço G1–G4</th><th class="n">Estoque</th><th></th></tr>${r||'<tr><td colspan="8" class="empty">Nenhum produto cadastrado.</td></tr>'}</table></div>`;
+}
+
+function fProd(id){
+  const p=id?prod(id):{};
+  modal(id?'Editar produto':'Novo produto',`
+  <div class="g2"><label>Referência<input name="ref" required inputmode="numeric" pattern="[0-9]+" title="Somente números" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="${esc(p.ref)}"></label>
+  <label>Descrição<input name="nome" required placeholder="Short tactel" value="${esc(p.nome)}"></label>
+  <label>Estoque mínimo (peças)<input name="min" type="number" min="0" value="${p.min??0}"></label>
+  <label>Preço P ao GG (R$)<input name="preco" type="number" step="0.01" min="0" required value="${p.preco??''}"></label>
+  <label>Preço G1 ao G4 (R$)<input name="precoG" type="number" step="0.01" min="0" required value="${p.precoG??p.preco??''}"></label>
+  <label>Custo (R$)<input name="custo" type="number" step="0.01" min="0" value="${p.custo??''}"></label></div>
+  <label>Estoque por cor e tamanho (peças que você tem hoje)</label><div id="gp">${grade(coresDe(p),(c,s)=>estQ(p,c,s))}</div>
+  <div class="r2"><input id="novacor" placeholder="Outra cor (ex.: Bege)"><button type="button" class="ghost" onclick="addCor()">+ Cor</button></div>`,
+  async(f,form)=>{
+    const d={ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.preco||0,precoG:+f.precoG||0,est:lerEst(form)};
+    id?await db.doc('produtos/'+id).set(d):await db.collection('produtos').add(d);
+  });
+}
+
+function reps(){
+  const r=S.reps.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.fone)}</td><td>${esc(x.regiao)}</td><td class="n">${x.com||0}%</td><td><button class="sm" onclick="fRep('${x.id}')">Editar</button><button class="sm del" onclick="del('reps','${x.id}')">Excluir</button></td></tr>`).join('');
+  return `<div class="bar"><h2>Representantes</h2><button class="pri" onclick="fRep()">+ Novo representante</button></div>
+  <div class="tw"><table><tr><th>Nome</th><th>Telefone</th><th>Região</th><th class="n">Comissão</th><th></th></tr>${r||'<tr><td colspan="5" class="empty">Nenhum representante cadastrado.</td></tr>'}</table></div>`;
+}
+function fRep(id){
+  const x=id?rep(id):{};
+  modal(id?'Editar representante':'Novo representante',`
+  <label>Nome<input name="nome" required value="${esc(x.nome)}"></label>
+  <div class="g2"><label>Telefone<input name="fone" value="${esc(x.fone)}"></label>
+  <label>Região<input name="regiao" value="${esc(x.regiao)}"></label></div>
+  <label>Comissão (%)<input name="com" type="number" step="0.1" min="0" max="100" value="${x.com??5}"></label>`,
+  async f=>{const d={nome:f.nome,fone:f.fone,regiao:f.regiao,com:+f.com||0};id?await db.doc('reps/'+id).set(d):await db.collection('reps').add(d)});
+}
+
+function pedidos(){
+  const r=S.pedidos.slice().sort((a,b)=>(b.numero||0)-(a.numero||0)).map(o=>`<tr><td>#${o.numero}</td><td>${esc((o.data||'').split('-').reverse().join('/'))}</td><td>${esc(o.cliente)}</td><td>${esc(rep(o.repId)?.nome||o.repNome||'—')}${rep(o.repId)?'':' <span class="tag">sem cadastro</span>'}</td><td class="n">${(o.itens||[]).reduce((a,i)=>a+i.qtd,0)}</td><td class="n">${pedDesatual(o)?'<span class="tag" title="Preço diferente do cadastro do produto">desatualizado</span> ':''}${brl(pedTotal(o))}</td>
+  <td><select onchange="setSt('${o.id}',this.value)">${ST.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></td>
+  <td><button class="sm" onclick="verPed('${o.id}')">Itens</button><button class="sm" onclick="fRepPed('${o.id}')">Representante</button><button class="sm del" onclick="delPed('${o.id}')">Excluir</button></td></tr>`).join('');
+  return `<div class="bar"><h2>Pedidos</h2><div class="r2" style="margin:0">${S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></div></div>
+  <div class="tw"><table><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Representante</th><th class="n">Peças</th><th class="n">Total</th><th>Status</th><th></th></tr>${r||'<tr><td colspan="8" class="empty">Nenhum pedido lançado.</td></tr>'}</table></div>`;
+}
+
+function semProd(extra){return [...CORES_BASE,...(extra||[]).filter(c=>!CORES_BASE.includes(c))]}
+function bloco(pid,get,extra,lida){
+  const p=pid===undefined?S.produtos[0]:(pid?prod(pid):null);
+  const opts=(p?'':'<option value="" selected>— escolha a referência —</option>')+S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(x=>`<option value="${x.id}" ${p&&x.id===p.id?'selected':''}>${esc(x.ref)} · ${esc(x.nome)}</option>`).join('');
+  const cores=p?coresDe(p,extra||[]):semProd(extra);
+  return `<div class="blk${p?'':' need'}"><div class="r2"><select class="selp" onchange="trocaProd(this)">${opts}</select><button type="button" class="sm del" onclick="this.closest('.blk').remove();checaFalta()">✕</button></div>${lida?`<small class="mut">Referência lida no arquivo: ${esc(lida)}</small>`:''}<div class="gw">${grade(cores,get||(()=>0))}</div></div>`;
+}
+function trocaProd(sel){
+  const b=sel.closest('.blk');
+  const val={};
+  b.querySelectorAll('input.qi').forEach(i=>{if(+i.value)(val[i.dataset.c]=val[i.dataset.c]||{})[i.dataset.t]=i.value});
+  const p=prod(sel.value),extra=Object.keys(val);
+  b.querySelector('.gw').innerHTML=grade(p?coresDe(p,extra):semProd(extra),(c,s)=>(val[c]||{})[s]);
+  b.classList.toggle('need',!p);
+  checaFalta();
+}
+function pendentes(root){let n=0;root.querySelectorAll('.blk').forEach(b=>{if(!prod(b.querySelector('.selp').value)&&[...b.querySelectorAll('input.qi')].some(i=>+i.value>0))n++});return n}
+function addItem(){$('#itens').insertAdjacentHTML('beforeend',bloco());checaFalta()}
+function lerItens(root){
+  const r=[];
+  root.querySelectorAll('.blk').forEach(b=>{
+    const p=prod(b.querySelector('.selp').value);if(!p)return;
+    b.querySelectorAll('input.qi').forEach(i=>{const q=+i.value||0;if(q>0)r.push({prodId:p.id,desc:p.ref+' '+p.nome,cor:i.dataset.c,tam:i.dataset.t,qtd:q,preco:precoDe(p,i.dataset.t)})});
+  });
+  return r;
+}
+
+function fPed(){
+  if(!S.produtos.length){aviso('Cadastre ao menos um produto antes de lançar pedidos.');tab='produtos';render();return}
+  modal('Novo pedido',`
+  <div class="imp"><div class="r"><input type="file" id="arq" onchange="importar()" accept="image/*,.pdf,application/pdf,.txt,.csv"><button type="button" class="pri" onclick="importar()">Ler arquivo</button></div><small id="impst">Anexe o pedido (PDF, foto, print, CSV ou TXT): o sistema lê sozinho e preenche cliente, representante, referências, cores, tamanhos e quantidades.</small></div>
+  <div class="g2"><label>Cliente (loja)<input name="cliente" required></label>
+  <label>Data<input name="data" type="date" required value="${new Date().toISOString().slice(0,10)}"></label></div>
+  <label>Representante (obrigatório)<input name="repNome" required list="replist" autocomplete="off" placeholder="Escolha da lista ou digite o nome"><datalist id="replist">${S.reps.map(r=>`<option value="${esc(r.nome)}">`).join('')}</datalist></label>
+  <label>Produtos (informe a quantidade de cada cor e tamanho)</label><div id="itens" oninput="checaFalta()" onchange="checaFalta()">${bloco()}</div><div id="falta"></div>
+  <button type="button" class="ghost sm" onclick="addItem()">+ Adicionar produto</button>`,
+  async(f,form)=>{
+    if(pendentes(form))throw new Error('Escolha a referência do produto nos blocos destacados em laranja.');
+    const itens=lerItens(form);
+    if(!itens.length)throw new Error('Informe a quantidade de ao menos um item.');
+    const rn=(f.repNome||'').trim();
+    if(!rn)throw new Error('Informe o representante.');
+    const rp=achaRep(rn);
+    const fl=faltas(itens);
+    const numero=Math.max(0,...S.pedidos.map(o=>o.numero||0))+1;
+    await db.collection('pedidos').add({numero,cliente:f.cliente,data:f.data,repId:rp?rp.id:'',repNome:rp?rp.nome:rn,itens,status:'Pendente'});
+    if(fl.length)setTimeout(()=>aviso('Pedido salvo. Itens enviados para a aba Fabricar: '+txtFalta(fl)+'.'),200);
+  });
+}
+
+async function importar(){
+  const st=$('#impst'),f=$('#arq').files[0];
+  if(!f){st.textContent='Escolha um arquivo primeiro.';return}
+  if(!S.produtos.length){st.textContent='Cadastre os produtos antes de importar.';return}
+  const isPdf=/pdf/i.test(f.type)||/\.pdf$/i.test(f.name);
+  let sample=null;
+  if(!sample){st.textContent='A leitura automática de arquivos ainda não está ativada. Preencha o pedido manualmente.';return}
+  const opts={};let texto='';
+  if(f.type.startsWith('image/')){
+    const lim=await sample.limits().catch(()=>null);
+    if(!lim||!lim.images){st.textContent='O envio de imagens não está liberado nesta visualização.';return}
+    opts.images=[f];
+  }else if(isPdf){
+    st.textContent='Abrindo o PDF…';
+    try{
+      if(!window.pdfjsLib)throw new Error('biblioteca de PDF indisponível');
+      const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;
+      const n=Math.min(pdf.numPages,10);
+      for(let i=1;i<=n;i++){const pg=await pdf.getPage(i);const tc=await pg.getTextContent();texto+=tc.items.map(x=>x.str+(x.hasEOL?'\n':' ')).join('')+'\n\n'}
+      if(texto.trim().length<80){
+        texto='';
+        const lim=await sample.limits().catch(()=>null);
+        if(!lim||!lim.images){st.textContent='Este PDF parece ser escaneado e o envio de imagens não está liberado aqui.';return}
+        const mx=Math.min(n,lim.images.maxCount||4);
+        opts.images=[];
+        for(let i=1;i<=mx;i++){
+          const pg=await pdf.getPage(i);const vp=pg.getViewport({scale:1.6});
+          const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;
+          await pg.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;
+          opts.images.push(await new Promise(r=>c.toBlob(r,'image/jpeg',.85)));
+        }
+      }
+      texto=texto.slice(0,20000);
+    }catch(e){st.textContent='Não consegui abrir o PDF ('+(e.message||'erro')+'). Tente enviar um print da página.';return}
+  }else texto=(await f.text()).slice(0,20000);
+  const cat=S.produtos.map(p=>({ref:p.ref,nome:p.nome,cor:p.cor}));
+  const prompt='Você extrai pedidos de venda de uma fábrica de shorts masculinos. '+(texto?'O texto abaixo é um pedido de um cliente.':'A imagem anexada é um pedido de um cliente.')+' Referências cadastradas (JSON): '+JSON.stringify(cat)+'. Cores padrão: '+CORES_BASE.join(', ')+'. Identifique no documento cada REFERÊNCIA de produto (código numérico) com a quantidade pedida em cada COR e TAMANHO. Responda SOMENTE com JSON no formato {"cliente":string|null,"representante":string|null,"data":"AAAA-MM-DD"|null,"itens":[{"ref":"somente dígitos da referência, como aparece no documento","cor":"nome da cor, preferindo um dos nomes padrão (ex.: azul marinho = Marinho); null se o documento não informar cor","tam":"P|M|G|GG|G1|G2|G3|G4","qtd":number}]}. Os tamanhos podem vir em colunas, linhas ou abreviados (XG1 = G1, XG2 = G2 e assim por diante). Se o documento tiver uma única referência (por exemplo no cabeçalho), use-a em todos os itens. Se a referência não aparecer, use null em ref, mas continue extraindo cor, tamanho e quantidade. Gere um item para cada combinação referência + cor + tamanho com quantidade maior que zero. Não invente itens que não estejam no documento.'+(texto?'\n\nPEDIDO:\n'+texto:'');
+  st.textContent='Lendo o arquivo…';
+  try{preencher(await sample.json(prompt,opts))}
+  catch(e){st.textContent='Não consegui ler o arquivo ('+(e.message||e.code||'erro')+'). Tente uma imagem mais nítida.'}
+}
+const ABERTOS=['Pendente','Faturado'];
+const kItem=i=>i.prodId+'|'+(i.cor||'Sem cor')+'|'+i.tam;
+function demanda(){
+  const m={};
+  S.pedidos.filter(o=>ABERTOS.includes(o.status)).forEach(o=>(o.itens||[]).forEach(i=>{const k=kItem(i);m[k]=(m[k]||0)+i.qtd}));
+  return m;
+}
+function ordLinha(x,y){return String(x.ref).localeCompare(String(y.ref))||coresIdx(x.c)-coresIdx(y.c)||SZ.indexOf(x.t)-SZ.indexOf(y.t)}
+function coresIdx(c){const i=CORES_BASE.indexOf(c);return i<0?99:i}
+function fabricarPedidos(){
+  const rem={},out=[];
+  const ped=S.pedidos.filter(o=>ABERTOS.includes(o.status)).sort((a,b)=>(a.numero||0)-(b.numero||0));
+  ped.forEach(o=>{
+    const ag={};
+    (o.itens||[]).forEach(i=>{const k=kItem(i);ag[k]=(ag[k]||0)+i.qtd});
+    const linhas=[];
+    for(const k in ag){
+      const [id,c,t]=k.split('|');const p=prod(id);if(!p)continue;
+      if(!(k in rem))rem[k]=Math.max(estQ(p,c,t),0);
+      const a=Math.min(rem[k],ag[k]);rem[k]-=a;
+      if(ag[k]-a>0)linhas.push({ref:p.ref,nome:p.nome,c,t,d:ag[k],a,f:ag[k]-a,num:o.numero});
+    }
+    linhas.sort(ordLinha);
+    out.push({o,linhas});
+  });
+  return out;
+}
+function fabricarLista(){return fabricarPedidos().flatMap(x=>x.linhas)}
+function fabricar(){
+  const P=fabricarPedidos();
+  const com=P.filter(x=>x.linhas.length),sem=P.filter(x=>!x.linhas.length);
+  const todas=com.flatMap(x=>x.linhas);
+  const total=todas.reduce((a,x)=>a+x.f,0);
+  const blocos=com.map(({o,linhas})=>{
+    const sub=linhas.reduce((a,x)=>a+x.f,0);
+    const rows=linhas.map(x=>`<tr><td>${esc(x.ref)} · ${esc(x.nome)}</td><td>${esc(x.c)}</td><td>${x.t}</td><td class="n">${x.d}</td><td class="n">${x.a}</td><td class="n low">${x.f}</td></tr>`).join('');
+    return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padding:12px 14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><strong style="font-size:16px">Pedido #${o.numero} · ${esc(o.cliente)}</strong><small>${esc(rep(o.repId)?.nome||o.repNome||'—')} · ${esc((o.data||'').split('-').reverse().join('/'))} · ${esc(o.status)}</small></div><div class="low"><strong style="font-size:16px">${sub}</strong> peças a fabricar</div></div><div class="tw" style="margin:0;border:0;border-top:1px solid var(--bd);border-radius:0"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Pedido</th><th class="n">Do estoque</th><th class="n">Fabricar</th></tr>${rows}</table></div></section>`;
+  }).join('');
+  const g={};
+  todas.forEach(x=>{const k=x.ref+'|'+x.c+'|'+x.t;const e=g[k]=g[k]||{ref:x.ref,nome:x.nome,c:x.c,t:x.t,f:0,de:[]};e.f+=x.f;e.de.push('#'+x.num+' ('+x.f+')')});
+  const resumo=Object.values(g).sort(ordLinha).map(e=>`<tr><td>${esc(e.ref)} · ${esc(e.nome)}</td><td>${esc(e.c)}</td><td>${e.t}</td><td class="n low">${e.f}</td><td>${esc(e.de.join(', '))}</td></tr>`).join('');
+  return `<div class="cards"><div class="c"><small>Peças a fabricar</small><b>${total}</b></div><div class="c"><small>Pedidos com itens a fabricar</small><b>${com.length}</b></div></div>
+  <div class="bar"><h2>Fabricar por pedido</h2></div>
+  ${blocos||'<div class="c empty">Nada a fabricar: o estoque cobre todos os pedidos em aberto.</div>'}
+  ${sem.length?`<p style="color:var(--mut)">Já cobertos pelo estoque: ${sem.map(x=>'#'+x.o.numero).join(', ')}.</p>`:''}
+  ${resumo?`<div class="bar"><h2>Resumo para a produção</h2></div><div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Total</th><th>De quais pedidos</th></tr>${resumo}</table></div>`:''}
+  <p style="color:var(--mut)">Considera pedidos Pendente ou Faturado. O estoque (por cor e tamanho) é reservado primeiro para os pedidos mais antigos. Os pedidos não alteram o estoque: quando a produção ficar pronta, lance a entrada na aba Estoque.</p>`;
+}
+function faltas(itens){
+  const base=demanda(),add={};
+  itens.forEach(i=>{const k=kItem(i);add[k]=(add[k]||0)+i.qtd});
+  const r=[];
+  for(const k in add){
+    const [id,c,t]=k.split('|');const p=prod(id);if(!p)continue;
+    const est=Math.max(estQ(p,c,t),0);const b=base[k]||0;
+    const falta=Math.max(0,b+add[k]-est)-Math.max(0,b-est);
+    if(falta>0)r.push({ref:p.ref,cor:c,tam:t,falta});
+  }
+  return r;
+}
+function txtFalta(fl){return fl.map(x=>x.ref+' '+x.cor+' '+x.tam+' ('+x.falta+' a fabricar)').join('; ')}
+function checaFalta(){
+  const box=$('#falta');if(!box)return;
+  const fl=faltas(lerItens($('#dlg')));
+  box.innerHTML=fl.length?'<div class="alert">⚠ Sem estoque suficiente: '+esc(txtFalta(fl))+'. Esses itens irão para a aba Fabricar. Você pode salvar mesmo assim.</div>':'';
+}
+function achaProd(ref){const d=String(ref||'').replace(/\D/g,'');return d?S.produtos.find(p=>String(p.ref).replace(/\D/g,'')===d):null}
+const REFINP=`<div class="r2" style="margin-top:8px"><input id="refman" inputmode="numeric" placeholder="Digite a referência (ex.: 5060)" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter'){event.preventDefault();aplicaRef()}"><button type="button" class="pri" onclick="aplicaRef()">Aplicar</button></div>`;
+function aplicaRef(){
+  const i=$('#refman');if(!i||!i.value.trim())return;
+  const p=achaProd(i.value);
+  if(!p){aviso('A referência '+i.value+' não está cadastrada. Cadastre o produto antes ou digite outra referência.');return}
+  document.querySelectorAll('#itens .blk.need .selp').forEach(sel=>{sel.value=p.id;trocaProd(sel)});
+  $('#impst').innerHTML='Referência '+esc(p.ref)+' aplicada aos itens do arquivo. As cores, tamanhos e quantidades foram mantidos.';
+}
+function preencher(r){
+  const fm=$('#dlg form');
+  if(r.cliente)fm.cliente.value=r.cliente;
+  if(r.representante)fm.repNome.value=r.representante;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(r.data||''))fm.data.value=r.data;
+  const por={},pend={},semTam=[];let n=0;
+  (r.itens||[]).forEach(i=>{
+    const q=+i.qtd;if(!(q>0))return;
+    const t=String(i.tam||'').toUpperCase().replace(/\s/g,'').replace(/^XG(\d)$/,'G$1');
+    if(!SZ.includes(t)){semTam.push(i);return}
+    const p=achaProd(i.ref);
+    const c=normCor(i.cor);
+    const alvo=p?(por[p.id]=por[p.id]||{cel:{},cores:[]}):(pend[String(i.ref||'').trim()]=pend[String(i.ref||'').trim()]||{cel:{},cores:[]});
+    const k=c+'|'+t;alvo.cel[k]=(alvo.cel[k]||0)+q;
+    if(!alvo.cores.includes(c))alvo.cores.push(c);
+    if(p)n++;
+  });
+  const idsOk=Object.keys(por),idsPend=Object.keys(pend);
+  if(idsOk.length||idsPend.length){
+    $('#itens').innerHTML=
+      idsOk.map(id=>{const e=por[id];return bloco(id,(c,s)=>e.cel[c+'|'+s],e.cores)}).join('')+
+      idsPend.map(ref=>{const e=pend[ref];return bloco('',(c,s)=>e.cel[c+'|'+s],e.cores,ref||'não identificada')}).join('');
+  }
+  const AL='<div class="alert" style="margin:8px 0 0">⚠ ';
+  let m=n?'Arquivo lido.':'';
+  if(idsPend.length){
+    const lidas=idsPend.filter(x=>x);
+    m+=(m?'<br>':'')+AL+(idsPend.includes('')?'Não foi possível identificar a referência de alguns itens do arquivo. ':'')+(lidas.length?'Referência(s) não cadastrada(s): '+lidas.map(esc).join(', ')+'. ':'')+'Digite a referência abaixo (vale para todos os itens) ou escolha nos blocos destacados.</div>'+REFINP;
+  }
+  if(semTam.length)m+=(m?'<br>':'')+AL+'Não foi possível identificar o tamanho de '+semTam.length+' item(ns). Adicione-os manualmente.</div>';
+  if(!n&&!idsPend.length&&!semTam.length)m=AL+'Não foi possível identificar a referência no arquivo. Selecione a referência do produto manualmente e informe as quantidades.</div>';
+  $('#impst').innerHTML=m;
+  checaFalta();
+}
+
+function achaRep(nome){const n=(nome||'').trim().toLowerCase();return S.reps.find(x=>(x.nome||'').trim().toLowerCase()===n)}
+function fRepPed(id){
+  const o=S.pedidos.find(x=>x.id===id);
+  modal('Representante do pedido #'+o.numero,`<label>Representante<input name="repNome" required list="replist" autocomplete="off" value="${esc(rep(o.repId)?.nome||o.repNome||'')}"><datalist id="replist">${S.reps.map(r=>`<option value="${esc(r.nome)}">`).join('')}</datalist></label><small style="color:var(--mut)">Escolha um representante cadastrado para o pedido entrar na comissão dele.</small>`,
+  async f=>{
+    const rn=(f.repNome||'').trim();
+    if(!rn)throw new Error('Informe o representante.');
+    const rp=achaRep(rn);
+    await db.doc('pedidos/'+id).update({repId:rp?rp.id:'',repNome:rp?rp.nome:rn});
+  });
+}
+
+
+async function atualizarPrecos(){
+  const L=S.pedidos.filter(pedDesatual);
+  if(!L.length){aviso('Todos os pedidos já estão com os preços atuais dos produtos.');return}
+  const dif=L.reduce((a,o)=>a+(o.itens||[]).reduce((b,i)=>b+i.qtd*precoAtual(i),0)-pedTotal(o),0);
+  if(!await confirma(`Atualizar ${L.length} pedido(s) com os preços atuais dos produtos? Diferença no total: ${dif>=0?'+':''}${brl(dif)}.`))return;
+  try{
+    for(const o of L)await db.doc('pedidos/'+o.id).update({itens:o.itens.map(i=>({...i,preco:precoAtual(i)}))});
+    aviso(L.length+' pedido(s) atualizado(s).');
+  }catch(e){aviso(e.message||'Erro ao atualizar preços')}
+}
+async function setSt(id,s){
+  const o=S.pedidos.find(x=>x.id===id);if(!o||o.status===s)return;
+  try{
+    await db.doc('pedidos/'+id).update({status:s});
+  }catch(e){aviso(e.message);render()}
+}
+async function delPed(id){
+  const o=S.pedidos.find(x=>x.id===id);
+  if(!await confirma('Excluir o pedido #'+o.numero+'?'))return;
+  await db.doc('pedidos/'+id).delete();
+}
+function verPed(id){
+  const o=S.pedidos.find(x=>x.id===id);
+  const d=$('#dlg');
+  d.innerHTML=`<h3>Pedido #${o.numero} · ${esc(o.cliente)}</h3><div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Qtd</th><th class="n">Unit.</th><th class="n">Subtotal</th></tr>${o.itens.map(i=>`<tr><td>${esc(i.desc)}</td><td>${esc(i.cor||'—')}</td><td>${i.tam}</td><td class="n">${i.qtd}</td><td class="n">${brl(i.preco)}</td><td class="n">${brl(i.qtd*i.preco)}</td></tr>`).join('')}</table></div><p><b>Total: ${brl(pedTotal(o))}</b></p><div class="row end"><button class="pri" onclick="dlg.close()">Fechar</button></div>`;
+  d.showModal();
+}
+
+function estoque(){
+  const rows=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>{
+    const cores=coresDe(p);
+    const lin=cores.map((c,k)=>`<tr><td>${k?'':esc(p.ref)+' · '+esc(p.nome)}</td><td>${esc(c)}</td>${SZ.map(s=>{const v=estQ(p,c,s);return `<td class="n ${v<=0?'mut':''}">${v}</td>`}).join('')}<td class="n">${SZ.reduce((a,s)=>a+estQ(p,c,s),0)}</td><td>${k?'':`<button class="sm" onclick="fEntrada('${p.id}')">Entrada / ajuste</button>`}</td></tr>`).join('');
+    const sub=`<tr><td></td><td><b>Total</b></td>${SZ.map(s=>`<td class="n"><b>${cores.reduce((a,c)=>a+estQ(p,c,s),0)}</b></td>`).join('')}<td class="n ${tot(p)<=(+p.min||0)?'low':''}"><b>${tot(p)}</b></td><td></td></tr>`;
+    return lin+sub;
+  }).join('');
+  return `<div class="bar"><h2>Estoque por cor e tamanho</h2></div>
+  <div class="tw"><table class="keep"><tr><th>Produto</th><th>Cor</th>${SZ.map(s=>`<th class="n">${s}</th>`).join('')}<th class="n">Total</th><th></th></tr>${rows||'<tr><td colspan="12" class="empty">Cadastre produtos para controlar o estoque.</td></tr>'}</table></div>
+  <p style="color:var(--mut)">Os pedidos não alteram o estoque. Use “Entrada / ajuste” para lançar produção pronta (valores positivos) ou saídas e perdas (negativos). Para mudar as quantidades de uma vez, use Editar na aba Produtos. O que falta aparece na aba Fabricar.</p>`;
+}
+function fEntrada(id){
+  const p=prod(id);
+  modal('Entrada / ajuste · '+p.ref+' '+p.nome,`<label>Quantidade a somar por cor e tamanho (use negativo para retirar)</label><div id="gp">${grade(coresDe(p),()=>0,true)}</div>`,
+  async(f,form)=>{
+    const est=JSON.parse(JSON.stringify(ests(p)));
+    form.querySelectorAll('input.qi').forEach(i=>{
+      const d=+i.value||0;if(!d)return;
+      const c=i.dataset.c,t=i.dataset.t;est[c]=est[c]||{};
+      const v=(+est[c][t]||0)+d;
+      if(v<0)throw new Error('O estoque de '+c+' '+t+' ficaria negativo.');
+      est[c][t]=v;
+    });
+    await db.doc('produtos/'+id).update({est});
+  });
+}
+
+function aviso(msg){
+  const d=document.querySelector('dialog[open]');
+  if(d){let e=d.querySelector('.err');if(!e){e=document.createElement('div');e.className='alert err';d.prepend(e)}e.textContent=msg;return}
+  const t=$('#toast');t.textContent=msg;t.style.display='block';clearTimeout(t._t);t._t=setTimeout(()=>t.style.display='none',5000);
+}
+function confirma(msg){
+  return new Promise(res=>{
+    const d=$('#cdlg');
+    d.innerHTML=`<p>${esc(msg)}</p><div class="row end"><button class="ghost" id="cn">Cancelar</button><button class="pri" id="cs">Confirmar</button></div>`;
+    d.querySelector('#cs').onclick=()=>{res(true);d.close()};
+    d.querySelector('#cn').onclick=()=>d.close();
+    d.onclose=()=>res(false);
+    d.showModal();
+  });
+}
+async function del(col,id){if(await confirma('Excluir este registro?'))await db.doc(col+'/'+id).delete()}
+
+function modal(title,body,onOk){
+  const d=$('#dlg');
+  d.innerHTML=`<form method="dialog"><h3>${title}</h3>${body}<div class="row end"><button type="button" class="ghost" onclick="dlg.close()">Cancelar</button><button class="pri">Salvar</button></div></form>`;
+  d.querySelector('form').onsubmit=async e=>{
+    e.preventDefault();
+    try{await onOk(Object.fromEntries(new FormData(e.target)),e.target)}catch(err){aviso(err.message||'Erro ao salvar');return}
+    d.close();
+  };
+  d.showModal();
+}
+</script>
+</body>
+</html>
