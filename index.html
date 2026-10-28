@@ -475,6 +475,7 @@ function fabricarPedidos(){
   return out;
 }
 function fabricarLista(){return fabricarPedidos().flatMap(x=>x.linhas)}
+let fabVista=(()=>{try{return localStorage.getItem('fabVista')}catch(e){return null}})()||'pedido';
 function fabricar(){
   const P=fabricarPedidos();
   const com=P.filter(x=>x.linhas.length),sem=P.filter(x=>!x.linhas.length);
@@ -488,11 +489,23 @@ function fabricar(){
   const g={};
   todas.forEach(x=>{const k=x.ref+'|'+x.c+'|'+x.t;const e=g[k]=g[k]||{ref:x.ref,nome:x.nome,c:x.c,t:x.t,f:0,de:[]};e.f+=x.f;e.de.push('#'+x.num+' ('+x.f+')')});
   const resumo=Object.values(g).sort(ordLinha).map(e=>`<tr><td>${esc(e.ref)} · ${esc(e.nome)}</td><td>${esc(e.c)}</td><td>${e.t}</td><td class="n low">${e.f}</td><td>${esc(e.de.join(', '))}</td></tr>`).join('');
+  const pr={};
+  todas.forEach(x=>{const e=pr[x.ref]=pr[x.ref]||{ref:x.ref,nome:x.nome,cel:{},cores:[],peds:[],f:0};const k=x.c+'|'+x.t;e.cel[k]=(e.cel[k]||0)+x.f;e.f+=x.f;if(!e.cores.includes(x.c))e.cores.push(x.c);if(!e.peds.includes(x.num))e.peds.push(x.num)});
+  const porRef=Object.values(pr).sort((x,y)=>String(x.ref).localeCompare(String(y.ref))).map(e=>{
+    const cores=e.cores.sort((x,y)=>coresIdx(x)-coresIdx(y)||x.localeCompare(y));
+    const rows=cores.map(c=>`<tr><td>${esc(c)}</td>${SZ.map(t=>`<td class="n">${e.cel[c+'|'+t]||''}</td>`).join('')}<td class="n low">${SZ.reduce((a,t)=>a+(e.cel[c+'|'+t]||0),0)}</td></tr>`).join('');
+    const tot=`<tr><th>Total</th>${SZ.map(t=>`<th class="n">${cores.reduce((a,c)=>a+(e.cel[c+'|'+t]||0),0)||''}</th>`).join('')}<th class="n">${e.f}</th></tr>`;
+    return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padding:12px 14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><strong style="font-size:16px">Ref. ${esc(e.ref)} · ${esc(e.nome)}</strong><small>Pedidos: ${e.peds.sort((x,y)=>x-y).map(n=>'#'+n).join(', ')}</small></div><strong class="low">${e.f} peças</strong></div><div class="tw" style="border:0;border-radius:0"><table><tr><th>Cor</th>${SZ.map(t=>`<th class="n">${t}</th>`).join('')}<th class="n">Total</th></tr>${rows}${tot}</table></div></section>`;
+  }).join('');
+  const VISTAS=[['pedido','Por pedido'],['referencia','Por referência'],['lista','Lista detalhada (cor e tamanho)']];
+  if(!VISTAS.some(v=>v[0]===fabVista))fabVista='pedido';
+  const vazio='<div class="c empty">Nada a fabricar: o estoque cobre todos os pedidos em aberto.</div>';
+  const corpo=fabVista==='referencia'?(porRef||vazio)
+    :fabVista==='lista'?(resumo?`<div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Total</th><th>De quais pedidos</th></tr>${resumo}</table></div>`:vazio)
+    :(blocos||vazio)+(sem.length?`<p style="color:var(--mut)">Já cobertos pelo estoque: ${sem.map(x=>'#'+x.o.numero).join(', ')}.</p>`:'');
   return `<div class="cards"><div class="c"><small>Peças a fabricar</small><b>${total}</b></div><div class="c"><small>Pedidos com itens a fabricar</small><b>${com.length}</b></div></div>
-  <div class="bar"><h2>Fabricar por pedido</h2></div>
-  ${blocos||'<div class="c empty">Nada a fabricar: o estoque cobre todos os pedidos em aberto.</div>'}
-  ${sem.length?`<p style="color:var(--mut)">Já cobertos pelo estoque: ${sem.map(x=>'#'+x.o.numero).join(', ')}.</p>`:''}
-  ${resumo?`<div class="bar"><h2>Resumo para a produção</h2></div><div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Total</th><th>De quais pedidos</th></tr>${resumo}</table></div>`:''}
+  <div class="bar"><h2>Fabricar</h2><label style="margin:0;display:flex;align-items:center;gap:8px">Mostrar<select id="fabvista" style="width:auto" onchange="fabVista=this.value;try{localStorage.setItem('fabVista',fabVista)}catch(e){};render()">${VISTAS.map(([k,l])=>`<option value="${k}"${k===fabVista?' selected':''}>${l}</option>`).join('')}</select></label></div>
+  ${corpo}
   <p style="color:var(--mut)">Considera pedidos Pendente ou Faturado. O estoque (por cor e tamanho) é reservado primeiro para os pedidos mais antigos. Os pedidos não alteram o estoque: quando a produção ficar pronta, lance a entrada na aba Estoque.</p>`;
 }
 function faltas(itens){
