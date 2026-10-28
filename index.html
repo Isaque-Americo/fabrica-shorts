@@ -102,7 +102,7 @@ const ERROS=[
   [/weak password|password is too weak|known to be weak/i,'Senha muito fraca. Use letras e números.'],
   [/email not confirmed/i,'E-mail ainda não confirmado.'],
   [/quota|resource.?exhausted/i,'Limite gratuito da leitura automática atingido. Tente de novo mais tarde.'],
-  [/model is overloaded|unavailable|high demand/i,'A leitura automática está sobrecarregada. Tente de novo em alguns minutos.'],
+  [/model is overloaded|unavailable|high demand|resposta inválida da ia|non-2xx|edge function/i,'A leitura automática está sobrecarregada. Tente de novo em alguns minutos.'],
   [/api key not valid|api_key_invalid|referer|chave da ia não configurada/i,'A leitura automática não está configurada corretamente.'],
   [/rate limit|too many requests/i,'Muitas tentativas. Aguarde alguns minutos e tente de novo.'],
   [/failed to fetch|networkerror|network request|load failed/i,'Sem conexão com o servidor. Verifique sua internet e tente de novo.'],
@@ -382,7 +382,11 @@ const IA={
   async json(prompt,opts){
     await sessaoOk();
     const images=[];for(const b of (opts.images||[]))images.push(await img64(b));
-    const {data,error}=await sb.functions.invoke('ler-pedido',{body:{prompt,images}});
+    let data,error;
+    for(let t=0;t<2;t++){
+      ({data,error}=await sb.functions.invoke('ler-pedido',{body:{prompt,images}}));
+      if(!error&&data&&!data.error)break;
+    }
     if(error){let m=error.message;try{const c=await error.context.json();m=c.error||m}catch(e){}throw new Error(m)}
     if(!data||data.error)throw new Error((data&&data.error)||'Resposta vazia da IA.');
     return data.result;
@@ -432,7 +436,7 @@ async function importar(){
   const prompt='Você extrai pedidos de venda de uma fábrica de shorts masculinos. '+(texto?'O texto abaixo é um pedido de um cliente.':'A imagem anexada é um pedido de um cliente.')+' Referências cadastradas (JSON): '+JSON.stringify(cat)+'. Cores padrão: '+CORES_BASE.join(', ')+'. Identifique no documento cada REFERÊNCIA de produto (código numérico) com a quantidade pedida em cada COR e TAMANHO. Responda SOMENTE com JSON no formato {"cliente":string|null,"representante":string|null,"data":"AAAA-MM-DD"|null,"itens":[{"ref":"somente dígitos da referência, como aparece no documento","cor":"nome da cor, preferindo um dos nomes padrão (ex.: azul marinho = Marinho); null se o documento não informar cor","tam":"P|M|G|GG|G1|G2|G3|G4","qtd":number}]}. Os tamanhos podem vir em colunas, linhas ou abreviados (XG1 = G1, XG2 = G2 e assim por diante). Se o documento tiver uma única referência (por exemplo no cabeçalho), use-a em todos os itens. Se a referência não aparecer, use null em ref, mas continue extraindo cor, tamanho e quantidade. Gere um item para cada combinação referência + cor + tamanho com quantidade maior que zero. Não invente itens que não estejam no documento.'+(texto?'\n\nPEDIDO:\n'+texto:'');
   st.textContent='Lendo o arquivo…';
   try{preencher(await sample.json(prompt,opts))}
-  catch(e){st.textContent='Não consegui ler o arquivo ('+ptErro(e.message||e.code||'erro')+'). Tente uma imagem mais nítida.'}
+  catch(e){console.error(e);st.textContent='Não consegui ler o arquivo: '+ptErro(e.message||e.code||'erro')+' Se continuar, tente uma imagem mais nítida ou preencha manualmente.'}
 }
 const ABERTOS=['Pendente','Faturado'];
 const kItem=i=>i.prodId+'|'+(i.cor||'Sem cor')+'|'+i.tam;
