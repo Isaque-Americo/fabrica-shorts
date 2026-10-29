@@ -520,7 +520,7 @@ const body=isRep?`
  <label>Comissão (%)<input name="com" type="number" step="0.1" min="0" max="100" value="${d.com??5}"></label>`:`
  <p class="mut">Usuário reservado: <b>${esc(username)}</b> · Nome da loja nos pedidos: <b>${esc(base.store_name)}</b></p>
  <label>CNPJ<input name="cnpj" required maxlength="18" placeholder="00.000.000/0000-00" value="${esc(d.cnpj)}" oninput="mascaraCnpj(this);this.form.dataset.cnpjConsultado=''" onblur="buscaCnpj(this)"></label>
- <div class="row end" style="margin-top:-6px;margin-bottom:10px"><button type="button" class="ghost sm" onclick="buscaCnpj(this)">Buscar dados do CNPJ</button></div><small id="cnpj-info" class="mut">A busca aprofundada consulta BrasilAPI, OpenCNPJ, Minha Receita e Sr. Watson; com CEP, também pode consultar ViaCEP. O CNPJ é enviado a esses serviços. Os resultados completam apenas campos vazios e devem ser revisados antes de salvar.</small>
+ <div class="row end" style="margin-top:-6px;margin-bottom:10px"><button type="button" class="ghost sm" onclick="buscaCnpj(this)">Buscar dados do CNPJ</button><button type="button" class="ghost sm" onclick="abrirCnpjBiz(this)">Consultar no CNPJ.Biz</button></div><small id="cnpj-info" class="mut">A busca automática consulta BrasilAPI, OpenCNPJ, Minha Receita e Sr. Watson; com CEP, também pode consultar ViaCEP. O CNPJ é enviado a esses serviços. O CNPJ.Biz abre em outra aba para consulta complementar. Revise os resultados antes de salvar.</small>
  <label>Razão Social<input name="razaoSocial" required value="${esc(d.razaoSocial)}"></label>
  <div class="g2"><label>E-mail<input name="email" type="email" value="${esc(d.email)}"></label><label>Telefone<input name="telefone" type="tel" value="${esc(d.telefone)}"></label></div>
  <label>Telefone 2<input name="telefone2" type="tel" value="${esc(d.telefone2)}"></label>
@@ -546,6 +546,12 @@ await db.doc('cadastros/'+saved.id).set(data);
 }
 function normalizaCnpj(v){return String(v||'').replace(/[^0-9a-z]/gi,'').toUpperCase()}
 function mascaraCnpj(input){const v=normalizaCnpj(input.value).slice(0,14);input.value=v.length>12?`${v.slice(0,2)}.${v.slice(2,5)}.${v.slice(5,8)}/${v.slice(8,12)}-${v.slice(12)}`:v.length>8?`${v.slice(0,2)}.${v.slice(2,5)}.${v.slice(5)}`:v.length>2?`${v.slice(0,2)}.${v.slice(2)}`:v}
+function abrirCnpjBiz(el){
+const form=el?.form||el?.closest('form')||$('#dlg form'),cnpj=normalizaCnpj(form?.elements.cnpj?.value||'');
+const status=form?.querySelector('#cnpj-info');
+if(cnpj.length!==14){if(status)status.textContent='Digite um CNPJ válido com 14 caracteres para abrir a consulta.';return}
+window.open('https://cnpj.biz/'+encodeURIComponent(cnpj),'_blank','noopener,noreferrer');
+}
 async function buscaCnpj(el){
 const form=el?.form||el?.closest('form')||$('#dlg form');if(!form?.elements.cnpj)return;
 const status=form.querySelector('#cnpj-info'),cnpj=normalizaCnpj(form.elements.cnpj.value);
