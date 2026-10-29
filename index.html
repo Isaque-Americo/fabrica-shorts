@@ -84,10 +84,15 @@ table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
 .r2{display:flex;gap:8px;margin-bottom:8px;align-items:center}
 .r2 select,.r2 input{flex:1;width:auto;min-width:0}
 .pw{display:flex;gap:6px;align-items:center}.pw input{flex:1;min-width:0}.olho{padding:6px 10px!important}
+.roles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 14px}
+.role-option{border:1px solid var(--bd);border-radius:9px;padding:10px 8px;text-align:center;cursor:pointer;color:var(--tx);background:var(--bg)}
+.role-option:has(input:checked){border-color:var(--ac);box-shadow:0 0 0 2px color-mix(in srgb,var(--ac) 18%,transparent);font-weight:600}
+.role-option input{width:auto;margin:0 4px 0 0;accent-color:var(--ac)}
+@media (max-width:420px){.roles{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<header><h1 style="display:flex;justify-content:space-between;align-items:center">🩳 Gestão da Fábrica de Shorts<span><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="trocarSenha()">Trocar senha</button><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="sair()">Sair</button></span></h1>
+<header><h1 style="display:flex;justify-content:space-between;align-items:center">🩳 Gestão da Fábrica de Shorts<span id="auth-actions" style="display:none"><small id="perfil-atual" style="font-size:12px;color:#b8c4d9;margin-right:6px"></small><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="trocarSenha()">Trocar senha</button><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="sair()">Sair</button></span></h1>
 <nav id="nav"></nav></header>
 <main id="app"></main>
 <dialog id="dlg"></dialog><dialog id="cdlg"></dialog><div id="toast"></div>
@@ -95,6 +100,8 @@ table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
 const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
 const sb=supabase.createClient(SB_URL,SB_KEY);
 const DOM_USUARIO='@fabrica.interno';
+let appProfile=null;
+const PERFIS={admin:'Administrador',lojista:'Lojista',representante:'Representante'};
 const ERROS=[
 [/auth session missing|session.*(not found|expired)|jwt expired|invalid jwt|refresh token/i,'Sua sessão expirou. Entre novamente.'],
 [/invalid login credentials/i,'Usuário ou senha incorretos.'],
@@ -126,9 +133,10 @@ if(saindo)return;saindo=true;
 try{document.querySelectorAll('dialog[open]').forEach(d=>d.close())}catch(e){}
 mostraLogin('Sua sessão expirou. Entre novamente.');
 }
-function mostraLogin(msg){
+function mostraLogin(msg,perfil='admin'){
 $('#nav').innerHTML='';
-$('#app').innerHTML=`<form class="c" style="max-width:360px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<label>Usuário<input name="usuario" type="text" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label><label>Senha<span class="pw"><input name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
+$('#auth-actions').style.display='none';
+$('#app').innerHTML=`<form class="c" style="max-width:440px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<fieldset style="border:0;padding:0;margin:0"><legend>Entrar como</legend><div class="roles">${Object.entries(PERFIS).map(([k,v])=>`<label class="role-option"><input type="radio" name="perfil" value="${k}"${k===perfil?' checked':''}>${v}</label>`).join('')}</div></fieldset><label>Usuário<input name="usuario" type="text" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label><label>Senha<span class="pw"><input name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
 }
 sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&db)sessaoExpirada()});
 function sbDb(){
@@ -136,7 +144,10 @@ const cache={},subs={};
 const snap=k=>({docs:(cache[k]||[]).map(r=>({id:r.id,data:()=>r.data}))});
 async function load(k){
 await sessaoOk();
-const {data,error}=await sb.from('docs').select('id,data').eq('col',k).order('created_at');
+const view=k==='produtos'&&appProfile.role!=='admin'?'catalogo_produtos':k==='reps'&&appProfile.role==='lojista'?'catalogo_representantes':k==='lojas'&&(appProfile.role==='admin'||appProfile.role==='representante')?'catalogo_lojas':null;
+let q=sb.from(view||'docs').select('id,data');
+if(!view)q=q.eq('col',k).order('created_at');
+const {data,error}=await q;
 if(error)throw error;
 cache[k]=data;(subs[k]||[]).forEach(f=>f(snap(k)));
 }
@@ -146,9 +157,10 @@ collection:k=>({
 onSnapshot(cb,err){
 (subs[k]=subs[k]||[]).push(cb);
 load(k).catch(err||console.error);
-sb.channel('docs-'+k).on('postgres_changes',{event:'*',schema:'public',table:'docs',filter:'col=eq.'+k},()=>load(k).catch(console.error)).subscribe();
+const isView=(k==='produtos'&&appProfile.role!=='admin')||(k==='reps'&&appProfile.role==='lojista')||(k==='lojas'&&(appProfile.role==='admin'||appProfile.role==='representante'));
+if(!isView)sb.channel('docs-'+k).on('postgres_changes',{event:'*',schema:'public',table:'docs',filter:'col=eq.'+k},()=>load(k).catch(console.error)).subscribe();
 },
-async add(d){await sessaoOk();ok(await sb.from('docs').insert({col:k,data:d}));await load(k)}
+async add(d,ownerId=null){await sessaoOk();const row={col:k,data:d};if(k==='pedidos'){const id=ownerId||(appProfile.role==='lojista'?appProfile.user_id:null);if(id)row.owner_id=id}ok(await sb.from('docs').insert(row));await load(k)}
 }),
 doc(p){
 const [k,id]=p.split('/');
@@ -163,10 +175,18 @@ async delete(){await sessaoOk();ok(await sb.from('docs').delete().eq('id',id));a
 async function entrar(e){
 e.preventDefault();
 const f=new FormData(e.target),m=$('#loginmsg');m.textContent='Entrando…';
+const perfil=String(f.get('perfil')||'');
+if(!PERFIS[perfil]){m.textContent='Escolha o tipo de acesso.';return}
 const usu=String(f.get('usuario')||'').trim().toLowerCase();
 if(!usu||/[@\s]/.test(usu)){m.textContent='Digite só o nome de usuário (sem @ e sem espaços).';return}
 const {error}=await sb.auth.signInWithPassword({email:usu+DOM_USUARIO,password:f.get('senha')});
 if(error){m.textContent=ptErro(error);return}
+const {data:{user},error:userError}=await sb.auth.getUser();
+if(userError||!user){await sb.auth.signOut({scope:'local'});mostraLogin('Não foi possível validar sua sessão. Tente entrar novamente.',perfil);return}
+const {data:p,error:profileError}=await sb.from('user_profiles').select('user_id,role,store_name,rep_id').eq('user_id',user.id).maybeSingle();
+if(profileError||!p){await sb.auth.signOut({scope:'local'});mostraLogin('Esta conta ainda não tem um perfil de acesso configurado.',perfil);return}
+if(p.role!==perfil){await sb.auth.signOut({scope:'local'});mostraLogin('Esta conta não está cadastrada para entrar como '+PERFIS[perfil]+'.',perfil);return}
+if((p.role==='lojista'&&!p.store_name)||(p.role==='representante'&&!p.rep_id)){await sb.auth.signOut({scope:'local'});mostraLogin('O perfil desta conta está incompleto. Peça ao administrador para revisar o cadastro.',perfil);return}
 location.reload();
 }
 const olho=()=>`<button type="button" class="ghost olho" title="Mostrar/ocultar senha" onclick="verSenha(this)">👁</button>`;
@@ -191,8 +211,8 @@ if(!/[0-9]/.test(s))f.push('um número');
 if(!/[^A-Za-z0-9À-ÿ\s]/.test(s))f.push('um caractere especial (ex.: ! @ # $ %)');
 return f;
 }
-function trocarSenha(){
-modal('Trocar senha',`<label>Nova senha (mín. 8 caracteres, com letra maiúscula, número e caractere especial)<span class="pw"><input name="s1" type="password" minlength="8" required autocomplete="new-password">${olho()}</span></label><label>Repita a nova senha<span class="pw"><input name="s2" type="password" minlength="8" required autocomplete="new-password">${olho()}</span></label>`,
+function trocarSenha(obrigatoria=Boolean(appProfile?.must_change_password)){
+modal(obrigatoria?'Crie sua senha pessoal':'Trocar senha',`<p>${obrigatoria?'Por segurança, troque a senha temporária antes de continuar.':'Escolha uma senha nova para sua conta.'}</p><label>Nova senha (mín. 8 caracteres, com letra maiúscula, número e caractere especial)<span class="pw"><input name="s1" type="password" minlength="8" required autocomplete="new-password">${olho()}</span></label><label>Repita a nova senha<span class="pw"><input name="s2" type="password" minlength="8" required autocomplete="new-password">${olho()}</span></label>`,
 async f=>{
 if(f.s1!==f.s2)throw new Error('As senhas não conferem.');
 const fal=regrasSenha(f.s1);
@@ -202,15 +222,18 @@ if(vz>0)throw new Error('Esta senha já apareceu em vazamentos de dados ('+vz.to
 await sessaoOk();
 const {error}=await sb.auth.updateUser({password:f.s1});
 if(error)throw new Error(ptErro(error));
-setTimeout(()=>aviso('Senha alterada.'),200);
-});
+if(obrigatoria){const {error:rpcError}=await sb.rpc('complete_initial_password_change');if(rpcError)throw new Error('A senha foi alterada, mas não foi possível concluir a ativação. Tente salvar novamente ou peça ajuda ao administrador.');appProfile.must_change_password=false;}
+setTimeout(()=>aviso(obrigatoria?'Senha temporária trocada.':'Senha alterada.'),200);
+},{preventClose:obrigatoria});
 }
 </script>
 <script>
-const S={produtos:[],reps:[],pedidos:[],materiais:[],config:[]};
+const S={produtos:[],reps:[],pedidos:[],lojas:[],materiais:[],config:[]};
 const SZ=['P','M','G','GG','G1','G2','G3','G4'];
 const ST=['Pendente','Faturado','Enviado','Entregue','Cancelado'];
-const TABS=[['painel','Painel'],['produtos','Produtos'],['materia','Matéria-prima'],['pedidos','Pedidos'],['fabricar','Fabricar'],['reps','Representantes'],['estoque','Estoque']];
+const TABS_ADMIN=[['painel','Painel'],['produtos','Produtos'],['materia','Matéria-prima'],['pedidos','Pedidos'],['fabricar','Fabricar'],['reps','Representantes'],['estoque','Estoque']];
+const TABS_LOJISTA=[['catalogo','Catálogo'],['pedidos','Pedidos']];
+const TABS_REP=[['painel','Comissões'],['catalogo','Catálogo'],['pedidos','Pedidos']];
 let db=null,tab='painel',ready=false;
 const $=s=>document.querySelector(s);
 const brl=n=>(+n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -258,10 +281,19 @@ const pedDesatual=o=>['Pendente','Faturado'].includes(o.status)&&(o.itens||[]).s
 const {data:{session}}=await sb.auth.getSession();
 const {data:{user}}=session?await sb.auth.getUser():{data:{}};
 if(!session||!user){if(session)await sb.auth.signOut({scope:'local'});mostraLogin();return}
+const {data:profile,error:profileError}=await sb.from('user_profiles').select('user_id,role,store_name,rep_id,must_change_password').eq('user_id',user.id).maybeSingle();
+if(profileError||!profile||!PERFIS[profile.role]||(profile.role==='lojista'&&!profile.store_name)||(profile.role==='representante'&&!profile.rep_id)){
+await sb.auth.signOut({scope:'local'});mostraLogin('Esta conta ainda não tem um perfil de acesso válido. Peça ao administrador para configurá-lo.');return;
+}
+appProfile=profile;
+$('#auth-actions').style.display='inline';
+$('#perfil-atual').textContent=PERFIS[profile.role];
+if(profile.must_change_password)trocarSenha(true);
+tab=profile.role==='lojista'?'catalogo':profile.role==='representante'?'painel':'painel';
 db=sbDb();
 if(db){
 let n=0;
-const COLS=['produtos','reps','pedidos','materiais','config'];
+const COLS=profile.role==='admin'?['produtos','reps','pedidos','lojas','materiais','config']:profile.role==='lojista'?['produtos','reps','pedidos']:['produtos','reps','pedidos','lojas'];
 for(const k of COLS){
 db.collection(k).onSnapshot(s=>{S[k]=s.docs.map(d=>({id:d.id,...d.data()}));if(++n>=COLS.length)ready=true;render()},e=>{console.error(e);ready=true;render()});
 }
@@ -270,10 +302,12 @@ render();
 })();
 
 function render(){
-$('#nav').innerHTML=TABS.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';render()">${l}</button>`).join('');
+const tabs=appProfile?.role==='lojista'?TABS_LOJISTA:appProfile?.role==='representante'?TABS_REP:TABS_ADMIN;
+if(!tabs.some(([k])=>k===tab))tab=tabs[0][0];
+$('#nav').innerHTML=tabs.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';render()">${l}</button>`).join('');
 const a=$('#app');
 if(!db&&ready){a.innerHTML='<div class="alert">Não foi possível conectar ao banco de dados. Verifique sua internet e recarregue a página.</div>';return}
-a.innerHTML=({painel,produtos,materia,pedidos,fabricar,reps,estoque})[tab]();
+a.innerHTML=({painel,produtos,catalogo,materia,pedidos,fabricar,reps,estoque})[tab]();
 rotula(a);
 }
 
@@ -289,6 +323,7 @@ const hs=[...hr.cells].map(c=>c.textContent.trim());
 new MutationObserver(()=>rotula($('#dlg'))).observe($('#dlg'),{childList:true});
 
 function painel(){
+if(appProfile?.role==='representante')return painelRepresentante();
 const ok=S.pedidos.filter(o=>o.status!=='Cancelado');
 const fat=ok.reduce((a,o)=>a+pedTotal(o),0);
 const pecas=S.produtos.reduce((a,p)=>a+tot(p),0);
@@ -307,6 +342,16 @@ return `<div class="cards">
  ${sc?`<div class="alert">⚠ ${sc} pedido(s) com representante sem cadastro não entram na comissão. Cadastre o representante e corrija o pedido na aba Pedidos.</div>`:''}
  <div class="bar"><h2>Vendas e comissões por representante</h2></div>
  <div class="tw"><table><tr><th>Representante</th><th>Região</th><th class="n">Vendas</th><th class="n">Comissão %</th><th class="n">A pagar</th></tr>${linhas||'<tr><td colspan="5" class="empty">Cadastre representantes e pedidos para ver os números.</td></tr>'}</table></div>`;
+}
+function painelRepresentante(){
+const r=rep(appProfile.rep_id)||S.reps[0]||{};
+const pedidos=S.pedidos.filter(o=>o.repId===appProfile.rep_id&&o.status!=='Cancelado');
+const vendas=pedidos.reduce((a,o)=>a+pedTotal(o),0),comissao=+r.com||0;
+return `<div class="cards"><div class="c"><small>Representante</small><b>${esc(r.nome||'—')}</b></div><div class="c"><small>Vendas não canceladas</small><b>${brl(vendas)}</b></div><div class="c"><small>Comissão (${comissao}%)</small><b>${brl(vendas*comissao/100)}</b></div><div class="c"><small>Pedidos vinculados</small><b>${pedidos.length}</b></div></div><p style="color:var(--mut)">Os valores consideram apenas pedidos vinculados ao seu cadastro. Pedidos cancelados não entram na comissão.</p>`;
+}
+function catalogo(){
+const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>`<tr><td>${esc(p.ref)}</td><td>${esc(p.nome)}</td><td class="n">${brl(p.preco)}</td><td class="n">${brl(precoG(p))}</td></tr>`).join('');
+return `<div class="bar"><h2>Catálogo</h2><button class="pri" onclick="tab='pedidos';render()">+ Novo pedido</button></div><div class="tw"><table><tr><th>Ref.</th><th>Produto</th><th class="n">Preço P–GG</th><th class="n">Preço G1–G4</th></tr>${r||'<tr><td colspan="4" class="empty">Nenhum produto disponível.</td></tr>'}</table></div>`;
 }
 
 function produtos(){
@@ -443,10 +488,11 @@ async f=>{const d={...x};delete d.id;REP_CAMPOS.forEach(k=>d[k]=(f[k]||'').trim(
 }
 
 function pedidos(){
-const r=S.pedidos.slice().sort((a,b)=>(b.numero||0)-(a.numero||0)).map(o=>`<tr><td>#${o.numero}</td><td>${esc((o.data||'').split('-').reverse().join('/'))}</td><td>${esc(o.cliente)}</td><td>${esc(rep(o.repId)?.nome||o.repNome||'—')}${rep(o.repId)?'':' <span class="tag">sem cadastro</span>'}</td><td class="n">${(o.itens||[]).reduce((a,i)=>a+i.qtd,0)}</td><td class="n">${pedDesatual(o)?'<span class="tag" title="Preço diferente do cadastro do produto">desatualizado</span> ':''}${brl(pedTotal(o))}</td>
- <td><select onchange="setSt('${o.id}',this.value)">${ST.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></td>
- <td><button class="sm" onclick="verPed('${o.id}')">Itens</button><button class="sm" onclick="fRepPed('${o.id}')">Representante</button><button class="sm del" onclick="delPed('${o.id}')">Excluir</button></td></tr>`).join('');
-return `<div class="bar"><h2>Pedidos</h2><div class="r2" style="margin:0">${S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></div></div>
+const admin=appProfile.role==='admin';
+const r=S.pedidos.slice().sort((a,b)=>(b.numero||0)-(a.numero||0)).map(o=>`<tr><td>#${o.numero}</td><td>${esc((o.data||'').split('-').reverse().join('/'))}</td><td>${esc(o.cliente)}</td><td>${esc(rep(o.repId)?.nome||o.repNome||'—')}${admin&&!rep(o.repId)?' <span class="tag">sem cadastro</span>':''}</td><td class="n">${(o.itens||[]).reduce((a,i)=>a+i.qtd,0)}</td><td class="n">${admin&&pedDesatual(o)?'<span class="tag" title="Preço diferente do cadastro do produto">desatualizado</span> ':''}${brl(pedTotal(o))}</td>
+ ${admin?`<td><select onchange="setSt('${o.id}',this.value)">${ST.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></td>`:`<td>${esc(o.status||'Pendente')}</td>`}
+ <td><button class="sm" onclick="verPed('${o.id}')">Itens</button>${admin?`<button class="sm" onclick="fRepPed('${o.id}')">Representante</button><button class="sm del" onclick="delPed('${o.id}')">Excluir</button>`:''}</td></tr>`).join('');
+return `<div class="bar"><h2>Pedidos</h2><div class="r2" style="margin:0">${admin&&S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></div></div>
  <div class="tw"><table><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Representante</th><th class="n">Peças</th><th class="n">Total</th><th>Status</th><th></th></tr>${r||'<tr><td colspan="8" class="empty">Nenhum pedido lançado.</td></tr>'}</table></div>`;
 }
 
@@ -478,12 +524,17 @@ return r;
 }
 
 function fPed(){
-if(!S.produtos.length){aviso('Cadastre ao menos um produto antes de lançar pedidos.');tab='produtos';render();return}
+const role=appProfile.role;
+if(!S.produtos.length){aviso('Não há produtos disponíveis para lançar pedidos.');tab=role==='admin'?'produtos':'catalogo';render();return}
+const cliente=role==='lojista'?`<label>Loja<input name="cliente" required value="${esc(appProfile.store_name)}" readonly></label>`:`<label>Cliente (loja)<input name="cliente" required></label>`;
+const vinculoLoja=role==='admin'||role==='representante'?`<label>Vincular à conta de lojista (opcional)<select name="ownerId" onchange="selecionaLoja(this)"><option value="">Outro cliente, sem conta cadastrada</option>${S.lojas.map(x=>`<option value="${x.id}" data-nome="${esc(x.nome)}">${esc(x.nome)}</option>`).join('')}</select><small>Pedidos vinculados também aparecem na conta da loja.</small></label>`:'';
+const representante=role==='representante'?`<label>Representante<input value="${esc(rep(appProfile.rep_id)?.nome||'')}" readonly></label>`:role==='lojista'?`<label>Representante atribuído<input value="${esc(rep(appProfile.rep_id)?.nome||'Sem representante atribuído')}" readonly></label>`:`<label>Representante (obrigatório)<input name="repNome" required list="replist" autocomplete="off" placeholder="Escolha da lista ou digite o nome"><datalist id="replist">${S.reps.map(r=>`<option value="${esc(r.nome)}">`).join('')}</datalist></label>`;
 modal('Novo pedido',`
  <div class="imp"><div class="r"><input type="file" id="arq" onchange="importar()" accept="image/*,.pdf,application/pdf,.txt,.csv"><button type="button" class="pri" onclick="importar()">Ler arquivo</button></div><small id="impst">Anexe o pedido (PDF, foto, print, CSV ou TXT): o sistema lê sozinho e preenche cliente, representante, referências, cores, tamanhos e quantidades.</small></div>
- <div class="g2"><label>Cliente (loja)<input name="cliente" required></label>
+ ${vinculoLoja}
+ <div class="g2">${cliente}
  <label>Data<input name="data" type="date" required value="${new Date().toISOString().slice(0,10)}"></label></div>
- <label>Representante (obrigatório)<input name="repNome" required list="replist" autocomplete="off" placeholder="Escolha da lista ou digite o nome"><datalist id="replist">${S.reps.map(r=>`<option value="${esc(r.nome)}">`).join('')}</datalist></label>
+ ${representante}
  <label>Produtos (informe a quantidade de cada cor e tamanho)</label><div id="itens" oninput="checaFalta()" onchange="checaFalta()">${bloco()}</div><div id="falta"></div>
  <button type="button" class="ghost sm" onclick="addItem()">+ Adicionar produto</button>`,
 async(f,form)=>{
@@ -491,13 +542,25 @@ if(pendentes(form))throw new Error('Escolha a referência do produto nos blocos 
 const itens=lerItens(form);
 if(!itens.length)throw new Error('Informe a quantidade de ao menos um item.');
 const rn=(f.repNome||'').trim();
-if(!rn)throw new Error('Informe o representante.');
-const rp=achaRep(rn);
-const fl=faltas(itens);
+const rp=role==='representante'||role==='lojista'?rep(appProfile.rep_id):achaRep(rn);
+if(role==='admin'&&!rn)throw new Error('Informe o representante.');
+if(role==='representante'&&!rp)throw new Error('O cadastro do representante está incompleto. Peça ao administrador para configurá-lo.');
+const repId=role==='representante'?appProfile.rep_id:role==='lojista'?appProfile.rep_id||'':rp?rp.id:'';
+const repNome=rp?rp.nome:role==='lojista'?'':rn;
+const fl=role==='admin'?faltas(itens):[];
 const numero=Math.max(0,...S.pedidos.map(o=>o.numero||0))+1;
-await db.collection('pedidos').add({numero,cliente:f.cliente,data:f.data,repId:rp?rp.id:'',repNome:rp?rp.nome:rn,itens,status:'Pendente'});
+const nomeCliente=role==='lojista'?appProfile.store_name:f.cliente;
+const ownerId=role==='lojista'?appProfile.user_id:(role==='admin'||role==='representante')?f.ownerId||null:null;
+const lojaVinculada=ownerId&&role!=='lojista'?S.lojas.find(x=>x.id===ownerId):null;
+if(ownerId&&role!=='lojista'&&(!lojaVinculada||lojaVinculada.nome!==nomeCliente))throw new Error('A loja selecionada não corresponde ao cliente do pedido.');
+await db.collection('pedidos').add({numero,cliente:nomeCliente,data:f.data,repId,repNome,itens,status:'Pendente'},ownerId);
 if(fl.length)setTimeout(()=>aviso('Pedido salvo. Itens enviados para a aba Fabricar: '+txtFalta(fl)+'.'),200);
 });
+}
+
+function selecionaLoja(select){
+const opt=select.selectedOptions[0];
+if(select.value&&opt?.dataset.nome)select.form.elements.cliente.value=opt.dataset.nome;
 }
 
 const IA={
@@ -637,6 +700,7 @@ return r;
 }
 function txtFalta(fl){return fl.map(x=>x.ref+' '+x.cor+' '+x.tam+' ('+x.falta+' a fabricar)').join('; ')}
 function checaFalta(){
+if(appProfile?.role!=='admin')return;
 const box=$('#falta');if(!box)return;
 const fl=faltas(lerItens($('#dlg')));
 box.innerHTML=fl.length?'<div class="alert">⚠ Sem estoque suficiente: '+esc(txtFalta(fl))+'. Esses itens irão para a aba Fabricar. Você pode salvar mesmo assim.</div>':'';
@@ -653,7 +717,7 @@ $('#impst').innerHTML='Referência '+esc(p.ref)+' aplicada aos itens do arquivo.
 function preencher(r){
 const fm=$('#dlg form');
 if(r.cliente)fm.cliente.value=r.cliente;
-if(r.representante)fm.repNome.value=r.representante;
+if(r.representante&&fm.repNome)fm.repNome.value=r.representante;
 if(/^\d{4}-\d{2}-\d{2}$/.test(r.data||''))fm.data.value=r.data;
 const por={},pend={},semTam=[];let n=0;
 (r.itens||[]).forEach(i=>{
@@ -777,9 +841,10 @@ d.showModal();
 }
 async function del(col,id){if(await confirma('Excluir este registro?'))await db.doc(col+'/'+id).delete()}
 
-function modal(title,body,onOk){
+function modal(title,body,onOk,options={}){
 const d=$('#dlg');
-d.innerHTML=`<form method="dialog"><h3>${title}</h3>${body}<div class="row end"><button type="button" class="ghost" onclick="dlg.close()">Cancelar</button><button class="pri">Salvar</button></div></form>`;
+d.innerHTML=`<form method="dialog"><h3>${title}</h3>${body}<div class="row end">${options.preventClose?'':'<button type="button" class="ghost" onclick="dlg.close()">Cancelar</button>'}<button class="pri">${options.preventClose?'Salvar senha':'Salvar'}</button></div></form>`;
+d.oncancel=e=>{if(options.preventClose)e.preventDefault()};
 d.querySelector('form').onsubmit=async e=>{
 e.preventDefault();
 try{await onOk(Object.fromEntries(new FormData(e.target)),e.target)}catch(err){aviso(err.message||'Erro ao salvar');return}
