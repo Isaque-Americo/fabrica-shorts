@@ -86,10 +86,7 @@ table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
 .r2 select,.r2 input{flex:1;width:auto;min-width:0}
 .pw{display:flex;gap:6px;align-items:center}.pw input{flex:1;min-width:0}.olho{padding:6px 10px!important}
 .roles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 14px}
-.role-option{border:1px solid var(--bd);border-radius:9px;padding:10px 8px;text-align:center;cursor:pointer;color:var(--tx);background:var(--bg)}
-.role-option:has(input:checked){border-color:var(--ac);box-shadow:0 0 0 2px color-mix(in srgb,var(--ac) 18%,transparent);font-weight:600}
-.role-option input{width:auto;margin:0 4px 0 0;accent-color:var(--ac)}
-@media (max-width:420px){.roles{grid-template-columns:1fr}}
+.login-account-list{max-height:180px;overflow-y:auto}
 </style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 </head>
@@ -138,7 +135,8 @@ mostraLogin('Sua sessão expirou. Entre novamente.');
 function mostraLogin(msg,perfil='admin'){
 $('#nav').innerHTML='';
 $('#auth-actions').style.display='none';
-$('#app').innerHTML=`<form class="c" style="max-width:440px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<fieldset style="border:0;padding:0;margin:0"><legend>Entrar como</legend><div class="roles">${Object.entries(PERFIS).map(([k,v])=>`<label class="role-option"><input type="radio" name="perfil" value="${k}"${k===perfil?' checked':''}>${v}</label>`).join('')}</div></fieldset><label>Usuário<input name="usuario" type="text" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label><label>Senha<span class="pw"><input name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><div id="turnstile-widget" style="margin:12px 0"></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
+$('#app').innerHTML=`<form class="c" style="max-width:440px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<label>Perfil de acesso<select name="perfil" id="login-perfil" onchange="atualizaLoginPerfil(this.value)">${Object.entries(PERFIS).map(([k,v])=>`<option value="${k}"${k===perfil?' selected':''}>${v}</option>`).join('')}</select></label><label id="login-usuario-manual">Usuário<input id="login-usuario-texto" name="usuario" type="text" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label><label id="login-conta-wrap" hidden>Cadastro<select id="login-conta" name="usuario" class="login-account-list" size="1" disabled onchange="$('#loginmsg').textContent=''"></select></label><small id="login-list-note" style="display:block;color:var(--mut);margin:-4px 0 10px" hidden></small><label>Senha<span class="pw"><input name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><div id="turnstile-widget" style="margin:12px 0"></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
+atualizaLoginPerfil(perfil);
 renderLoginCaptcha();
 }
 let loginCaptchaToken=null,loginCaptchaWidget=null,loginCaptchaAttempts=0;
@@ -149,6 +147,45 @@ loginCaptchaAttempts=0;loginCaptchaToken=null;
 if(loginCaptchaWidget!==null){try{window.turnstile.remove(loginCaptchaWidget)}catch(e){}loginCaptchaWidget=null}
 host.innerHTML="";
 loginCaptchaWidget=window.turnstile.render(host,{sitekey:"0x4AAAAAAFryednho3gvFb2G",callback:t=>{loginCaptchaToken=t;},"expired-callback":()=>{loginCaptchaToken=null;},"error-callback":()=>{loginCaptchaToken=null;}});
+}
+let loginOptionsSeq=0;
+async function atualizaLoginPerfil(perfil){
+const manual=$('#login-usuario-manual'),input=$('#login-usuario-texto'),wrap=$('#login-conta-wrap'),select=$('#login-conta'),note=$('#login-list-note');
+const seq=++loginOptionsSeq;
+if(perfil==='admin'){
+manual.hidden=false;input.disabled=false;input.required=true;
+wrap.hidden=true;select.disabled=true;select.required=false;select.value='';
+note.hidden=true;return
+}
+manual.hidden=true;input.disabled=true;input.required=false;input.value='';
+wrap.hidden=false;select.disabled=true;select.required=true;
+select.innerHTML='<option value="">Carregando cadastros…</option>';
+note.hidden=false;note.textContent='Carregando cadastros…';
+const {data,error}=await sb.rpc('login_options',{p_role:perfil});
+if(seq!==loginOptionsSeq||$('#login-perfil')?.value!==perfil)return;
+select.innerHTML='';
+if(error){
+select.disabled=true;select.innerHTML='<option value="">Lista indisponível</option>';
+note.textContent='Não foi possível carregar os cadastros. Tente novamente.';
+return
+}
+if(!Array.isArray(data)||data.length===0){
+select.disabled=true;select.innerHTML='<option value="">Nenhum cadastro encontrado</option>';
+note.textContent='Não há cadastros disponíveis para esse perfil.';
+return
+}
+const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='Selecione seu cadastro';select.appendChild(placeholder);
+data.forEach(row=>{
+const option=document.createElement('option');
+option.value=row.username;
+option.textContent=(row.display_name||row.username)+(row.access_ready?'':' — acesso pendente');
+option.dataset.accessReady=String(Boolean(row.access_ready));
+select.appendChild(option)
+});
+select.size=Math.min(6,data.length+1);select.disabled=false;
+note.textContent=data.some(row=>!row.access_ready)
+?'Os cadastros aparecem na lista, mas o acesso de login ainda precisa ser ativado pelo administrador.'
+:'Selecione seu cadastro para preencher o usuário de acesso.';
 }
 sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&db)sessaoExpirada()});
 function sbDb(){
@@ -189,6 +226,11 @@ e.preventDefault();
 const f=new FormData(e.target),m=$('#loginmsg');m.textContent='Entrando…';
 const perfil=String(f.get('perfil')||'');
 if(!PERFIS[perfil]){m.textContent='Escolha o tipo de acesso.';return}
+if(perfil!=='admin'){
+const selected=$('#login-conta')?.selectedOptions?.[0];
+if(!selected||!selected.value){m.textContent='Selecione seu cadastro.';return}
+if(selected.dataset.accessReady!=='true'){m.textContent='Este pré-cadastro ainda não tem acesso de login ativo. Peça ao administrador para ativar a conta.';return}
+}
 const usu=String(f.get('usuario')||'').trim().toLowerCase();
 if(!usu||/[@\s]/.test(usu)){m.textContent='Digite só o nome de usuário (sem @ e sem espaços).';return}
 if(!loginCaptchaToken){m.textContent='Conclua a verificação de segurança antes de entrar.';return}
