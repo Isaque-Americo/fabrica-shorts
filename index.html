@@ -88,6 +88,7 @@ table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
 .pw{display:flex;gap:6px;align-items:center}.pw input{flex:1;min-width:0}.olho{padding:6px 10px!important}
 .roles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0 14px}
 .login-account-list{max-height:180px;overflow-y:auto}
+.login-account-selected{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
 </style>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 </head>
@@ -136,7 +137,7 @@ mostraLogin('Sua sessão expirou. Entre novamente.');
 function mostraLogin(msg,perfil='admin'){
 $('#nav').innerHTML='';
 $('#auth-actions').style.display='none';
-$('#app').innerHTML=`<form class="c" style="max-width:440px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<label>Perfil de acesso<select name="perfil" id="login-perfil" onchange="atualizaLoginPerfil(this.value)">${Object.entries(PERFIS).map(([k,v])=>`<option value="${k}"${k===perfil?' selected':''}>${v}</option>`).join('')}</select></label><label id="login-usuario-manual">Usuário<input id="login-usuario-texto" name="usuario" type="text" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label><label id="login-conta-wrap" hidden>Usuário<select id="login-conta" name="usuario" class="login-account-list" size="1" disabled onchange="$('#loginmsg').textContent='';this.size=1;document.querySelector('#login-senha').focus()"></select></label><small id="login-list-note" style="display:block;color:var(--mut);margin:-4px 0 10px" hidden></small><label>Senha<span class="pw"><input id="login-senha" name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><div id="turnstile-widget" style="margin:12px 0"></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
+$('#app').innerHTML=`<form class="c" style="max-width:440px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<label>Perfil de acesso<select name="perfil" id="login-perfil" onchange="atualizaLoginPerfil(this.value)">${Object.entries(PERFIS).map(([k,v])=>`<option value="${k}"${k===perfil?' selected':''}>${v}</option>`).join('')}</select></label><label id="login-usuario-manual">Usuário<input id="login-usuario-texto" name="usuario" type="text" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label><label id="login-conta-wrap" hidden>Usuário<select id="login-conta" name="usuario" class="login-account-list" size="1" disabled onchange="selecionarLoginConta(this)"></select><span id="login-conta-selecionado" class="login-account-selected" hidden><span id="login-conta-nome"></span><button type="button" class="sm" onclick="trocarLoginConta()">Alterar</button></span></label><small id="login-list-note" style="display:block;color:var(--mut);margin:-4px 0 10px" hidden></small><label>Senha<span class="pw"><input id="login-senha" name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><div id="turnstile-widget" style="margin:12px 0"></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
 atualizaLoginPerfil(perfil);
 renderLoginCaptcha();
 }
@@ -150,16 +151,33 @@ host.innerHTML="";
 loginCaptchaWidget=window.turnstile.render(host,{sitekey:"0x4AAAAAAFryednho3gvFb2G",callback:t=>{loginCaptchaToken=t;},"expired-callback":()=>{loginCaptchaToken=null;},"error-callback":()=>{loginCaptchaToken=null;}});
 }
 let loginOptionsSeq=0;
+function selecionarLoginConta(select){
+const option=select.selectedOptions[0];
+if(!option||!option.value)return;
+$('#login-conta-nome').textContent=option.textContent;
+select.hidden=true;
+$('#login-conta-selecionado').hidden=false;
+$('#login-list-note').hidden=true;
+$('#loginmsg').textContent='';
+document.querySelector('#login-senha').focus();
+}
+function trocarLoginConta(){
+const select=$('#login-conta');
+$('#login-conta-selecionado').hidden=true;
+select.hidden=false;select.value='';
+$('#login-list-note').hidden=false;
+select.focus();
+}
 async function atualizaLoginPerfil(perfil){
 const manual=$('#login-usuario-manual'),input=$('#login-usuario-texto'),wrap=$('#login-conta-wrap'),select=$('#login-conta'),note=$('#login-list-note');
 const seq=++loginOptionsSeq;
 if(perfil==='admin'){
 manual.hidden=false;input.disabled=false;input.required=true;
-wrap.hidden=true;select.disabled=true;select.required=false;select.value='';
+wrap.hidden=true;select.hidden=false;$('#login-conta-selecionado').hidden=true;select.disabled=true;select.required=false;select.value='';
 note.hidden=true;return
 }
 manual.hidden=true;input.disabled=true;input.required=false;input.value='';
-wrap.hidden=false;select.disabled=true;select.required=true;
+wrap.hidden=false;select.hidden=false;$('#login-conta-selecionado').hidden=true;select.disabled=true;select.required=true;
 select.innerHTML='<option value="">Carregando cadastros…</option>';
 note.hidden=false;note.textContent='Carregando cadastros…';
 const {data,error}=await sb.rpc('login_options',{p_role:perfil});
