@@ -4,6 +4,7 @@ create table public.user_profiles (
   role text not null check (role in ('admin', 'lojista', 'representante')),
   store_name text,
   rep_id text references public.docs(id) on delete restrict,
+  must_change_password boolean not null default false,
   created_at timestamptz not null default now(),
   constraint user_profiles_role_link_check check (
     (role = 'admin' and store_name is null and rep_id is null)
@@ -29,6 +30,20 @@ create policy user_profiles_read_self
   for select
   to authenticated
   using (user_id = (select auth.uid()));
+
+create function public.complete_initial_password_change()
+returns void
+language sql
+security definer
+set search_path = ''
+as $$
+  update public.user_profiles
+  set must_change_password = false
+  where user_id = (select auth.uid())
+    and must_change_password;
+$$;
+revoke all on function public.complete_initial_password_change() from public, anon;
+grant execute on function public.complete_initial_password_change() to authenticated;
 
 -- Lojistas only see their own orders; representatives see orders assigned to
 -- their representative record. The admin retains full access.

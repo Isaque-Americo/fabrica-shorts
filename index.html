@@ -211,8 +211,8 @@ if(!/[0-9]/.test(s))f.push('um número');
 if(!/[^A-Za-z0-9À-ÿ\s]/.test(s))f.push('um caractere especial (ex.: ! @ # $ %)');
 return f;
 }
-function trocarSenha(){
-modal('Trocar senha',`<label>Nova senha (mín. 8 caracteres, com letra maiúscula, número e caractere especial)<span class="pw"><input name="s1" type="password" minlength="8" required autocomplete="new-password">${olho()}</span></label><label>Repita a nova senha<span class="pw"><input name="s2" type="password" minlength="8" required autocomplete="new-password">${olho()}</span></label>`,
+function trocarSenha(obrigatoria=Boolean(appProfile?.must_change_password)){
+modal(obrigatoria?'Crie sua senha pessoal':'Trocar senha',`<p>${obrigatoria?'Por segurança, troque a senha temporária antes de continuar.':'Escolha uma senha nova para sua conta.'}</p><label>Nova senha (mín. 8 caracteres, com letra maiúscula, número e caractere especial)<span class="pw"><input name="s1" type="password" minlength="8" required autocomplete="new-password">${olho()}</span></label><label>Repita a nova senha<span class="pw"><input name="s2" type="password" minlength="8" required autocomplete="new-password">${olho()}</span></label>`,
 async f=>{
 if(f.s1!==f.s2)throw new Error('As senhas não conferem.');
 const fal=regrasSenha(f.s1);
@@ -222,8 +222,9 @@ if(vz>0)throw new Error('Esta senha já apareceu em vazamentos de dados ('+vz.to
 await sessaoOk();
 const {error}=await sb.auth.updateUser({password:f.s1});
 if(error)throw new Error(ptErro(error));
-setTimeout(()=>aviso('Senha alterada.'),200);
-});
+if(obrigatoria){const {error:rpcError}=await sb.rpc('complete_initial_password_change');if(rpcError)throw new Error('A senha foi alterada, mas não foi possível concluir a ativação. Tente salvar novamente ou peça ajuda ao administrador.');appProfile.must_change_password=false;}
+setTimeout(()=>aviso(obrigatoria?'Senha temporária trocada.':'Senha alterada.'),200);
+},{preventClose:obrigatoria});
 }
 </script>
 <script>
@@ -280,13 +281,14 @@ const pedDesatual=o=>['Pendente','Faturado'].includes(o.status)&&(o.itens||[]).s
 const {data:{session}}=await sb.auth.getSession();
 const {data:{user}}=session?await sb.auth.getUser():{data:{}};
 if(!session||!user){if(session)await sb.auth.signOut({scope:'local'});mostraLogin();return}
-const {data:profile,error:profileError}=await sb.from('user_profiles').select('user_id,role,store_name,rep_id').eq('user_id',user.id).maybeSingle();
+const {data:profile,error:profileError}=await sb.from('user_profiles').select('user_id,role,store_name,rep_id,must_change_password').eq('user_id',user.id).maybeSingle();
 if(profileError||!profile||!PERFIS[profile.role]||(profile.role==='lojista'&&!profile.store_name)||(profile.role==='representante'&&!profile.rep_id)){
 await sb.auth.signOut({scope:'local'});mostraLogin('Esta conta ainda não tem um perfil de acesso válido. Peça ao administrador para configurá-lo.');return;
 }
 appProfile=profile;
 $('#auth-actions').style.display='inline';
 $('#perfil-atual').textContent=PERFIS[profile.role];
+if(profile.must_change_password)trocarSenha(true);
 tab=profile.role==='lojista'?'catalogo':profile.role==='representante'?'painel':'painel';
 db=sbDb();
 if(db){
@@ -839,9 +841,10 @@ d.showModal();
 }
 async function del(col,id){if(await confirma('Excluir este registro?'))await db.doc(col+'/'+id).delete()}
 
-function modal(title,body,onOk){
+function modal(title,body,onOk,options={}){
 const d=$('#dlg');
-d.innerHTML=`<form method="dialog"><h3>${title}</h3>${body}<div class="row end"><button type="button" class="ghost" onclick="dlg.close()">Cancelar</button><button class="pri">Salvar</button></div></form>`;
+d.innerHTML=`<form method="dialog"><h3>${title}</h3>${body}<div class="row end">${options.preventClose?'':'<button type="button" class="ghost" onclick="dlg.close()">Cancelar</button>'}<button class="pri">${options.preventClose?'Salvar senha':'Salvar'}</button></div></form>`;
+d.oncancel=e=>{if(options.preventClose)e.preventDefault()};
 d.querySelector('form').onsubmit=async e=>{
 e.preventDefault();
 try{await onOk(Object.fromEntries(new FormData(e.target)),e.target)}catch(err){aviso(err.message||'Erro ao salvar');return}
