@@ -62,6 +62,10 @@ Os nomes abaixo vêm dos clientes que já aparecem em `pedidos`. Os nomes de usu
 | Sandro José | `sandro.jose` | Uberdan F. Cavalcante |
 | Uberdan F. Cavalcante | `uberdan` | — |
 
+Na tela **Cadastros**, o administrador pode completar os dados comerciais de cada lojista e os dados do representante. Esses dados são salvos na coleção `cadastros`; o nome de usuário é uma reserva e não cria sozinho a conta do Supabase Auth.
+
+No cadastro da loja, a consulta pelo CNPJ usa `https://brasilapi.com.br/api/cnpj/v1/{cnpj}` e preenche os dados públicos retornados, como razão social, nome fantasia, situação, endereço, contato, porte e CNAE. O CNPJ digitado é enviado à BrasilAPI; revise os resultados antes de salvar. Os dados fornecidos para Casa Rezende Tecidos já aparecem como valores iniciais do formulário.
+
 Use a senha temporária única fornecida ao administrador fora do repositório. O campo `must_change_password` força a troca no primeiro acesso e impede fechar essa etapa sem salvar uma senha pessoal.
 
 Depois de inserir os perfis, associe os pedidos já existentes aos lojistas pelo nome exato:
