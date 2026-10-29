@@ -197,7 +197,7 @@ const placeholder=document.createElement('option');placeholder.value='';placehol
 data.forEach(row=>{
 const option=document.createElement('option');
 option.value=row.username;
-option.textContent=(row.display_name||row.username)+(row.access_ready?'':' — aguardando ativação');
+option.textContent=(row.display_name||row.username)+(row.access_ready?'':' — acesso não ativo');
 option.dataset.accessReady=String(Boolean(row.access_ready));
 select.appendChild(option)
 });
