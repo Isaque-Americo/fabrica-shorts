@@ -198,19 +198,22 @@ Deno.serve(async (req) => {
       }
     }
 
-    if (action === 'reject' || action === 'deactivate') {
+    if (action === 'reject') {
+      if (profile && profile.role !== role) return json({ error: 'Esta conta já está vinculada a outro perfil; peça revisão ao administrador.' }, 409)
+      if (profileMatches(profile, row) && !isBanned(user)) {
+        return json({ error: 'A conta já está ativa. Para recusá-la, desative-a antes por um fluxo administrativo próprio.' }, 409)
+      }
       if (user) {
         const ban = await admin.auth.admin.updateUserById(user.id, { ban_duration: '876000h' })
         if (ban.error) return json({ error: 'Não foi possível bloquear esta conta no Auth.' }, 500)
       }
-      const status = action === 'reject' ? 'recusado' : 'desativado'
       try {
-        await saveStatus(row, status)
+        await saveStatus(row, 'recusado')
       } catch (e) {
         if (user) await admin.auth.admin.updateUserById(user.id, { ban_duration: 'none' })
         return json({ error: (e as Error).message }, 500)
       }
-      return json({ item: itemFor(row, status) })
+      return json({ item: itemFor(row, 'recusado') })
     }
 
     return json({ error: 'Ação não reconhecida.' }, 400)
