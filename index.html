@@ -605,7 +605,7 @@ const empresa=objetos.find(item=>{const tipos=Array.isArray(item['@type'])?item[
 if(!empresa)throw new Error('A página não retornou dados estruturados para este CNPJ.');
 const endereco=Array.isArray(empresa.address)?empresa.address[0]:(empresa.address||{});
 const rua=String(endereco.streetAddress||'');
-const numero=rua.match(/^(.*?)(?:,\\s*|\\s+)(\\d+[A-Za-z]?)$/);
+const numero=rua.match(/^(.*?)(?:,\s*|\s+)(\d+[A-Za-z]?)$/);
 return {fonte:'Sr. Watson',data:{razao_social:empresa.name,nome_fantasia:empresa.alternateName,email:empresa.email,telefone:empresa.telephone,logradouro:numero?numero[1]:rua,numero:numero?numero[2]:'',cep:endereco.postalCode,municipio:endereco.addressLocality,uf:endereco.addressRegion,data_inicio_atividade:empresa.foundingDate}};
 }catch(error){return {fonte:'Sr. Watson',erro:error.message||'falha na consulta'}}
 };
