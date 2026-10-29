@@ -91,6 +91,7 @@ table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
 .role-option input{width:auto;margin:0 4px 0 0;accent-color:var(--ac)}
 @media (max-width:420px){.roles{grid-template-columns:1fr}}
 </style>
+<script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 </head>
 <body>
 <header><h1 style="display:flex;justify-content:space-between;align-items:center">🩳 Gestão da Fábrica de Shorts<span id="auth-actions" style="display:none"><small id="perfil-atual" style="font-size:12px;color:#b8c4d9;margin-right:6px"></small><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="trocarSenha()">Trocar senha</button><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="sair()">Sair</button></span></h1>
@@ -137,7 +138,17 @@ mostraLogin('Sua sessão expirou. Entre novamente.');
 function mostraLogin(msg,perfil='admin'){
 $('#nav').innerHTML='';
 $('#auth-actions').style.display='none';
-$('#app').innerHTML=`<form class="c" style="max-width:440px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<fieldset style="border:0;padding:0;margin:0"><legend>Entrar como</legend><div class="roles">${Object.entries(PERFIS).map(([k,v])=>`<label class="role-option"><input type="radio" name="perfil" value="${k}"${k===perfil?' checked':''}>${v}</label>`).join('')}</div></fieldset><label>Usuário<input name="usuario" type="text" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label><label>Senha<span class="pw"><input name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
+$('#app').innerHTML=`<form class="c" style="max-width:440px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<fieldset style="border:0;padding:0;margin:0"><legend>Entrar como</legend><div class="roles">${Object.entries(PERFIS).map(([k,v])=>`<label class="role-option"><input type="radio" name="perfil" value="${k}"${k===perfil?' checked':''}>${v}</label>`).join('')}</div></fieldset><label>Usuário<input name="usuario" type="text" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label><label>Senha<span class="pw"><input name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><div id="turnstile-widget" style="margin:12px 0"></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
+renderLoginCaptcha();
+}
+let loginCaptchaToken=null,loginCaptchaWidget=null,loginCaptchaAttempts=0;
+function renderLoginCaptcha(){
+const host=document.querySelector("#turnstile-widget");if(!host)return;
+if(!window.turnstile){if(loginCaptchaAttempts++<40)setTimeout(renderLoginCaptcha,250);else host.textContent="Não foi possível carregar a verificação de segurança. Atualize a página.";return}
+loginCaptchaAttempts=0;loginCaptchaToken=null;
+if(loginCaptchaWidget!==null){try{window.turnstile.remove(loginCaptchaWidget)}catch(e){}loginCaptchaWidget=null}
+host.innerHTML="";
+loginCaptchaWidget=window.turnstile.render(host,{sitekey:"0x4AAAAAAFryednho3gvFb2G",callback:t=>{loginCaptchaToken=t;},"expired-callback":()=>{loginCaptchaToken=null;},"error-callback":()=>{loginCaptchaToken=null;}});
 }
 sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&db)sessaoExpirada()});
 function sbDb(){
@@ -180,7 +191,10 @@ const perfil=String(f.get('perfil')||'');
 if(!PERFIS[perfil]){m.textContent='Escolha o tipo de acesso.';return}
 const usu=String(f.get('usuario')||'').trim().toLowerCase();
 if(!usu||/[@\s]/.test(usu)){m.textContent='Digite só o nome de usuário (sem @ e sem espaços).';return}
-const {error}=await sb.auth.signInWithPassword({email:usu+DOM_USUARIO,password:f.get('senha')});
+if(!loginCaptchaToken){m.textContent='Conclua a verificação de segurança antes de entrar.';return}
+const captchaToken=loginCaptchaToken;loginCaptchaToken=null;
+const {error}=await sb.auth.signInWithPassword({email:usu+DOM_USUARIO,password:f.get('senha'),options:{captchaToken}});
+if(loginCaptchaWidget!==null)window.turnstile.reset(loginCaptchaWidget);
 if(error){m.textContent=ptErro(error);return}
 const {data:{user},error:userError}=await sb.auth.getUser();
 if(userError||!user){await sb.auth.signOut({scope:'local'});mostraLogin('Não foi possível validar sua sessão. Tente entrar novamente.',perfil);return}
