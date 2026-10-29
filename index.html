@@ -588,7 +588,7 @@ return '<span class="tag">Aguardando decisão</span>'
 }
 function botoesAcesso(username){
 const name=esc(username),status=statusAcesso(username);
-if(status==='ativo')return `<button type="button" class="sm del" data-access-action="deactivate" data-access-username="${name}">Desativar</button>`;
+if(status==='ativo')return '<span class="ok">Acesso liberado</span>';
 if(status==='desativado')return `<button type="button" class="sm" data-access-action="activate" data-access-username="${name}">Reativar</button>`;
 if(status==='recusado')return `<button type="button" class="sm" data-access-action="activate" data-access-username="${name}">Reconsiderar</button>`;
 return `<button type="button" class="sm" data-access-action="activate" data-access-username="${name}">Ativar</button> <button type="button" class="sm del" data-access-action="reject" data-access-username="${name}">Não aceitar</button>`
@@ -606,7 +606,7 @@ const {data,error}=await sb.functions.invoke('gerenciar-acesso',{body:{action:'l
 if(error)throw new Error(await textoErroFuncao(error));
 statusAcessos=Object.fromEntries((data?.items||[]).map(item=>[item.username,item]));
 statusAcessosCarregado=true;
-}catch(e){statusAcessosErro=e.message||'Não foi possível carregar os acessos.'}
+}catch(e){statusAcessosErro=e.message||'Não foi possível carregar os acessos.';statusAcessosCarregado=true}
 finally{statusAcessosCarregando=false;render()}
 }
 function recarregarStatusAcessos(){statusAcessosCarregado=false;carregarStatusAcessos()}
