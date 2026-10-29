@@ -520,7 +520,7 @@ const body=isRep?`
  <label>Comissão (%)<input name="com" type="number" step="0.1" min="0" max="100" value="${d.com??5}"></label>`:`
  <p class="mut">Usuário reservado: <b>${esc(username)}</b> · Nome da loja nos pedidos: <b>${esc(base.store_name)}</b></p>
  <label>CNPJ<input name="cnpj" required maxlength="18" placeholder="00.000.000/0000-00" value="${esc(d.cnpj)}" oninput="mascaraCnpj(this);this.form.dataset.cnpjConsultado=''" onblur="buscaCnpj(this)"></label>
- <div class="row end" style="margin-top:-6px;margin-bottom:10px"><button type="button" class="ghost sm" onclick="buscaCnpj(this)">Buscar dados do CNPJ</button></div><small id="cnpj-info" class="mut">Ao consultar, o CNPJ será enviado à BrasilAPI, OpenCNPJ e Minha Receita; se o CEP ajudar, também consultamos o ViaCEP. Os dados encontrados completam apenas campos vazios. Revise antes de salvar.</small>
+ <div class="row end" style="margin-top:-6px;margin-bottom:10px"><button type="button" class="ghost sm" onclick="buscaCnpj(this)">Buscar dados do CNPJ</button></div><small id="cnpj-info" class="mut">A busca aprofundada consulta BrasilAPI, OpenCNPJ, Minha Receita e Sr. Watson; com CEP, também pode consultar ViaCEP. O CNPJ é enviado a esses serviços. Os resultados completam apenas campos vazios e devem ser revisados antes de salvar.</small>
  <label>Razão Social<input name="razaoSocial" required value="${esc(d.razaoSocial)}"></label>
  <div class="g2"><label>Nome Fantasia<input name="nomeFantasia" value="${esc(d.nomeFantasia)}"></label><label>Tipo<select name="tipo" onchange="this.dataset.editado='1'"><option ${d.tipo==='Matriz'?'selected':''}>Matriz</option><option ${d.tipo==='Filial'?'selected':''}>Filial</option></select></label></div>
  <div class="g2"><label>Situação cadastral<input name="situacao" value="${esc(d.situacao)}"></label><label>Data de abertura<input name="dataAbertura" value="${esc(d.dataAbertura)}" placeholder="AAAA-MM-DD"></label></div>
@@ -595,10 +595,27 @@ const fontes=[
 {nome:'OpenCNPJ',url:'https://api.opencnpj.org/'+encodeURIComponent(cnpj)},
 {nome:'Minha Receita',url:'https://minhareceita.org/'+encodeURIComponent(cnpj)}
 ];
-const resultados=await Promise.all(fontes.map(async fonte=>{try{const response=await fetch(fonte.url);const data=await response.json();if(!response.ok)throw new Error(data.message||data.error||('HTTP '+response.status));return {fonte:fonte.nome,data}}catch(error){return {fonte:fonte.nome,erro:error.message||'falha na consulta'}}}));
+const buscarSrWatson=async()=>{
+try{
+const response=await fetch('https://srwatson.io/empresa/'+encodeURIComponent(cnpj),{headers:{Accept:'text/html'}});
+if(!response.ok)throw new Error('HTTP '+response.status);
+const html=await response.text(),doc=new DOMParser().parseFromString(html,'text/html');
+const objetos=[...doc.querySelectorAll('script[type="application/ld+json"]')].flatMap(script=>{try{const valor=JSON.parse(script.textContent||'null');const lista=Array.isArray(valor)?valor:[valor];return lista.flatMap(item=>item&&Array.isArray(item['@graph'])?[item,...item['@graph']]:[item]).filter(Boolean)}catch(error){return[]}});
+const empresa=objetos.find(item=>{const tipos=Array.isArray(item['@type'])?item['@type']:[item['@type']];const ids=[item.taxID,item.identifier?.value||item.identifier].filter(Boolean);return tipos.includes('Organization')&&ids.some(id=>normalizaCnpj(id)===cnpj)});
+if(!empresa)throw new Error('A página não retornou dados estruturados para este CNPJ.');
+const endereco=Array.isArray(empresa.address)?empresa.address[0]:(empresa.address||{});
+const rua=String(endereco.streetAddress||'');
+const numero=rua.match(/^(.*?)(?:,\\s*|\\s+)(\\d+[A-Za-z]?)$/);
+return {fonte:'Sr. Watson',data:{razao_social:empresa.name,nome_fantasia:empresa.alternateName,email:empresa.email,telefone:empresa.telephone,logradouro:numero?numero[1]:rua,numero:numero?numero[2]:'',cep:endereco.postalCode,municipio:endereco.addressLocality,uf:endereco.addressRegion,data_inicio_atividade:empresa.foundingDate}};
+}catch(error){return {fonte:'Sr. Watson',erro:error.message||'falha na consulta'}}
+};
+const [resultados,srWatson]=await Promise.all([
+Promise.all(fontes.map(async fonte=>{try{const response=await fetch(fonte.url);const data=await response.json();if(!response.ok)throw new Error(data.message||data.error||('HTTP '+response.status));return {fonte:fonte.nome,data}}catch(error){return {fonte:fonte.nome,erro:error.message||'falha na consulta'}}})),
+buscarSrWatson()
+]);
 const consultadas=[],falhas=[];
-for(const resultado of resultados){if(resultado.data){aplica(resultado.data);consultadas.push(resultado.fonte)}else falhas.push(resultado.fonte)}
-if(!consultadas.length)throw new Error('BrasilAPI, OpenCNPJ e Minha Receita não responderam. Tente novamente.');
+for(const resultado of [...resultados,srWatson]){if(resultado.data){aplica(resultado.data);consultadas.push(resultado.fonte)}else falhas.push(resultado.fonte)}
+if(!consultadas.length)throw new Error('Nenhuma fonte respondeu. Tente novamente.');
 const cep=normalizaCnpj(form.elements.cep?.value||'');
 if(cep.length===8&&(!form.elements.logradouro?.value||!form.elements.bairro?.value||!form.elements.municipio?.value)){
 try{const response=await fetch('https://viacep.com.br/ws/'+encodeURIComponent(cep)+'/json/');const endereco=await response.json();if(response.ok&&!endereco.erro){set('logradouro',endereco.logradouro);set('bairro',endereco.bairro);set('cep',endereco.cep);set('municipio',endereco.localidade);set('uf',endereco.estado||ufNome[String(endereco.uf||'').toUpperCase()]||endereco.uf);if(endereco.logradouro||endereco.bairro||endereco.localidade)consultadas.push('ViaCEP')}}catch(error){falhas.push('ViaCEP')}
