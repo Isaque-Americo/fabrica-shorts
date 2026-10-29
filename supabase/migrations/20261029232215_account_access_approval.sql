@@ -12,7 +12,7 @@ as $function$
       nullif(trim(d.data->>'nome'), ''),
       nullif(trim(d.data->>'username'), '')
     ),
-    coalesce(d.data->>'acessoStatus' = 'ativo', false)
+    coalesce(d.data->>'acessoStatus', 'ativo') = 'ativo'
     and exists (
       select 1
       from auth.users as u
