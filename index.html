@@ -197,13 +197,13 @@ const placeholder=document.createElement('option');placeholder.value='';placehol
 data.forEach(row=>{
 const option=document.createElement('option');
 option.value=row.username;
-option.textContent=(row.display_name||row.username)+(row.access_ready?'':' — acesso pendente');
+option.textContent=(row.display_name||row.username)+(row.access_ready?'':' — acesso não ativo');
 option.dataset.accessReady=String(Boolean(row.access_ready));
 select.appendChild(option)
 });
 select.size=Math.min(6,data.length+1);select.disabled=false;
 note.textContent=data.some(row=>!row.access_ready)
-?'Os cadastros aparecem na lista, mas o acesso de login ainda precisa ser ativado pelo administrador.'
+?'Apenas contas ativadas pelo administrador podem entrar no sistema.'
 :'Selecione seu cadastro para preencher o usuário de acesso.';
 }
 sb.auth.onAuthStateChange(ev=>{if(ev==='SIGNED_OUT'&&db)sessaoExpirada()});
@@ -568,17 +568,77 @@ function preCadastro(username){return S.cadastros.find(x=>x.username===username)
 function dadosCadastro(username){return preCadastro(username)||{}}
 function cadastroSalvo(username){return Boolean(preCadastro(username)?.dadosPreenchidos)}
 function cadastroLojista(){
-const lojas=S.cadastros.filter(x=>x.tipoCadastro==='lojista').map(x=>{const salvo=cadastroSalvo(x.username),acesso=S.lojas.some(l=>l.nome===x.store_name),contato=[x.email?`<a href="mailto:${esc(x.email)}">${esc(x.email)}</a>`:'',x.telefone?`<a href="tel:${encodeURIComponent(x.telefone)}">${esc(x.telefone)}</a>`:''].filter(Boolean).join('<br>')||'—';return `<tr><td>${esc(x.store_name)}</td><td>${esc(x.username)}</td><td>${esc(x.cnpj||'—')}</td><td>${contato}</td><td>${salvo?'<span class="ok">Dados registrados</span>':'<span class="tag">Pré-cadastro</span>'}</td><td>${acesso?'<span class="ok">Acesso criado</span>':'<span class="tag">Acesso pendente</span>'}</td><td><button class="sm" onclick="fCadastro('${x.username}')">${salvo?'Editar':'Completar'}</button></td></tr>`}).join('');
-return `<div class="bar"><h2>Cadastro de lojistas</h2></div><p class="mut">Os seis clientes dos pedidos já estão listados. Preencha os dados necessários da empresa; a busca pelo CNPJ tenta localizar contato e endereço em várias fontes públicas. Confira os dados antes de salvar.</p><div class="tw"><table><tr><th>Loja (cliente nos pedidos)</th><th>Usuário reservado</th><th>CNPJ</th><th>Contato</th><th>Cadastro</th><th>Acesso</th><th></th></tr>${lojas}</table></div>`;
+const lojas=S.cadastros.filter(x=>x.tipoCadastro==='lojista').map(x=>{const salvo=cadastroSalvo(x.username),contato=[x.email?`<a href="mailto:${esc(x.email)}">${esc(x.email)}</a>`:'',x.telefone?`<a href="tel:${encodeURIComponent(x.telefone)}">${esc(x.telefone)}</a>`:''].filter(Boolean).join('<br>')||'—';return `<tr><td>${esc(x.store_name)}</td><td>${esc(x.username)}</td><td>${esc(x.cnpj||'—')}</td><td>${contato}</td><td>${salvo?'<span class="ok">Dados registrados</span>':'<span class="tag">Pré-cadastro</span>'}</td><td>${badgeAcesso(x.username)}</td><td><button class="sm" onclick="fCadastro('${x.username}')">${salvo?'Editar':'Completar'}</button> ${botoesAcesso(x.username)}</td></tr>`}).join('');
+return `<div class="bar"><h2>Cadastro de lojistas</h2></div><p class="mut">O administrador decide quais cadastros podem acessar o sistema. Ao ativar, a senha inicial será 123456 e a troca será obrigatória no primeiro acesso.</p>${mensagemStatusAcessos()}<div class="tw"><table><tr><th>Loja (cliente nos pedidos)</th><th>Usuário reservado</th><th>CNPJ</th><th>Contato</th><th>Cadastro</th><th>Acesso</th><th>Ações</th></tr>${lojas}</table></div>`;
 }
 function cadastroRepresentante(){
 const x=S.cadastros.find(c=>c.tipoCadastro==='representante');if(!x)return '<div class="empty">Nenhum representante pré-cadastrado.</div>';const d=dadosCadastro(x.username),salvo=cadastroSalvo(x.username),r=S.reps.find(a=>a.id===d.rep_id)||S.reps.find(a=>(a.nome||'').toLowerCase().includes('uberdan'));
-return `<div class="bar"><h2>Cadastro de representante</h2><button class="pri" onclick="fCadastro('${x.username}')">${salvo?'Editar cadastro':'Completar cadastro'}</button></div><div class="c"><small>Usuário reservado</small><b>${esc(x.username)}</b><p>${esc(d.nome||r?.nome||x.nome)}</p><span class="tag">${r?'Representante cadastrado':'Cadastro do representante pendente'}</span> <span class="tag">Acesso de login pendente</span></div>`;
-}
-function cadastros(){
-return `<div class="bar"><h2>Cadastros iniciais</h2></div><div class="roles"><button class="${cadastroAba==='lojista'?'pri':'ghost'}" onclick="cadastroAba='lojista';render()">Lojistas</button><button class="${cadastroAba==='representante'?'pri':'ghost'}" onclick="cadastroAba='representante';render()">Representante</button></div>${cadastroAba==='lojista'?cadastroLojista():cadastroRepresentante()}<p class="mut">Os nomes de usuário são pré-cadastrados para organização. Criar o acesso de autenticação é uma etapa separada no Supabase Auth.</p>`;
+return `<div class="bar"><h2>Cadastro de representante</h2><button class="pri" onclick="fCadastro('${x.username}')">${salvo?'Editar cadastro':'Completar cadastro'}</button></div><div class="c"><small>Usuário reservado</small><b>${esc(x.username)}</b><p>${esc(d.nome||r?.nome||x.nome)}</p><span class="tag">${r?'Representante cadastrado':'Cadastro do representante pendente'}</span><p>Acesso: ${badgeAcesso(x.username)}</p><div class="row end">${botoesAcesso(x.username)}</div></div>${mensagemStatusAcessos()}`;
 }
 let cadastroAba='lojista';
+let statusAcessos={};
+let statusAcessosCarregado=false,statusAcessosCarregando=false,statusAcessosErro='';
+function statusAcesso(username){return statusAcessos[username]?.status||'pendente'}
+function badgeAcesso(username){
+const status=statusAcesso(username);
+if(status==='ativo')return '<span class="ok">Ativa</span>';
+if(status==='recusado')return '<span class="tag">Não aprovada</span>';
+if(status==='desativado')return '<span class="tag">Desativada</span>';
+return '<span class="tag">Aguardando decisão</span>'
+}
+function botoesAcesso(username){
+const name=esc(username),status=statusAcesso(username);
+if(status==='ativo')return '<span class="ok">Acesso liberado</span>';
+if(status==='desativado')return `<button type="button" class="sm" data-access-action="activate" data-access-username="${name}">Reativar</button>`;
+if(status==='recusado')return `<button type="button" class="sm" data-access-action="activate" data-access-username="${name}">Reconsiderar</button>`;
+return `<button type="button" class="sm" data-access-action="activate" data-access-username="${name}">Ativar</button> <button type="button" class="sm del" data-access-action="reject" data-access-username="${name}">Não aceitar</button>`
+}
+function mensagemStatusAcessos(){
+if(statusAcessosCarregando)return '<p class="mut">Carregando situação dos acessos…</p>';
+if(statusAcessosErro)return `<div class="alert">${esc(statusAcessosErro)} <button type="button" class="sm" onclick="recarregarStatusAcessos()">Tentar novamente</button></div>`;
+return ''
+}
+async function carregarStatusAcessos(){
+if(statusAcessosCarregando)return;
+statusAcessosCarregando=true;statusAcessosErro='';
+try{
+const {data,error}=await sb.functions.invoke('gerenciar-acesso',{body:{action:'list'}});
+if(error)throw new Error(await textoErroFuncao(error));
+statusAcessos=Object.fromEntries((data?.items||[]).map(item=>[item.username,item]));
+statusAcessosCarregado=true;
+}catch(e){statusAcessosErro=e.message||'Não foi possível carregar os acessos.';statusAcessosCarregado=true}
+finally{statusAcessosCarregando=false;render()}
+}
+function recarregarStatusAcessos(){statusAcessosCarregado=false;carregarStatusAcessos()}
+async function textoErroFuncao(error){
+try{const payload=await error.context?.json();if(payload?.error)return payload.error}catch(e){}
+return error?.message||'Falha ao comunicar com o servidor.'
+}
+async function decidirAcesso(username,action){
+const pergunta=action==='activate'
+?`Ativar o acesso de "${username}" com senha inicial 123456? No primeiro login, será obrigatório criar uma senha pessoal.`
+:action==='reject'
+?`Não aceitar o acesso de "${username}"? A conta não poderá entrar no sistema.`
+:`Desativar o acesso de "${username}"? A conta deixará de conseguir entrar.`;
+if(!confirm(pergunta))return;
+try{
+const {data,error}=await sb.functions.invoke('gerenciar-acesso',{body:{action,username}});
+if(error)throw new Error(await textoErroFuncao(error));
+if(!data?.item)throw new Error('O servidor não retornou a situação atualizada.');
+statusAcessos={...statusAcessos,[username]:data.item};
+statusAcessosCarregado=true;
+render();
+if(action==='activate'&&data.item.temporary_password_set)aviso('Conta ativada. Senha inicial: 123456. A troca da senha será obrigatória no primeiro acesso.');
+else if(action==='activate')aviso('Acesso reativado. A senha existente foi mantida.');
+else if(action==='reject')aviso('Acesso recusado. Nenhuma senha foi criada.');
+else aviso('Acesso desativado.');
+}catch(e){aviso(e.message||'Não foi possível atualizar o acesso.')}
+}
+document.addEventListener('click',e=>{const target=e.target instanceof Element?e.target:null;const btn=target?.closest('[data-access-action]');if(btn)decidirAcesso(btn.dataset.accessUsername,btn.dataset.accessAction)});
+function cadastros(){
+if(!statusAcessosCarregado&&!statusAcessosCarregando)carregarStatusAcessos();
+return `<div class="bar"><h2>Cadastros iniciais</h2></div><div class="roles"><button class="${cadastroAba==='lojista'?'pri':'ghost'}" onclick="cadastroAba='lojista';render()">Lojistas</button><button class="${cadastroAba==='representante'?'pri':'ghost'}" onclick="cadastroAba='representante';render()">Representante</button></div>${cadastroAba==='lojista'?cadastroLojista():cadastroRepresentante()}`;
+}
 function fCadastro(username){
 const base=preCadastro(username);if(!base)return;
 const saved=base,isRep=base.tipoCadastro==='representante';
