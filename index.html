@@ -556,18 +556,60 @@ const form=el?.form||el?.closest('form')||$('#dlg form');if(!form?.elements.cnpj
 const status=form.querySelector('#cnpj-info'),cnpj=normalizaCnpj(form.elements.cnpj.value);
 if(cnpj.length!==14){if(status)status.textContent='Digite um CNPJ válido com 14 caracteres.';return}
 if(form.dataset.cnpjConsultado===cnpj||form.dataset.cnpjBuscando==='1')return;
-form.dataset.cnpjBuscando='1';if(status)status.textContent='Consultando CNPJ…';
+form.dataset.cnpjBuscando='1';if(status)status.textContent='Consultando BrasilAPI e OpenCNPJ…';
+const set=(name,value)=>{const campo=form.elements[name];if(campo&&value!==null&&value!==undefined&&String(value).trim()!==''&&!String(campo.value||'').trim())campo.value=String(value).trim()};
+const aplica=(data)=>{
+const cnae=Array.isArray(data.cnaes)?data.cnaes.find(a=>a.is_principal)||data.cnaes[0]:null;
+const atividade=Array.isArray(data.atividade_principal)?data.atividade_principal[0]:null;
+const nomeCnae=cnae||atividade||{};
+const tel=Array.isArray(data.telefones)?data.telefones.filter(t=>!t.is_fax).map(t=>[t.ddd,t.numero].filter(Boolean).join(' ')): [];
+const telefones=tel.length?tel:[data.ddd_telefone_1,data.ddd_telefone_2,data.telefone].filter(Boolean).flatMap(v=>String(v).split(/\s*\/\s*/)).filter(Boolean);
+set('razaoSocial',data.razao_social||data.nome_empresarial||data.nome);
+set('nomeFantasia',data.nome_fantasia||data.fantasia);
+const tipo=String(data.descricao_identificador_matriz_filial||data.matriz_filial||data.tipo||'').toLowerCase();
+if(tipo.includes('filial')||+data.identificador_matriz_filial===2)set('tipo','Filial');else if(tipo.includes('matriz')||+data.identificador_matriz_filial===1)set('tipo','Matriz');
+const situacao=data.descricao_situacao_cadastral||data.situacao_cadastral||data.situacao;
+set('situacao',situacao);
+set('dataAbertura',data.data_inicio_atividade||data.abertura);
+set('porte',data.descricao_porte||data.porte_empresa||data.porte);
+set('natureza',data.natureza_juridica);
+set('capitalSocial',data.capital_social);
+set('cnaeCodigo',data.cnae_fiscal||data.cnae_principal||nomeCnae.codigo||nomeCnae.code);
+set('atividade',data.cnae_fiscal_descricao||nomeCnae.descricao||nomeCnae.text);
+const secundarias=Array.isArray(data.cnaes)?data.cnaes.filter(a=>!a.is_principal).map(a=>[a.codigo,a.descricao].filter(Boolean).join(' · ')):Array.isArray(data.cnaes_secundarios)?data.cnaes_secundarios.map(a=>typeof a==='string'?a:[a.codigo||a.code,a.descricao||a.text].filter(Boolean).join(' · ')):Array.isArray(data.atividades_secundarias)?data.atividades_secundarias.map(a=>[a.code,a.text].filter(Boolean).join(' · ')):[];
+set('atividadesSecundarias',secundarias.join('\n'));
+set('email',data.email);
+set('telefone',telefones[0]);
+set('telefone2',telefones[1]);
+set('logradouro',[data.descricao_tipo_de_logradouro||data.tipo_logradouro,data.logradouro].filter(Boolean).join(' '));
+set('numero',data.numero);
+set('complemento',data.complemento);
+set('bairro',data.bairro);
+set('cep',data.cep);
+set('municipio',data.municipio||data.localidade);
+const uf=String(data.uf||'').toUpperCase();set('uf',ufNome[uf]||uf);
+};
 try{
-const response=await fetch('https://brasilapi.com.br/api/cnpj/v1/'+encodeURIComponent(cnpj));
-const data=await response.json();if(!response.ok)throw new Error(data.message||data.error||'CNPJ não encontrado.');
-const set=(name,value)=>{if(value!==null&&value!==undefined&&String(value).trim()!=='')form.elements[name].value=String(value).trim()};
-set('razaoSocial',data.razao_social||data.nome_empresarial);set('nomeFantasia',data.nome_fantasia);
-const tipo=String(data.descricao_identificador_matriz_filial||'').toLowerCase();form.elements.tipo.value=tipo.includes('filial')||+data.identificador_matriz_filial===2?'Filial':'Matriz';
-const sit=Number(data.situacao_cadastral),situacao=data.descricao_situacao_cadastral||({1:'Nula',2:'Ativa',3:'Suspensa',4:'Inapta',8:'Baixada'}[sit]||data.situacao_cadastral);
-set('situacao',situacao);set('dataAbertura',data.data_inicio_atividade);set('porte',data.descricao_porte||data.porte);set('natureza',data.natureza_juridica||data.descricao_natureza_juridica);set('capitalSocial',data.capital_social);set('cnaeCodigo',data.cnae_fiscal);set('atividade',data.cnae_fiscal_descricao);set('atividadesSecundarias',(data.cnaes_secundarios||[]).map(a=>[a.codigo,a.descricao].filter(Boolean).join(' · ')).join('\n'));
-set('email',data.email);set('telefone',data.ddd_telefone_1);set('telefone2',data.ddd_telefone_2);set('logradouro',[data.descricao_tipo_de_logradouro,data.logradouro].filter(Boolean).join(' '));set('numero',data.numero);set('complemento',data.complemento);set('bairro',data.bairro);set('cep',data.cep);set('municipio',data.municipio);set('uf',ufNome[String(data.uf||'').toUpperCase()]||data.uf);
-form.dataset.cnpjConsultado=cnpj;if(status)status.textContent='Dados recebidos da BrasilAPI. Confira e complete o que estiver faltando antes de salvar.';
-}catch(error){if(status)status.textContent='Não foi possível consultar: '+(error.message||'erro temporário');}
+const fontes=[
+{nome:'BrasilAPI',url:'https://brasilapi.com.br/api/cnpj/v1/'+encodeURIComponent(cnpj)},
+{nome:'OpenCNPJ',url:'https://api.opencnpj.org/'+encodeURIComponent(cnpj)},
+{nome:'Minha Receita',url:'https://minhareceita.org/'+encodeURIComponent(cnpj)}
+];
+const resultados=await Promise.all(fontes.map(async fonte=>{try{const response=await fetch(fonte.url);const data=await response.json();if(!response.ok)throw new Error(data.message||data.error||('HTTP '+response.status));return {fonte:fonte.nome,data}}catch(error){return {fonte:fonte.nome,erro:error.message||'falha na consulta'}}}));
+const consultadas=[],falhas=[];
+for(const resultado of resultados){if(resultado.data){aplica(resultado.data);consultadas.push(resultado.fonte)}else falhas.push(resultado.fonte)}
+if(!consultadas.length)throw new Error('BrasilAPI, OpenCNPJ e Minha Receita não responderam. Tente novamente.');
+const cep=normalizaCnpj(form.elements.cep?.value||'');
+if(cep.length===8&&(!form.elements.logradouro?.value||!form.elements.bairro?.value||!form.elements.municipio?.value)){
+try{const response=await fetch('https://viacep.com.br/ws/'+encodeURIComponent(cep)+'/json/');const endereco=await response.json();if(response.ok&&!endereco.erro){set('logradouro',endereco.logradouro);set('bairro',endereco.bairro);set('cep',endereco.cep);set('municipio',endereco.localidade);set('uf',endereco.estado||ufNome[String(endereco.uf||'').toUpperCase()]||endereco.uf);if(endereco.logradouro||endereco.bairro||endereco.localidade)consultadas.push('ViaCEP')}}catch(error){falhas.push('ViaCEP')}
+}
+form.dataset.cnpjConsultado=cnpj;
+const faltam=[['E-mail','email'],['Telefone','telefone'],['logradouro','logradouro'],['bairro','bairro'],['município','municipio']].filter(([label,name])=>!String(form.elements[name]?.value||'').trim()).map(([label])=>label);
+let mensagem='Dados complementados por: '+consultadas.join(', ')+'. Confira e ajuste antes de salvar.';
+if(faltam.length)mensagem+=' Ainda não encontrados: '+faltam.join(', ')+'.';
+if(falhas.length)mensagem+=' Fontes indisponíveis nesta tentativa: '+falhas.join(', ')+'.';
+if(status)status.textContent=mensagem;
+}catch(error){if(status)status.textContent='Não foi possível consultar as fontes de CNPJ: '+(error.message||'erro temporário');}
 finally{form.dataset.cnpjBuscando='0'}
 }
 
