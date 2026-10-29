@@ -520,9 +520,9 @@ const body=isRep?`
  <label>Comissão (%)<input name="com" type="number" step="0.1" min="0" max="100" value="${d.com??5}"></label>`:`
  <p class="mut">Usuário reservado: <b>${esc(username)}</b> · Nome da loja nos pedidos: <b>${esc(base.store_name)}</b></p>
  <label>CNPJ<input name="cnpj" required maxlength="18" placeholder="00.000.000/0000-00" value="${esc(d.cnpj)}" oninput="mascaraCnpj(this);this.form.dataset.cnpjConsultado=''" onblur="buscaCnpj(this)"></label>
- <div class="row end" style="margin-top:-6px;margin-bottom:10px"><button type="button" class="ghost sm" onclick="buscaCnpj(this)">Buscar dados do CNPJ</button></div><small id="cnpj-info" class="mut">Ao consultar, o CNPJ será enviado à BrasilAPI para buscar os dados públicos da empresa.</small>
+ <div class="row end" style="margin-top:-6px;margin-bottom:10px"><button type="button" class="ghost sm" onclick="buscaCnpj(this)">Buscar dados do CNPJ</button></div><small id="cnpj-info" class="mut">Ao consultar, o CNPJ será enviado à BrasilAPI, OpenCNPJ e Minha Receita; se o CEP ajudar, também consultamos o ViaCEP. Os dados encontrados completam apenas campos vazios. Revise antes de salvar.</small>
  <label>Razão Social<input name="razaoSocial" required value="${esc(d.razaoSocial)}"></label>
- <div class="g2"><label>Nome Fantasia<input name="nomeFantasia" value="${esc(d.nomeFantasia)}"></label><label>Tipo<select name="tipo"><option ${d.tipo==='Matriz'?'selected':''}>Matriz</option><option ${d.tipo==='Filial'?'selected':''}>Filial</option></select></label></div>
+ <div class="g2"><label>Nome Fantasia<input name="nomeFantasia" value="${esc(d.nomeFantasia)}"></label><label>Tipo<select name="tipo" onchange="this.dataset.editado='1'"><option ${d.tipo==='Matriz'?'selected':''}>Matriz</option><option ${d.tipo==='Filial'?'selected':''}>Filial</option></select></label></div>
  <div class="g2"><label>Situação cadastral<input name="situacao" value="${esc(d.situacao)}"></label><label>Data de abertura<input name="dataAbertura" value="${esc(d.dataAbertura)}" placeholder="AAAA-MM-DD"></label></div>
  <div class="g2"><label>Porte<input name="porte" value="${esc(d.porte)}"></label><label>Natureza jurídica<input name="natureza" value="${esc(d.natureza)}"></label></div>
  <div class="g2"><label>Capital Social<input name="capitalSocial" value="${esc(d.capitalSocial)}"></label><label>CNAE principal<input name="cnaeCodigo" value="${esc(d.cnaeCodigo)}"></label></div>
@@ -567,7 +567,7 @@ const telefones=tel.length?tel:[data.ddd_telefone_1,data.ddd_telefone_2,data.tel
 set('razaoSocial',data.razao_social||data.nome_empresarial||data.nome);
 set('nomeFantasia',data.nome_fantasia||data.fantasia);
 const tipo=String(data.descricao_identificador_matriz_filial||data.matriz_filial||data.tipo||'').toLowerCase();
-if(tipo.includes('filial')||+data.identificador_matriz_filial===2)set('tipo','Filial');else if(tipo.includes('matriz')||+data.identificador_matriz_filial===1)set('tipo','Matriz');
+const campoTipo=form.elements.tipo;if(campoTipo&&!campoTipo.dataset.editado){if(tipo.includes('filial')||+data.identificador_matriz_filial===2)campoTipo.value='Filial';else if(tipo.includes('matriz')||+data.identificador_matriz_filial===1)campoTipo.value='Matriz'}
 const situacao=data.descricao_situacao_cadastral||data.situacao_cadastral||data.situacao;
 set('situacao',situacao);
 set('dataAbertura',data.data_inicio_atividade||data.abertura);
@@ -603,7 +603,7 @@ const cep=normalizaCnpj(form.elements.cep?.value||'');
 if(cep.length===8&&(!form.elements.logradouro?.value||!form.elements.bairro?.value||!form.elements.municipio?.value)){
 try{const response=await fetch('https://viacep.com.br/ws/'+encodeURIComponent(cep)+'/json/');const endereco=await response.json();if(response.ok&&!endereco.erro){set('logradouro',endereco.logradouro);set('bairro',endereco.bairro);set('cep',endereco.cep);set('municipio',endereco.localidade);set('uf',endereco.estado||ufNome[String(endereco.uf||'').toUpperCase()]||endereco.uf);if(endereco.logradouro||endereco.bairro||endereco.localidade)consultadas.push('ViaCEP')}}catch(error){falhas.push('ViaCEP')}
 }
-form.dataset.cnpjConsultado=cnpj;
+if(!falhas.length)form.dataset.cnpjConsultado=cnpj;
 const faltam=[['E-mail','email'],['Telefone','telefone'],['logradouro','logradouro'],['bairro','bairro'],['município','municipio']].filter(([label,name])=>!String(form.elements[name]?.value||'').trim()).map(([label])=>label);
 let mensagem='Dados complementados por: '+consultadas.join(', ')+'. Confira e ajuste antes de salvar.';
 if(faltam.length)mensagem+=' Ainda não encontrados: '+faltam.join(', ')+'.';
