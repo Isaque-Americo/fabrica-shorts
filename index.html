@@ -522,12 +522,6 @@ const body=isRep?`
  <label>CNPJ<input name="cnpj" required maxlength="18" placeholder="00.000.000/0000-00" value="${esc(d.cnpj)}" oninput="mascaraCnpj(this);this.form.dataset.cnpjConsultado=''" onblur="buscaCnpj(this)"></label>
  <div class="row end" style="margin-top:-6px;margin-bottom:10px"><button type="button" class="ghost sm" onclick="buscaCnpj(this)">Buscar dados do CNPJ</button></div><small id="cnpj-info" class="mut">A busca aprofundada consulta BrasilAPI, OpenCNPJ, Minha Receita e Sr. Watson; com CEP, também pode consultar ViaCEP. O CNPJ é enviado a esses serviços. Os resultados completam apenas campos vazios e devem ser revisados antes de salvar.</small>
  <label>Razão Social<input name="razaoSocial" required value="${esc(d.razaoSocial)}"></label>
- <div class="g2"><label>Nome Fantasia<input name="nomeFantasia" value="${esc(d.nomeFantasia)}"></label><label>Tipo<select name="tipo" onchange="this.dataset.editado='1'"><option ${d.tipo==='Matriz'?'selected':''}>Matriz</option><option ${d.tipo==='Filial'?'selected':''}>Filial</option></select></label></div>
- <div class="g2"><label>Situação cadastral<input name="situacao" value="${esc(d.situacao)}"></label><label>Data de abertura<input name="dataAbertura" value="${esc(d.dataAbertura)}" placeholder="AAAA-MM-DD"></label></div>
- <div class="g2"><label>Porte<input name="porte" value="${esc(d.porte)}"></label><label>Natureza jurídica<input name="natureza" value="${esc(d.natureza)}"></label></div>
- <div class="g2"><label>Capital Social<input name="capitalSocial" value="${esc(d.capitalSocial)}"></label><label>CNAE principal<input name="cnaeCodigo" value="${esc(d.cnaeCodigo)}"></label></div>
- <label>Atividade principal<input name="atividade" value="${esc(d.atividade)}"></label>
- <label>Atividades secundárias<textarea name="atividadesSecundarias">${esc(d.atividadesSecundarias)}</textarea></label>
  <div class="g2"><label>E-mail<input name="email" type="email" value="${esc(d.email)}"></label><label>Telefone<input name="telefone" type="tel" value="${esc(d.telefone)}"></label></div>
  <label>Telefone 2<input name="telefone2" type="tel" value="${esc(d.telefone2)}"></label>
  <label>Logradouro<input name="logradouro" required value="${esc(d.logradouro)}"></label>
@@ -543,9 +537,10 @@ const rdata={...repExistente};delete rdata.id;
 ['nome','cpf','fone','email','endereco','bairro','cep','cidade','uf','regiao'].forEach(k=>rdata[k]=(f[k]||'').trim());rdata.uf=rdata.uf.toUpperCase();rdata.com=+f.com||0;
 await db.doc('reps/'+repExistente.id).set(rdata);data={...data,...rdata,rep_id:repExistente.id};
 }else{
-['cnpj','razaoSocial','nomeFantasia','tipo','situacao','dataAbertura','porte','natureza','capitalSocial','cnaeCodigo','atividade','atividadesSecundarias','email','telefone','telefone2','logradouro','numero','complemento','bairro','cep','municipio','uf'].forEach(k=>data[k]=(f[k]||'').trim());
+['cnpj','razaoSocial','email','telefone','telefone2','logradouro','numero','complemento','bairro','cep','municipio','uf'].forEach(k=>data[k]=(f[k]||'').trim());
 data.cnpj=normalizaCnpj(data.cnpj);data.rep_id=repExistente?.id||'';
 }
+['nomeFantasia','tipo','situacao','dataAbertura','porte','natureza','capitalSocial','cnaeCodigo','atividade','atividadesSecundarias'].forEach(k=>delete data[k]);
 await db.doc('cadastros/'+saved.id).set(data);
 });
 }
@@ -559,25 +554,9 @@ if(form.dataset.cnpjConsultado===cnpj||form.dataset.cnpjBuscando==='1')return;
 form.dataset.cnpjBuscando='1';if(status)status.textContent='Consultando BrasilAPI e OpenCNPJ…';
 const set=(name,value)=>{const campo=form.elements[name];if(campo&&value!==null&&value!==undefined&&String(value).trim()!==''&&!String(campo.value||'').trim())campo.value=String(value).trim()};
 const aplica=(data)=>{
-const cnae=Array.isArray(data.cnaes)?data.cnaes.find(a=>a.is_principal)||data.cnaes[0]:null;
-const atividade=Array.isArray(data.atividade_principal)?data.atividade_principal[0]:null;
-const nomeCnae=cnae||atividade||{};
 const tel=Array.isArray(data.telefones)?data.telefones.filter(t=>!t.is_fax).map(t=>[t.ddd,t.numero].filter(Boolean).join(' ')): [];
 const telefones=tel.length?tel:[data.ddd_telefone_1,data.ddd_telefone_2,data.telefone].filter(Boolean).flatMap(v=>String(v).split(/\s*\/\s*/)).filter(Boolean);
 set('razaoSocial',data.razao_social||data.nome_empresarial||data.nome);
-set('nomeFantasia',data.nome_fantasia||data.fantasia);
-const tipo=String(data.descricao_identificador_matriz_filial||data.matriz_filial||data.tipo||'').toLowerCase();
-const campoTipo=form.elements.tipo;if(campoTipo&&!campoTipo.dataset.editado){if(tipo.includes('filial')||+data.identificador_matriz_filial===2)campoTipo.value='Filial';else if(tipo.includes('matriz')||+data.identificador_matriz_filial===1)campoTipo.value='Matriz'}
-const situacao=data.descricao_situacao_cadastral||data.situacao_cadastral||data.situacao;
-set('situacao',situacao);
-set('dataAbertura',data.data_inicio_atividade||data.abertura);
-set('porte',data.descricao_porte||data.porte_empresa||data.porte);
-set('natureza',data.natureza_juridica);
-set('capitalSocial',data.capital_social);
-set('cnaeCodigo',data.cnae_fiscal||data.cnae_principal||nomeCnae.codigo||nomeCnae.code);
-set('atividade',data.cnae_fiscal_descricao||nomeCnae.descricao||nomeCnae.text);
-const secundarias=Array.isArray(data.cnaes)?data.cnaes.filter(a=>!a.is_principal).map(a=>[a.codigo,a.descricao].filter(Boolean).join(' · ')):Array.isArray(data.cnaes_secundarios)?data.cnaes_secundarios.map(a=>typeof a==='string'?a:[a.codigo||a.code,a.descricao||a.text].filter(Boolean).join(' · ')):Array.isArray(data.atividades_secundarias)?data.atividades_secundarias.map(a=>[a.code,a.text].filter(Boolean).join(' · ')):[];
-set('atividadesSecundarias',secundarias.join('\n'));
 set('email',data.email);
 set('telefone',telefones[0]);
 set('telefone2',telefones[1]);
@@ -606,7 +585,7 @@ if(!empresa)throw new Error('A página não retornou dados estruturados para est
 const endereco=Array.isArray(empresa.address)?empresa.address[0]:(empresa.address||{});
 const rua=String(endereco.streetAddress||'');
 const numero=rua.match(/^(.*?)(?:,\s*|\s+)(\d+[A-Za-z]?)$/);
-return {fonte:'Sr. Watson',data:{razao_social:empresa.name,nome_fantasia:empresa.alternateName,email:empresa.email,telefone:empresa.telephone,logradouro:numero?numero[1]:rua,numero:numero?numero[2]:'',cep:endereco.postalCode,municipio:endereco.addressLocality,uf:endereco.addressRegion,data_inicio_atividade:empresa.foundingDate}};
+return {fonte:'Sr. Watson',data:{razao_social:empresa.name,email:empresa.email,telefone:empresa.telephone,logradouro:numero?numero[1]:rua,numero:numero?numero[2]:'',cep:endereco.postalCode,municipio:endereco.addressLocality,uf:endereco.addressRegion}};
 }catch(error){return {fonte:'Sr. Watson',erro:error.message||'falha na consulta'}}
 };
 const [resultados,srWatson]=await Promise.all([
