@@ -92,6 +92,20 @@ values ('UUID_DA_CONTA', 'representante', 'ID_DO_REPRESENTANTE', true);
 
 Defina `must_change_password = true` para o representante se ele receber a senha temporária compartilhada. A conta existente `isaque@fabrica.interno` permanece Administrador.
 
+### Administradores e recuperação de senha
+
+Na tela **Administradores**, um administrador autenticado pode convidar outro administrador e alterar o e-mail de login e o WhatsApp das contas administrativas. O convite do Supabase Auth é enviado ao e-mail real informado; o novo administrador define a própria senha pelo link recebido. A alteração do e-mail também atualiza a identidade de login e o destino de recuperação de senha.
+
+A ação **Esqueci minha senha** aparece no login do administrador. A conta existente `@fabrica.interno` não recebe e-mails; para habilitar a recuperação dessa conta, entre com o usuário atual, abra **Administrador**, salve o e-mail real de contato e depois use o e-mail como login. O envio depende do SMTP de e-mail do Supabase estar configurado.
+
+Publique `index.html` no GitHub Pages e a função administrativa no Supabase. Permita o retorno de autenticação para a página do app em **Authentication > URL Configuration**:
+
+```powershell
+npx.cmd --yes supabase functions deploy gerenciar-administradores --project-ref kgikdyqyoaqrhsshpmcw
+```
+
+Inclua `https://isaque-americo.github.io/fabrica-shorts/` na lista de URLs de redirecionamento do Supabase. O perfil de administrador é criado apenas depois de a função validar que o solicitante tem perfil `admin`.
+
 ## Pedidos existentes
 
 Pedidos antigos permanecem disponíveis ao administrador e ao representante indicado em `repId`. A migração não tenta adivinhar a qual conta de lojista pertencem. Pedidos vinculados a uma loja recebem o `owner_id` dessa conta e ficam visíveis para ela; pedidos não vinculados continuam visíveis ao administrador e ao representante indicado em `repId`.
@@ -99,4 +113,3 @@ Pedidos antigos permanecem disponíveis ao administrador e ao representante indi
 ## Ativação
 
 Quando as políticas restritivas entrarem em vigor, usuários sem linha em `user_profiles` não terão acesso aos dados. A seleção de perfil na tela só habilita o fluxo correto; ela nunca substitui as regras do banco.
-
