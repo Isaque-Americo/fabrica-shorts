@@ -37,6 +37,8 @@ button.pri{background:var(--ac);color:var(--acx)}
 button.ghost,button.sm{background:none;color:var(--ac)}
 button.sm{padding:3px 9px;font-size:13px;margin-right:4px}
 button.sm.del{color:var(--bad);border-color:var(--bad)}
+.profile-button{background:none;border:0;color:#b8c4d9;font:inherit;font-size:12px;cursor:pointer;margin-right:6px;padding:4px 6px;border-radius:6px}
+.profile-button:hover,.profile-button:focus-visible{color:#fff;background:rgba(255,255,255,.1)}
 input,select{font:inherit;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}
 textarea{font:inherit;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%;min-height:70px}
 label{display:block;font-size:13px;color:var(--mut);margin-bottom:10px}
@@ -93,7 +95,7 @@ table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 </head>
 <body>
-<header><h1 style="display:flex;justify-content:space-between;align-items:center">🩳 Gestão da Fábrica de Shorts<span id="auth-actions" style="display:none"><small id="perfil-atual" style="font-size:12px;color:#b8c4d9;margin-right:6px"></small><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="trocarSenha()">Trocar senha</button><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="sair()">Sair</button></span></h1>
+<header><h1 style="display:flex;justify-content:space-between;align-items:center">🩳 Gestão da Fábrica de Shorts<span id="auth-actions" style="display:none"><button id="perfil-atual-admin" class="profile-button" type="button" style="display:none" onclick="editarPerfilAdmin()" title="Editar contato do administrador"></button><small id="perfil-atual" style="font-size:12px;color:#b8c4d9;margin-right:6px"></small><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="trocarSenha()">Trocar senha</button><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="sair()">Sair</button></span></h1>
 <nav id="nav"></nav></header>
 <main id="app"></main>
 <dialog id="dlg"></dialog><dialog id="cdlg"></dialog><div id="toast"></div>
@@ -101,6 +103,7 @@ table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
 const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
 const sb=supabase.createClient(SB_URL,SB_KEY);
 const DOM_USUARIO='@fabrica.interno';
+const recoveryRequested=new URLSearchParams(location.search).get('recuperar')==='1';
 let appProfile=null;
 const PERFIS={admin:'Administrador',lojista:'Lojista',representante:'Representante'};
 const ERROS=[
@@ -138,6 +141,13 @@ function mostraLogin(msg,perfil='admin'){
 $('#nav').innerHTML='';
 $('#auth-actions').style.display='none';
 $('#app').innerHTML=`<form class="c" style="max-width:440px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<label>Perfil de acesso<select name="perfil" id="login-perfil" onchange="atualizaLoginPerfil(this.value)">${Object.entries(PERFIS).map(([k,v])=>`<option value="${k}"${k===perfil?' selected':''}>${v}</option>`).join('')}</select></label><label id="login-usuario-manual">Usuário<input id="login-usuario-texto" name="usuario" type="text" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label><label id="login-conta-wrap" hidden>Usuário<select id="login-conta" name="usuario" class="login-account-list" size="1" disabled onchange="selecionarLoginConta(this)"></select><span id="login-conta-selecionado" class="login-account-selected" hidden><span id="login-conta-nome"></span><button type="button" class="sm" onclick="trocarLoginConta()">Alterar</button></span></label><small id="login-list-note" style="display:block;color:var(--mut);margin:-4px 0 10px" hidden></small><label>Senha<span class="pw"><input id="login-senha" name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><div id="turnstile-widget" style="margin:12px 0"></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
+const recoveryButton=document.createElement('button');
+recoveryButton.id='recovery-button';
+recoveryButton.type='button';
+recoveryButton.className='ghost';
+recoveryButton.textContent='Esqueci minha senha';
+recoveryButton.onclick=recuperarSenha;
+$('#loginmsg').before(recoveryButton);
 atualizaLoginPerfil(perfil);
 renderLoginCaptcha();
 }
@@ -170,6 +180,7 @@ select.focus();
 }
 async function atualizaLoginPerfil(perfil){
 const manual=$('#login-usuario-manual'),input=$('#login-usuario-texto'),wrap=$('#login-conta-wrap'),select=$('#login-conta'),note=$('#login-list-note');
+$('#recovery-button').hidden=perfil!=='admin';
 const seq=++loginOptionsSeq;
 if(perfil==='admin'){
 manual.hidden=false;input.disabled=false;input.required=true;
@@ -251,10 +262,11 @@ if(!selected||!selected.value){m.textContent='Selecione seu cadastro.';return}
 if(selected.dataset.accessReady!=='true'){m.textContent='Este pré-cadastro ainda não tem acesso de login ativo. Peça ao administrador para ativar a conta.';return}
 }
 const usu=String(f.get('usuario')||'').trim().toLowerCase();
-if(!usu||/[@\s]/.test(usu)){m.textContent='Digite só o nome de usuário (sem @ e sem espaços).';return}
+if(!usu||/\s/.test(usu)||(perfil!=='admin'&&usu.includes('@'))){m.textContent=perfil==='admin'?'Digite seu usuário ou e-mail.':'Digite só o nome de usuário (sem @ e sem espaços).';return}
 if(!loginCaptchaToken){m.textContent='Conclua a verificação de segurança antes de entrar.';return}
 const captchaToken=loginCaptchaToken;loginCaptchaToken=null;
-const {error}=await sb.auth.signInWithPassword({email:usu+DOM_USUARIO,password:f.get('senha'),options:{captchaToken}});
+const loginEmail=perfil==='admin'&&usu.includes('@')?usu:usu+DOM_USUARIO;
+const {error}=await sb.auth.signInWithPassword({email:loginEmail,password:f.get('senha'),options:{captchaToken}});
 if(loginCaptchaWidget!==null)window.turnstile.reset(loginCaptchaWidget);
 if(error){m.textContent=ptErro(error);return}
 const {data:{user},error:userError}=await sb.auth.getUser();
@@ -268,6 +280,30 @@ location.reload();
 const olho=()=>`<button type="button" class="ghost olho" title="Mostrar/ocultar senha" onclick="verSenha(this)">👁</button>`;
 function verSenha(b){const i=b.previousElementSibling,v=i.type==='password';i.type=v?'text':'password';b.textContent=v?'🙈':'👁'}
 async function sair(){await sb.auth.signOut();location.reload()}
+function recuperarSenha(){
+const typed=String($('#login-usuario-texto')?.value||'').trim();
+const email=typed.includes('@')?typed:'';
+modal('Recuperar senha',`<p>Informe o e-mail real associado à conta de administrador. O usuário antigo terminado em @fabrica.interno não recebe mensagens.</p><label>E-mail da conta<input name="email" type="email" required autocomplete="email" value="${esc(email)}"></label><div id="recovery-captcha" style="margin:12px 0"></div>`,async form=>{
+const address=String(form.email||'').trim().toLowerCase();
+if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address))throw new Error('Informe um e-mail válido.');
+if(!recoveryCaptchaToken)throw new Error('Conclua a verificação de segurança antes de continuar.');
+const captchaToken=recoveryCaptchaToken;recoveryCaptchaToken=null;
+if(recoveryCaptchaWidget!==null)window.turnstile.reset(recoveryCaptchaWidget);
+const {error}=await sb.auth.resetPasswordForEmail(address,{redirectTo:location.origin+location.pathname+'?recuperar=1',captchaToken});
+if(error)throw new Error(ptErro(error));
+setTimeout(()=>aviso('Se o e-mail corresponder a uma conta, você receberá as instruções de recuperação.'),100);
+});
+renderRecoveryCaptcha();
+}
+let recoveryCaptchaToken=null,recoveryCaptchaWidget=null,recoveryCaptchaAttempts=0;
+function renderRecoveryCaptcha(){
+const host=$('#recovery-captcha');if(!host)return;
+if(!window.turnstile){if(recoveryCaptchaAttempts++<40)setTimeout(renderRecoveryCaptcha,250);else host.textContent='Não foi possível carregar a verificação de segurança. Atualize a página.';return}
+recoveryCaptchaAttempts=0;recoveryCaptchaToken=null;
+if(recoveryCaptchaWidget!==null){try{window.turnstile.remove(recoveryCaptchaWidget)}catch(e){}recoveryCaptchaWidget=null}
+host.innerHTML='';
+recoveryCaptchaWidget=window.turnstile.render(host,{sitekey:'0x4AAAAAAFryednho3gvFb2G',callback:t=>{recoveryCaptchaToken=t;},'expired-callback':()=>{recoveryCaptchaToken=null;},'error-callback':()=>{recoveryCaptchaToken=null;}});
+}
 async function senhaVazada(s){
 try{
 const b=await crypto.subtle.digest('SHA-1',new TextEncoder().encode(s));
@@ -357,14 +393,18 @@ const pedDesatual=o=>['Pendente','Faturado'].includes(o.status)&&(o.itens||[]).s
 const {data:{session}}=await sb.auth.getSession();
 const {data:{user}}=session?await sb.auth.getUser():{data:{}};
 if(!session||!user){if(session)await sb.auth.signOut({scope:'local'});mostraLogin();return}
-const {data:profile,error:profileError}=await sb.from('user_profiles').select('user_id,role,store_name,rep_id,must_change_password').eq('user_id',user.id).maybeSingle();
+const {data:profile,error:profileError}=await sb.from('user_profiles').select('user_id,role,store_name,rep_id,must_change_password,contact_email,contact_whatsapp').eq('user_id',user.id).maybeSingle();
 if(profileError||!profile||!PERFIS[profile.role]||(profile.role==='lojista'&&!profile.store_name)||(profile.role==='representante'&&!profile.rep_id)){
 await sb.auth.signOut({scope:'local'});mostraLogin('Esta conta ainda não tem um perfil de acesso válido. Peça ao administrador para configurá-lo.');return;
 }
 appProfile=profile;
 $('#auth-actions').style.display='inline';
-$('#perfil-atual').textContent=PERFIS[profile.role];
-if(profile.must_change_password)trocarSenha(true);
+if(profile.role==='admin'){
+const profileButton=$('#perfil-atual-admin');
+profileButton.textContent=PERFIS[profile.role];
+profileButton.style.display='inline';
+}else $('#perfil-atual').textContent=PERFIS[profile.role];
+if(profile.must_change_password&&!recoveryRequested)trocarSenha(true);
 tab=profile.role==='lojista'?'catalogo':profile.role==='representante'?'painel':'painel';
 db=sbDb();
 if(db){
@@ -375,16 +415,89 @@ db.collection(k).onSnapshot(s=>{S[k]=s.docs.map(d=>({id:d.id,...d.data()}));if(+
 }
 }else ready=true;
 render();
+if(recoveryRequested){
+history.replaceState(null,'',location.pathname);
+trocarSenha(false);
+}
 })();
 
 function render(){
-const tabs=appProfile?.role==='lojista'?TABS_LOJISTA:appProfile?.role==='representante'?TABS_REP:TABS_ADMIN;
+const tabs=appProfile?.role==='lojista'?TABS_LOJISTA:appProfile?.role==='representante'?TABS_REP:[...TABS_ADMIN,['administradores','Administradores']];
 if(!tabs.some(([k])=>k===tab))tab=tabs[0][0];
 $('#nav').innerHTML=tabs.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';render()">${l}</button>`).join('');
 const a=$('#app');
 if(!db&&ready){a.innerHTML='<div class="alert">Não foi possível conectar ao banco de dados. Verifique sua internet e recarregue a página.</div>';return}
-a.innerHTML=({painel,produtos,catalogo,materia,pedidos,fabricar,reps,cadastros,estoque})[tab]();
+a.innerHTML=({painel,produtos,catalogo,materia,pedidos,fabricar,reps,cadastros,estoque,administradores:adminAccountsPage})[tab]();
 rotula(a);
+if(tab==='administradores'&&!adminAccounts.length&&!adminAccountsLoading&&!adminAccountsError)carregarAdministradores();
+}
+
+let adminAccounts=[],adminAccountsLoading=false,adminAccountsError='';
+function adminAccountsPage(){
+const rows=adminAccounts.map(account=>`<tr><td>${esc(account.email)}</td><td>${esc(account.contact_whatsapp||'—')}</td><td><button class="sm" onclick="editarAdministrador('${esc(account.user_id)}')">Editar</button></td></tr>`).join('');
+return `<div class="bar"><h2>Administradores</h2><div class="row"><button class="ghost" onclick="carregarAdministradores()">Atualizar</button><button class="pri" onclick="novoAdministrador()">Novo administrador</button></div></div><p class="mut">O e-mail cadastrado também será o login e receberá os convites e as instruções de recuperação de senha.</p>${adminAccountsError?`<div class="alert">${esc(adminAccountsError)}</div>`:''}${adminAccountsLoading?'<p class="mut">Carregando administradores…</p>':''}<div class="tw"><table><tr><th>E-mail de login e contato</th><th>WhatsApp</th><th>Ações</th></tr>${rows||'<tr><td colspan="3">Nenhum administrador carregado.</td></tr>'}</table></div>`;
+}
+async function chamarGerenciadorAdmin(body){
+await sessaoOk();
+const {data,error}=await sb.functions.invoke('gerenciar-administradores',{body});
+if(error){
+const response=error.context;
+if(response&&typeof response.clone==='function'){
+const payload=await response.clone().json().catch(()=>null);
+if(payload?.error)throw new Error(payload.error);
+}
+throw new Error(error.message||'Não foi possível concluir a operação administrativa.');
+}
+if(data?.error)throw new Error(data.error);
+return data;
+}
+async function carregarAdministradores(){
+if(appProfile?.role!=='admin'||adminAccountsLoading)return;
+adminAccountsLoading=true;adminAccountsError='';render();
+try{const data=await chamarGerenciadorAdmin({action:'list'});adminAccounts=data.items||[]}
+catch(error){adminAccountsError=error.message||'Não foi possível carregar os administradores.'}
+finally{adminAccountsLoading=false;render()}
+}
+function telefoneAdmin(value){
+const input=String(value||'').trim(),digits=input.replace(/\D/g,'');
+return input.startsWith('+')?'+'+digits:digits.startsWith('55')?'+'+digits:digits?'+55'+digits:'';
+}
+function validarContatoAdmin(emailInput,phoneInput){
+const email=String(emailInput||'').trim().toLowerCase(),whatsapp=telefoneAdmin(phoneInput);
+if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))throw new Error('Informe um e-mail válido.');
+if(email.endsWith('@fabrica.interno'))throw new Error('Use um e-mail real que possa receber mensagens.');
+if(whatsapp&&!/^\+[1-9]\d{7,14}$/.test(whatsapp))throw new Error('Informe um WhatsApp válido com DDI e DDD.');
+return {email,whatsapp};
+}
+function editarPerfilAdmin(){
+if(appProfile?.role!=='admin')return;
+modal('Contato do administrador',`<label>E-mail de contato<input name="contact_email" type="email" required autocomplete="email" value="${esc(appProfile.contact_email||'')}" placeholder="nome@empresa.com"></label><label>WhatsApp<input name="contact_whatsapp" type="tel" required autocomplete="tel" value="${esc(appProfile.contact_whatsapp||'')}" placeholder="+55 32 98838-3046"></label><small class="mut">O WhatsApp será salvo no formato internacional, por exemplo +5532988383046.</small>`,async form=>{
+const {email,whatsapp}=validarContatoAdmin(form.contact_email,form.contact_whatsapp);
+await chamarGerenciadorAdmin({action:'update',user_id:appProfile.user_id,email,contact_whatsapp:whatsapp});
+appProfile.contact_email=email;
+appProfile.contact_whatsapp=whatsapp;
+});
+$('#dlg form').insertAdjacentHTML('afterbegin','<p class="mut">O e-mail também será usado como login e destino de recuperação de senha.</p>');
+}
+function novoAdministrador(){
+if(appProfile?.role!=='admin')return;
+modal('Cadastrar administrador',`<p>Um convite para definir senha será enviado ao e-mail. Esse endereço será também o login da nova conta.</p><label>E-mail<input name="email" type="email" required autocomplete="email"></label><label>WhatsApp (opcional)<input name="contact_whatsapp" type="tel" autocomplete="tel" placeholder="+55 32 98838-3046"></label>`,async form=>{
+const {email,whatsapp}=validarContatoAdmin(form.email,form.contact_whatsapp);
+await chamarGerenciadorAdmin({action:'create',email,contact_whatsapp:whatsapp});
+await carregarAdministradores();
+setTimeout(()=>aviso('Convite enviado ao novo administrador.'),100);
+});
+}
+function editarAdministrador(userId){
+if(appProfile?.role!=='admin')return;
+const account=adminAccounts.find(item=>item.user_id===userId);
+if(!account)return;
+modal('Editar administrador',`<p>Alterar o e-mail também altera o login e o endereço usado para recuperação de senha.</p><label>E-mail<input name="email" type="email" required autocomplete="email" value="${esc(account.email)}"></label><label>WhatsApp (opcional)<input name="contact_whatsapp" type="tel" autocomplete="tel" value="${esc(account.contact_whatsapp||'')}"></label>`,async form=>{
+const {email,whatsapp}=validarContatoAdmin(form.email,form.contact_whatsapp);
+await chamarGerenciadorAdmin({action:'update',user_id:userId,email,contact_whatsapp:whatsapp});
+await carregarAdministradores();
+setTimeout(()=>aviso('Dados do administrador atualizados.'),100);
+});
 }
 
 function rotula(root){
