@@ -291,9 +291,10 @@ async function sair(){await sb.auth.signOut();location.reload()}
 function recuperarSenha(){
 const typed=String($('#login-usuario-texto')?.value||'').trim();
 const email=typed.includes('@')?typed:'';
-modal('Recuperar senha',`<p>Informe o e-mail real associado à conta de administrador. O usuário antigo terminado em @fabrica.interno não recebe mensagens.</p><label>E-mail da conta<input name="email" type="email" required autocomplete="email" value="${esc(email)}"></label><div id="recovery-captcha" style="margin:12px 0"></div>`,async form=>{
+modal('Recuperar senha',`<p>Informe e confirme o e-mail real associado à conta de administrador. O usuário antigo terminado em @fabrica.interno não recebe mensagens.</p><label>E-mail da conta<input name="email" type="email" required autocomplete="email" value="${esc(email)}"></label><label>Confirme o e-mail<input name="confirm-email" type="email" required autocomplete="off"></label><div id="recovery-captcha" style="margin:12px 0"></div>`,async form=>{
 const address=String(form.email||'').trim().toLowerCase();
 if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address))throw new Error('Informe um e-mail válido.');
+if(address!==String(form['confirm-email']||'').trim().toLowerCase())throw new Error('Os e-mails não coincidem. Confira os dois campos.');
 if(!recoveryCaptchaToken)throw new Error('Conclua a verificação de segurança antes de continuar.');
 const captchaToken=recoveryCaptchaToken;recoveryCaptchaToken=null;
 if(recoveryCaptchaWidget!==null)window.turnstile.reset(recoveryCaptchaWidget);
