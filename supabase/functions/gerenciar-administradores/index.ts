@@ -32,6 +32,192 @@ function validPhone(value: string) {
   return value === '' || /^\+[1-9]\d{7,14}$/.test(value)
 }
 
+const recoveryResponse = {
+  message: 'Se o número corresponder a uma conta administrativa ativa, você receberá um código pelo WhatsApp.',
+}
+
+function recoveryPhone(value: unknown) {
+  return typeof value === 'string' && /^\+[1-9]\d{7,14}$/.test(value.trim()) ? value.trim() : ''
+}
+
+function recoveryConfigurationReady(action: unknown) {
+  const hashSecret = Deno.env.get('WHATSAPP_OTP_HASH_SECRET') || ''
+  if (hashSecret.length < 32 || !Deno.env.get('TURNSTILE_SECRET_KEY')) return false
+  if (action !== 'whatsapp_recovery_send') return true
+
+  const token = Deno.env.get('META_WHATSAPP_ACCESS_TOKEN') || ''
+  const phoneNumberId = Deno.env.get('META_WHATSAPP_PHONE_NUMBER_ID') || ''
+  const templateName = Deno.env.get('META_WHATSAPP_TEMPLATE_NAME') || 'authentication_code_copy_code_button'
+  const language = Deno.env.get('META_WHATSAPP_TEMPLATE_LANGUAGE') || 'pt_BR'
+  const version = Deno.env.get('META_GRAPH_API_VERSION') || 'v26.0'
+  return Boolean(token && /^\d+$/.test(phoneNumberId) && /^[a-z0-9_]{1,512}$/i.test(templateName)
+    && /^[a-z]{2,3}_[A-Z]{2}$/.test(language) && /^v\d+\.\d+$/.test(version))
+}
+
+function generateRecoveryCode() {
+  const limit = Math.floor(0x100000000 / 1_000_000) * 1_000_000
+  const value = new Uint32Array(1)
+  do crypto.getRandomValues(value)
+  while (value[0] >= limit)
+  return String(value[0] % 1_000_000).padStart(6, '0')
+}
+
+async function hashRecoveryCode(code: string, userId: string, phone: string) {
+  const secret = Deno.env.get('WHATSAPP_OTP_HASH_SECRET') || ''
+  if (secret.length < 32) throw new Error('WHATSAPP_OTP_HASH_SECRET is not configured.')
+  const input = new TextEncoder().encode(`${userId}:${phone}:${code}`)
+  const key = await crypto.subtle.importKey(
+    'raw',
+    new TextEncoder().encode(secret),
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+  const digest = await crypto.subtle.sign('HMAC', key, input)
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+async function verifyRecoveryCaptcha(req: Request, token: unknown) {
+  const secret = Deno.env.get('TURNSTILE_SECRET_KEY') || ''
+  if (!secret) throw new Error('TURNSTILE_SECRET_KEY is not configured.')
+  if (typeof token !== 'string' || token.length < 1 || token.length > 2048) return false
+
+  const form = new URLSearchParams({ secret, response: token })
+  const ip = req.headers.get('cf-connecting-ip')
+  if (ip) form.set('remoteip', ip)
+  const response = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: form,
+  })
+  if (!response.ok) throw new Error(`Turnstile verification failed with status ${response.status}.`)
+  const result = await response.json()
+  return result.success === true
+    && (!result.hostname || result.hostname === 'isaque-americo.github.io')
+}
+
+async function findRecoveryProfile(phone: string) {
+  const { data, error } = await admin.from('user_profiles')
+    .select('user_id').eq('role', 'admin').eq('contact_whatsapp', phone).limit(2)
+  if (error) throw new Error('Could not look up the recovery profile.')
+  return data?.length === 1 ? data[0] : null
+}
+
+async function sendWhatsAppRecoveryCode(phone: string, code: string) {
+  const token = Deno.env.get('META_WHATSAPP_ACCESS_TOKEN') || ''
+  const phoneNumberId = Deno.env.get('META_WHATSAPP_PHONE_NUMBER_ID') || ''
+  const templateName = Deno.env.get('META_WHATSAPP_TEMPLATE_NAME') || 'authentication_code_copy_code_button'
+  const language = Deno.env.get('META_WHATSAPP_TEMPLATE_LANGUAGE') || 'pt_BR'
+  const version = Deno.env.get('META_GRAPH_API_VERSION') || 'v26.0'
+  if (!token || !/^\d+$/.test(phoneNumberId) || !/^[a-z0-9_]{1,512}$/i.test(templateName)
+    || !/^[a-z]{2,3}_[A-Z]{2}$/.test(language) || !/^v\d+\.\d+$/.test(version)) {
+    throw new Error('WhatsApp Cloud API secrets are missing or invalid.')
+  }
+
+  const authorizationHeader = ['Bearer', token].join(' ')
+  const response = await fetch(`https://graph.facebook.com/${version}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: { Authorization: authorizationHeader, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: phone.replace(/\D/g, ''),
+      type: 'template',
+      template: {
+        name: templateName,
+        language: { code: language },
+        components: [
+          { type: 'body', parameters: [{ type: 'text', text: code }] },
+          {
+            type: 'button',
+            sub_type: 'url',
+            index: '0',
+            parameters: [{ type: 'text', text: code }],
+          },
+        ],
+      },
+    }),
+  })
+  if (!response.ok) {
+    const result = await response.json().catch(() => ({}))
+    console.error('WhatsApp Cloud API rejected a recovery message:', {
+      status: response.status,
+      code: result?.error?.code,
+    })
+    throw new Error('WhatsApp Cloud API could not send the recovery message.')
+  }
+}
+
+async function handleWhatsAppRecovery(req: Request, body: Record<string, unknown>) {
+  const action = body.action
+  const phone = recoveryPhone(body.phone)
+  if (!phone) return json({ error: 'Informe o WhatsApp no formato internacional, por exemplo +5532988383046.' }, 400)
+  if (action === 'whatsapp_recovery_send' && body.consent !== true) {
+    return json({ error: 'Autorize o envio do código de recuperação.' }, 400)
+  }
+  if (!recoveryConfigurationReady(action)) {
+    return json({ error: 'A recuperação pelo WhatsApp ainda não está configurada. Use a recuperação por e-mail.' }, 503)
+  }
+
+  try {
+    if (!await verifyRecoveryCaptcha(req, body.captchaToken)) {
+      return json({ error: 'Conclua novamente a verificação de segurança.' }, 400)
+    }
+
+    const profile = await findRecoveryProfile(phone)
+    if (!profile) {
+      return action === 'whatsapp_recovery_send'
+        ? json(recoveryResponse)
+        : json({ error: 'Código inválido ou expirado.' }, 400)
+    }
+
+    if (action === 'whatsapp_recovery_send') {
+      const code = generateRecoveryCode()
+      const codeHash = await hashRecoveryCode(code, profile.user_id, phone)
+      const { data: permitted, error } = await admin.rpc('begin_admin_password_recovery', {
+        p_user_id: profile.user_id,
+        p_phone: phone,
+        p_code_hash: codeHash,
+      })
+      if (error) throw new Error('Could not start the recovery challenge.')
+      if (permitted) await sendWhatsAppRecoveryCode(phone, code)
+      return json(recoveryResponse)
+    }
+
+    if (action === 'whatsapp_recovery_verify') {
+      const code = typeof body.code === 'string' ? body.code.trim() : ''
+      const password = typeof body.password === 'string' ? body.password : ''
+      if (!/^\d{6}$/.test(code)) return json({ error: 'Informe o código de seis dígitos.' }, 400)
+      if (password.length < 8 || password.length > 72) {
+        return json({ error: 'A senha deve ter entre 8 e 72 caracteres.' }, 400)
+      }
+
+      const codeHash = await hashRecoveryCode(code, profile.user_id, phone)
+      const { data: verified, error } = await admin.rpc('verify_admin_password_recovery', {
+        p_user_id: profile.user_id,
+        p_phone: phone,
+        p_code_hash: codeHash,
+      })
+      if (error) throw new Error('Could not verify the recovery challenge.')
+      if (verified !== true) return json({ error: 'Código inválido ou expirado.' }, 400)
+
+      const { error: updateError } = await admin.auth.admin.updateUserById(profile.user_id, { password })
+      if (updateError) {
+        console.error('Could not update the administrator password after WhatsApp verification.')
+        return json({ error: 'Não foi possível atualizar a senha. Solicite um novo código.' }, 500)
+      }
+      return json({ message: 'Senha atualizada. Entre com sua nova senha.' })
+    }
+  } catch (error) {
+    console.error('WhatsApp password recovery failed:', error instanceof Error ? error.message : 'Unknown error')
+    return action === 'whatsapp_recovery_send'
+      ? json(recoveryResponse)
+      : json({ error: 'Não foi possível concluir a recuperação. Solicite um novo código e tente novamente.' }, 500)
+  }
+
+  return json({ error: 'Ação desconhecida.' }, 400)
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'Método não permitido.' }, 405)
@@ -41,6 +227,12 @@ Deno.serve(async (req) => {
   if (origin && origin !== APP_ORIGIN) return json({ error: 'Origem não autorizada.' }, 403)
 
   try {
+    const body = await req.json().catch(() => ({}))
+    const action = typeof body.action === 'string' ? body.action : ''
+    if (action === 'whatsapp_recovery_send' || action === 'whatsapp_recovery_verify') {
+      return await handleWhatsAppRecovery(req, body)
+    }
+
     const authorization = req.headers.get('authorization') || ''
     const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : ''
     if (!token) return json({ error: 'Sessão necessária.' }, 401)
@@ -52,9 +244,6 @@ Deno.serve(async (req) => {
       .select('role').eq('user_id', authData.user.id).maybeSingle()
     if (callerError) return json({ error: 'Não foi possível validar o perfil administrador.' }, 500)
     if (caller?.role !== 'admin') return json({ error: 'Somente administradores podem gerenciar contas.' }, 403)
-
-    const body = await req.json().catch(() => ({}))
-    const action = typeof body.action === 'string' ? body.action : ''
 
     if (action === 'list') {
       const [{ data: profiles, error: profilesError }, { data: users, error: usersError }] = await Promise.all([

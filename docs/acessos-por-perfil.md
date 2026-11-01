@@ -106,6 +106,32 @@ npx.cmd --yes supabase functions deploy gerenciar-administradores --project-ref 
 
 Inclua `https://isaque-americo.github.io/fabrica-shorts/` na lista de URLs de redirecionamento do Supabase. O perfil de administrador é criado apenas depois de a função validar que o solicitante tem perfil `admin`.
 
+### Recuperação por WhatsApp (Meta Cloud API)
+
+O login oferece recuperação por e-mail e WhatsApp. A recuperação por WhatsApp só funciona depois de habilitar a Meta WhatsApp Cloud API e configurar o backend; até lá, use a opção por e-mail.
+
+**Estado em 31/10/2026:** a tentativa de envio com o número de teste da Meta retornou `(#133010) Account not registered`; a conta WhatsApp de teste aparece com `account_review_status: REJECTED`. A integração não está validada para envio. Resolva o estado da conta de teste na Meta antes de considerar o fluxo pronto; o número comercial terminado em 3046 não foi alterado.
+
+**Atenção às migrations:** a lista local e a lista do projeto Supabase remoto estão divergentes: existem migrations locais ainda não registradas no remoto e migrations remotas ausentes deste checkout. Não execute `supabase db push` até reconciliar o histórico e fazer backup do banco.
+
+1. Na Meta, configure uma conta WhatsApp Business, um número habilitado para a Cloud API e um token de acesso de servidor. Crie e obtenha aprovação para um template da categoria **Authentication**, idioma `pt_BR`, botão OTP **Copy code** e código de expiração de 10 minutos. O nome inicial esperado pelo app é `authentication_code_copy_code_button`; se escolher outro, configure `META_WHATSAPP_TEMPLATE_NAME`.
+2. Salve, pelo painel **Supabase > Edge Functions > Secrets**, os seguintes secrets. Nunca os coloque em `index.html`, Git ou mensagens:
+   - `META_WHATSAPP_ACCESS_TOKEN`: token de acesso do servidor da Meta.
+   - `META_WHATSAPP_PHONE_NUMBER_ID`: ID do número de telefone no WhatsApp Manager.
+   - `WHATSAPP_OTP_HASH_SECRET`: segredo aleatório forte com pelo menos 32 caracteres, usado para armazenar somente o hash do código.
+   - `TURNSTILE_SECRET_KEY`: secret do Cloudflare Turnstile correspondente à chave pública do app.
+   - Opcional: `META_WHATSAPP_TEMPLATE_NAME`, `META_WHATSAPP_TEMPLATE_LANGUAGE` (padrão `pt_BR`) e `META_GRAPH_API_VERSION` (padrão `v26.0`).
+3. Aplique a migração `20261031235000_admin_whatsapp_password_recovery.sql` e publique a função atualizada:
+
+```powershell
+npx.cmd --yes supabase db push --project-ref kgikdyqyoaqrhsshpmcw
+npx.cmd --yes supabase functions deploy gerenciar-administradores --project-ref kgikdyqyoaqrhsshpmcw
+```
+
+4. Publique o `index.html` atualizado no GitHub Pages. O administrador deve ter salvo o telefone no formato internacional (`+55...`) no próprio perfil. Na recuperação, a pessoa solicita o código e confirma que aceita recebê-lo; respostas públicas não indicam se o número está cadastrado. Os códigos expiram em 10 minutos, são de uso único, têm até cinco tentativas e o envio é limitado a um por minuto e cinco por 24 horas por conta.
+
+A conta Meta precisa ter o opt-in adequado para enviar mensagens ao número. A criação e aprovação do template, ativação do número, verificação do consentimento e eventuais cobranças são administradas pela Meta; o app não cria esses recursos automaticamente. O SMTP e a recuperação por e-mail continuam disponíveis como alternativa.
+
 ## Pedidos existentes
 
 Pedidos antigos permanecem disponíveis ao administrador e ao representante indicado em `repId`. A migração não tenta adivinhar a qual conta de lojista pertencem. Pedidos vinculados a uma loja recebem o `owner_id` dessa conta e ficam visíveis para ela; pedidos não vinculados continuam visíveis ao administrador e ao representante indicado em `repId`.

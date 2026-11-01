@@ -148,6 +148,13 @@ recoveryButton.className='ghost';
 recoveryButton.textContent='Esqueci minha senha';
 recoveryButton.onclick=recuperarSenha;
 $('#loginmsg').before(recoveryButton);
+const whatsappRecoveryButton=document.createElement('button');
+whatsappRecoveryButton.id='whatsapp-recovery-button';
+whatsappRecoveryButton.type='button';
+whatsappRecoveryButton.className='ghost';
+whatsappRecoveryButton.textContent='Recuperar pelo WhatsApp';
+whatsappRecoveryButton.onclick=recuperarSenhaWhatsApp;
+recoveryButton.after(whatsappRecoveryButton);
 atualizaLoginPerfil(perfil);
 renderLoginCaptcha();
 }
@@ -181,6 +188,7 @@ select.focus();
 async function atualizaLoginPerfil(perfil){
 const manual=$('#login-usuario-manual'),input=$('#login-usuario-texto'),wrap=$('#login-conta-wrap'),select=$('#login-conta'),note=$('#login-list-note');
 $('#recovery-button').hidden=perfil!=='admin';
+$('#whatsapp-recovery-button').hidden=perfil!=='admin';
 const seq=++loginOptionsSeq;
 if(perfil==='admin'){
 manual.hidden=false;input.disabled=false;input.required=true;
@@ -292,6 +300,47 @@ if(recoveryCaptchaWidget!==null)window.turnstile.reset(recoveryCaptchaWidget);
 const {error}=await sb.auth.resetPasswordForEmail(address,{redirectTo:location.origin+location.pathname+'?recuperar=1',captchaToken});
 if(error)throw new Error(ptErro(error));
 setTimeout(()=>aviso('Se o e-mail corresponder a uma conta, você receberá as instruções de recuperação.'),100);
+});
+renderRecoveryCaptcha();
+}
+function recuperarSenhaWhatsApp(){
+modal('Recuperar senha pelo WhatsApp',`<p>Informe o número internacional já cadastrado no perfil de administrador. Se o número corresponder a uma conta, enviaremos um código de uso único. Ao continuar, você autoriza o envio desta mensagem de recuperação.</p><label>WhatsApp<input name="phone" type="tel" required autocomplete="tel" placeholder="+5532988383046" pattern="\\+[1-9][0-9]{7,14}"></label><label><input name="whatsapp-consent" type="checkbox" required> Concordo em receber o código de recuperação por WhatsApp.</label><div id="recovery-captcha" style="margin:12px 0"></div>`,async form=>{
+const phone=String(form.phone||'').trim();
+if(!/^\+[1-9]\d{7,14}$/.test(phone))throw new Error('Informe o WhatsApp no formato internacional, por exemplo +5532988383046.');
+if(form['whatsapp-consent']!=='on')throw new Error('Autorize o envio do código de recuperação.');
+if(!recoveryCaptchaToken)throw new Error('Conclua a verificação de segurança antes de continuar.');
+const captchaToken=recoveryCaptchaToken;recoveryCaptchaToken=null;
+if(recoveryCaptchaWidget!==null)window.turnstile.reset(recoveryCaptchaWidget);
+await chamarRecoveryWhatsApp({action:'whatsapp_recovery_send',phone,consent:true,captchaToken});
+setTimeout(()=>digitarCodigoWhatsApp(phone),100);
+});
+renderRecoveryCaptcha();
+}
+async function chamarRecoveryWhatsApp(body){
+const {data,error}=await sb.functions.invoke('gerenciar-administradores',{body});
+if(error){
+const response=error.context;
+if(response&&typeof response.clone==='function'){
+const payload=await response.clone().json().catch(()=>null);
+if(payload?.error)throw new Error(payload.error);
+}
+throw new Error(error.message||'Não foi possível iniciar a recuperação pelo WhatsApp.');
+}
+if(data?.error)throw new Error(data.error);
+return data;
+}
+function digitarCodigoWhatsApp(phone){
+modal('Confirmar código e redefinir senha',`<p>Se o número estiver vinculado a uma conta, um código pode ter sido enviado. Informe o mais recente; ele expira em 10 minutos e só pode ser usado uma vez.</p><input name="phone" type="hidden" value="${esc(phone)}"><label>Código<input name="code" type="text" required inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6"></label><label>Nova senha<input name="password" type="password" required minlength="8" maxlength="72" autocomplete="new-password"></label><label>Confirme a nova senha<input name="confirm-password" type="password" required minlength="8" maxlength="72" autocomplete="new-password"></label><div id="recovery-captcha" style="margin:12px 0"></div>`,async form=>{
+const code=String(form.code||'').trim();
+const newPassword=String(form.password||'');
+if(!/^\d{6}$/.test(code))throw new Error('Informe o código de seis dígitos.');
+if(newPassword.length<8||newPassword.length>72)throw new Error('A senha deve ter entre 8 e 72 caracteres.');
+if(newPassword!==form['confirm-password'])throw new Error('As senhas não coincidem.');
+if(!recoveryCaptchaToken)throw new Error('Conclua a verificação de segurança antes de continuar.');
+const captchaToken=recoveryCaptchaToken;recoveryCaptchaToken=null;
+if(recoveryCaptchaWidget!==null)window.turnstile.reset(recoveryCaptchaWidget);
+const result=await chamarRecoveryWhatsApp({action:'whatsapp_recovery_verify',phone:form.phone,code,password:newPassword,captchaToken});
+setTimeout(()=>aviso(result.message||'Senha atualizada. Entre com sua nova senha.'),100);
 });
 renderRecoveryCaptcha();
 }
