@@ -139,6 +139,8 @@ const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1
 const sb=supabase.createClient(SB_URL,SB_KEY);
 const DOM_USUARIO='@fabrica.interno';
 const recoveryRequested=new URLSearchParams(location.search).get('recuperar')==='1';
+const hashParams = new URLSearchParams(location.hash.slice(1));
+const recoveryMode = hashParams.get('type') === 'recovery';
 let appProfile=null;
 const PERFIS={admin:'Administrador',lojista:'Lojista',representante:'Representante'};
 const ERROS=[
@@ -328,7 +330,7 @@ if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address))throw new Error('Informe um e-mai
 if(!recoveryCaptchaToken && !IS_DEV)throw new Error('Conclua a verificação de segurança antes de continuar.');
 const captchaToken = IS_DEV ? undefined : recoveryCaptchaToken;recoveryCaptchaToken=null;
 if(recoveryCaptchaWidget!==null)window.turnstile.reset(recoveryCaptchaWidget);
-const {error}=await sb.auth.resetPasswordForEmail(address,{redirectTo:location.origin+location.pathname+'?recuperar=1',captchaToken});
+const {error}=await sb.auth.resetPasswordForEmail(address,{redirectTo:location.origin+location.pathname+'#type=recovery',captchaToken});
 if(error)throw new Error(ptErro(error));
 setTimeout(()=>aviso('Se o e-mail corresponder a uma conta, você receberá as instruções de recuperação.'),100);
 });
@@ -459,7 +461,7 @@ const profileButton=$('#perfil-atual-admin');
 profileButton.textContent=PERFIS[profile.role];
 profileButton.style.display='inline';
 }else $('#perfil-atual').textContent=PERFIS[profile.role];
-if(profile.must_change_password&&!recoveryRequested)trocarSenha(true);
+if(profile.must_change_password&&!recoveryRequested&&!recoveryMode)trocarSenha(true);
 tab=profile.role==='lojista'?'catalogo':profile.role==='representante'?'painel':'painel';
 db=sbDb();
 if(db){
@@ -473,6 +475,9 @@ render();
 if(recoveryRequested){
 history.replaceState(null,'',location.pathname);
 trocarSenha(false);
+}
+if(recoveryMode){
+sb.auth.onAuthStateChange(async (e,s)=>{if(e==='PASSWORD_RECOVERY'&&s){history.replaceState(null,'',location.pathname);trocarSenha(false);}});
 }
 })();
 
