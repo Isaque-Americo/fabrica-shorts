@@ -4,23 +4,33 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Gestão da Fábrica de Shorts</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <style>
-:root{--bg:#f6f5f2;--card:#fff;--tx:#1d2330;--mut:#667085;--bd:#e3e1db;--ac:#1f4e8c;--acx:#fff;--ok:#1a7f4b;--warn:#b54708;--bad:#b42318;--hd:#16233a;
+:root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;--sidebar:#212529;--sidebar-active:#007bff;
 color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;color-scheme:dark}}
 :root[data-theme="dark"]{--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;color-scheme:dark}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-header{background:var(--hd);color:#fff;padding:14px 16px 0}
-header h1{margin:0 0 10px;font-size:18px;letter-spacing:.2px}
-nav{display:flex;gap:4px;overflow-x:auto}
-nav button{background:none;border:0;color:#b8c4d9;padding:10px 14px;font:inherit;cursor:pointer;border-bottom:3px solid transparent;white-space:nowrap}
-nav button.on{color:#fff;border-color:#6ea8fe;font-weight:600}
-main{max-width:1100px;margin:0 auto;padding:16px}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 'Inter', system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.app-shell{display:flex;min-height:100vh}
+.sidebar{width:260px;background:var(--sidebar);color:#fff;display:flex;flex-direction:column}
+.sidebar-header{padding:20px 16px;border-bottom:1px solid rgba(255,255,255,.1)}
+.sidebar-header h1{margin:0;font-size:18px;font-family:'Poppins',sans-serif}
+.sidebar-nav{padding:12px 0;flex:1}
+.sidebar-nav a{display:flex;align-items:center;gap:12px;padding:12px 16px;color:#adb5bd;text-decoration:none;font-size:14px;transition:all .2s}
+.sidebar-nav a:hover,.sidebar-nav a.active{background:rgba(255,255,255,.08);color:#fff}
+.sidebar-nav a.active{border-left:3px solid var(--ac);color:#fff;background:rgba(0,123,255,.1)}
+.material-icons{font-size:20px}
+.main-area{flex:1;display:flex;flex-direction:column}
+header{background:var(--card);color:var(--tx);padding:12px 24px;border-bottom:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+header h1{margin:0;font-size:20px;font-family:'Poppins',sans-serif;font-weight:600}
+main{flex:1;padding:24px;max-width:none;margin:0}
 .bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .bar h2{margin:0;font-size:18px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
@@ -95,9 +105,34 @@ table.gr{min-width:0}.gr td{padding:4px 6px}.gr th{padding:6px}
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 </head>
 <body>
-<header><h1 style="display:flex;justify-content:space-between;align-items:center">🩳 Gestão da Fábrica de Shorts<span id="auth-actions" style="display:none"><button id="perfil-atual-admin" class="profile-button" type="button" style="display:none" onclick="editarPerfilAdmin()" title="Editar contato do administrador"></button><small id="perfil-atual" style="font-size:12px;color:#b8c4d9;margin-right:6px"></small><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="trocarSenha()">Trocar senha</button><button class="sm" style="color:#b8c4d9;border-color:#b8c4d9" onclick="sair()">Sair</button></span></h1>
-<nav id="nav"></nav></header>
-<main id="app"></main>
+<div id="login-container"></div>
+<div id="app-shell" class="app-shell" style="display:none">
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <h1>🩳 Fábrica</h1>
+      <small style="color:#adb5bd;font-size:12px">Gestão de Shorts</small>
+    </div>
+    <nav class="sidebar-nav" id="sidebar-nav"></nav>
+    <div style="padding:16px;border-top:1px solid rgba(255,255,255,.1)">
+      <button id="logout-btn" class="ghost" style="width:100%;text-align:left;color:#adb5bd" onclick="sair()"><span class="material-icons">logout</span> Sair</button>
+    </div>
+  </aside>
+  <div class="main-area">
+    <header>
+      <div>
+        <h1 id="page-title">Painel</h1>
+        <small id="page-subtitle" style="color:var(--mut)"></small>
+      </div>
+      <div id="auth-actions" style="display:none">
+        <button id="perfil-atual-admin" class="profile-button" type="button" style="display:none" onclick="editarPerfilAdmin()" title="Editar contato do administrador"></button>
+        <small id="perfil-atual" style="font-size:12px;color:var(--mut);margin-right:12px"></small>
+        <button class="sm" onclick="trocarSenha()">Trocar senha</button>
+        <button class="sm" onclick="sair()">Sair</button>
+      </div>
+    </header>
+    <main id="app"></main>
+  </div>
+</div>
 <dialog id="dlg"></dialog><dialog id="cdlg"></dialog><div id="toast"></div>
 <script>
 const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
@@ -138,9 +173,11 @@ try{document.querySelectorAll('dialog[open]').forEach(d=>d.close())}catch(e){}
 mostraLogin('Sua sessão expirou. Entre novamente.');
 }
 function mostraLogin(msg,perfil='admin'){
-$('#nav').innerHTML='';
 $('#auth-actions').style.display='none';
-$('#app').innerHTML=`<form class="c" style="max-width:440px;margin:40px auto" onsubmit="entrar(event)"><h2 style="margin-top:0">Entrar</h2>${msg?`<div class="alert">${esc(msg)}</div>`:''}<label>Perfil de acesso<select name="perfil" id="login-perfil" onchange="atualizaLoginPerfil(this.value)">${Object.entries(PERFIS).map(([k,v])=>`<option value="${k}"${k===perfil?' selected':''}>${v}</option>`).join('')}</select></label><label id="login-usuario-manual">Usuário<input id="login-usuario-texto" name="usuario" type="text" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false"></label><label id="login-conta-wrap" hidden>Usuário<select id="login-conta" name="usuario" class="login-account-list" size="1" disabled onchange="selecionarLoginConta(this)"></select><span id="login-conta-selecionado" class="login-account-selected" hidden><span id="login-conta-nome"></span><button type="button" class="sm" onclick="trocarLoginConta()">Alterar</button></span></label><small id="login-list-note" style="display:block;color:var(--mut);margin:-4px 0 10px" hidden></small><label>Senha<span class="pw"><input id="login-senha" name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end"><button class="pri">Entrar</button></div><div id="turnstile-widget" style="margin:12px 0"></div><small id="loginmsg" style="color:var(--mut)"></small></form>`;
+const shell=document.getElementById('app-shell');
+if(shell) shell.style.display='none';
+const loginContainer=document.getElementById('login-container');
+loginContainer.innerHTML=`<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:var(--bg)"><div class="c" style="width:100%;max-width:400px"><div style="text-align:center;margin-bottom:24px"><h1 style="margin:0;font-family:'Poppins',sans-serif;font-size:28px;font-weight:600;color:var(--hd)">Fábrica de Shorts</h1><p style="margin:8px 0 0;color:var(--mut);font-size:14px">Gestão de pedidos, estoque e produção</p></div><form class="c" style="padding:24px" onsubmit="entrar(event)"><h2 style="margin:0 0 8px;font-size:20px;font-weight:500">Entrar</h2>${msg?`<div class="alert" style="margin-bottom:16px">${esc(msg)}</div>`:''}<label style="margin-bottom:16px">Perfil de acesso<select name="perfil" id="login-perfil" onchange="atualizaLoginPerfil(this.value)" style="margin-top:6px">${Object.entries(PERFIS).map(([k,v])=>`<option value="${k}"${k===perfil?' selected':''}>${v}</option>`).join('')}</select></label><label id="login-usuario-manual" style="margin-bottom:16px">Usuário<input id="login-usuario-texto" name="usuario" type="text" required autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" style="margin-top:6px"></label><label id="login-conta-wrap" hidden style="margin-bottom:16px">Usuário<select id="login-conta" name="usuario" class="login-account-list" size="1" disabled onchange="selecionarLoginConta(this)" style="margin-top:6px"></select><span id="login-conta-selecionado" class="login-account-selected" hidden><span id="login-conta-nome"></span><button type="button" class="sm" onclick="trocarLoginConta()" style="margin-top:8px">Alterar</button></span></label><small id="login-list-note" style="display:block;color:var(--mut);margin:-8px 0 16px" hidden></small><label style="margin-bottom:16px">Senha<span class="pw"><input id="login-senha" name="senha" type="password" required autocomplete="current-password">${olho()}</span></label><div class="row end" style="margin-top:20px"><button class="pri" style="width:100%;min-height:48px">Entrar</button></div><div id="turnstile-widget" style="margin:16px 0"></div><small id="loginmsg" style="color:var(--mut);display:block;text-align:center;margin-top:12px"></small></form></div></div>`;
 const recoveryButton=document.createElement('button');
 recoveryButton.id='recovery-button';
 recoveryButton.type='button';
@@ -152,8 +189,10 @@ atualizaLoginPerfil(perfil);
 renderLoginCaptcha();
 }
 let loginCaptchaToken=null,loginCaptchaWidget=null,loginCaptchaAttempts=0;
+const IS_DEV = location.hostname==='localhost'||location.hostname==='127.0.0.1';
 function renderLoginCaptcha(){
 const host=document.querySelector("#turnstile-widget");if(!host)return;
+if(IS_DEV){host.textContent='Modo desenvolvimento: captcha ignorado.';loginCaptchaToken='dev-bypass';return}
 if(!window.turnstile){if(loginCaptchaAttempts++<40)setTimeout(renderLoginCaptcha,250);else host.textContent="Não foi possível carregar a verificação de segurança. Atualize a página.";return}
 loginCaptchaAttempts=0;loginCaptchaToken=null;
 if(loginCaptchaWidget!==null){try{window.turnstile.remove(loginCaptchaWidget)}catch(e){}loginCaptchaWidget=null}
@@ -263,8 +302,8 @@ if(selected.dataset.accessReady!=='true'){m.textContent='Este pré-cadastro aind
 }
 const usu=String(f.get('usuario')||'').trim().toLowerCase();
 if(!usu||/\s/.test(usu)||(perfil!=='admin'&&usu.includes('@'))){m.textContent=perfil==='admin'?'Digite seu usuário ou e-mail.':'Digite só o nome de usuário (sem @ e sem espaços).';return}
-if(!loginCaptchaToken){m.textContent='Conclua a verificação de segurança antes de entrar.';return}
-const captchaToken=loginCaptchaToken;loginCaptchaToken=null;
+if(!loginCaptchaToken && !IS_DEV){m.textContent='Conclua a verificação de segurança antes de entrar.';return}
+const captchaToken = IS_DEV ? undefined : loginCaptchaToken; loginCaptchaToken=null;
 const loginEmail=perfil==='admin'&&usu.includes('@')?usu:usu+DOM_USUARIO;
 const {error}=await sb.auth.signInWithPassword({email:loginEmail,password:f.get('senha'),options:{captchaToken}});
 if(loginCaptchaWidget!==null)window.turnstile.reset(loginCaptchaWidget);
@@ -286,8 +325,8 @@ const email=typed.includes('@')?typed:'';
 modal('Recuperar senha',`<p>Informe o e-mail associado à conta de administrador. Ao salvar, o sistema enviará instruções apenas se houver uma conta com esse endereço. Por segurança, não informamos se o e-mail está cadastrado. O usuário antigo terminado em @fabrica.interno não recebe mensagens.</p><label>E-mail da conta<input name="email" type="email" required autocomplete="email" value="${esc(email)}"></label><div id="recovery-captcha" style="margin:12px 0"></div>`,async form=>{
 const address=String(form.email||'').trim().toLowerCase();
 if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address))throw new Error('Informe um e-mail válido.');
-if(!recoveryCaptchaToken)throw new Error('Conclua a verificação de segurança antes de continuar.');
-const captchaToken=recoveryCaptchaToken;recoveryCaptchaToken=null;
+if(!recoveryCaptchaToken && !IS_DEV)throw new Error('Conclua a verificação de segurança antes de continuar.');
+const captchaToken = IS_DEV ? undefined : recoveryCaptchaToken;recoveryCaptchaToken=null;
 if(recoveryCaptchaWidget!==null)window.turnstile.reset(recoveryCaptchaWidget);
 const {error}=await sb.auth.resetPasswordForEmail(address,{redirectTo:location.origin+location.pathname+'?recuperar=1',captchaToken});
 if(error)throw new Error(ptErro(error));
@@ -298,6 +337,7 @@ renderRecoveryCaptcha();
 let recoveryCaptchaToken=null,recoveryCaptchaWidget=null,recoveryCaptchaAttempts=0;
 function renderRecoveryCaptcha(){
 const host=$('#recovery-captcha');if(!host)return;
+if(IS_DEV){host.textContent='Modo desenvolvimento: captcha ignorado.';recoveryCaptchaToken='dev-bypass';return}
 if(!window.turnstile){if(recoveryCaptchaAttempts++<40)setTimeout(renderRecoveryCaptcha,250);else host.textContent='Não foi possível carregar a verificação de segurança. Atualize a página.';return}
 recoveryCaptchaAttempts=0;recoveryCaptchaToken=null;
 if(recoveryCaptchaWidget!==null){try{window.turnstile.remove(recoveryCaptchaWidget)}catch(e){}recoveryCaptchaWidget=null}
@@ -346,6 +386,21 @@ const ST=['Pendente','Faturado','Enviado','Entregue','Cancelado'];
 const TABS_ADMIN=[['painel','Painel'],['produtos','Produtos'],['materia','Matéria-prima'],['pedidos','Pedidos'],['fabricar','Fabricar'],['reps','Representantes'],['cadastros','Cadastros'],['estoque','Estoque']];
 const TABS_LOJISTA=[['catalogo','Catálogo'],['pedidos','Pedidos']];
 const TABS_REP=[['painel','Comissões'],['catalogo','Catálogo'],['pedidos','Pedidos']];
+function iconForTab(k){
+switch(k){
+case 'painel':return 'dashboard';
+case 'produtos':return 'inventory_2';
+case 'materia':return 'fabric';
+case 'pedidos':return 'receipt_long';
+case 'fabricar':return 'precision_manufacturing';
+case 'reps':return 'groups';
+case 'cadastros':return 'person_add';
+case 'estoque':return 'store';
+case 'administradores':return 'admin_panel_settings';
+case 'catalogo':return 'menu_book';
+default:return 'circle';
+}
+}
 let db=null,tab='painel',ready=false;
 const $=s=>document.querySelector(s);
 const brl=n=>(+n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
@@ -424,7 +479,11 @@ trocarSenha(false);
 function render(){
 const tabs=appProfile?.role==='lojista'?TABS_LOJISTA:appProfile?.role==='representante'?TABS_REP:[...TABS_ADMIN,['administradores','Administradores']];
 if(!tabs.some(([k])=>k===tab))tab=tabs[0][0];
-$('#nav').innerHTML=tabs.map(([k,l])=>`<button class="${k===tab?'on':''}" onclick="tab='${k}';render()">${l}</button>`).join('');
+$('#sidebar-nav').innerHTML=tabs.map(([k,l])=>`<a href="#" class="${k===tab?'active':''}" onclick="tab='${k}';render();return false;"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`).join('');
+$('#page-title').textContent=tabs.find(t=>t[0]===tab)?.[1]||'Painel';
+$('#page-subtitle').textContent='';
+const shell=document.getElementById('app-shell');
+if(shell) shell.style.display='flex';
 const a=$('#app');
 if(!db&&ready){a.innerHTML='<div class="alert">Não foi possível conectar ao banco de dados. Verifique sua internet e recarregue a página.</div>';return}
 a.innerHTML=({painel,produtos,catalogo,materia,pedidos,fabricar,reps,cadastros,estoque,administradores:adminAccountsPage})[tab]();
