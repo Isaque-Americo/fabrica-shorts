@@ -1302,7 +1302,7 @@ function fabricarLista(){return fabricarPedidos().flatMap(x=>x.linhas)}
 let fabVista=(()=>{try{return localStorage.getItem('fabVista')}catch(e){return null}})()||'pedido';
 // shortcut: mesa e altura do enfesto ficam no navegador de quem planeja, não no banco; mover para a config se outra pessoa precisar dos mesmos números
 const lsNum=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:+v||0}catch(e){return d}};
-let enfCam=lsNum('enfCam',50),enfMesa=lsNum('enfMesa',0);
+let enfCam=lsNum('enfCam',50),enfMesa=lsNum('enfMesa',5);
 function setEnf(k,v){const n=Math.max(0,+v||0);if(k==='cam')enfCam=n;else enfMesa=n;try{localStorage.setItem(k==='cam'?'enfCam':'enfMesa',n)}catch(e){}render()}
 // cada camada do enfesto rende 1 peça de cada tamanho do risco; o risco cresce até a mesa acabar e as camadas param no menor saldo (não sobra peça)
 function planoEnfesto(qtds,consTam,maxCam,mesa){
