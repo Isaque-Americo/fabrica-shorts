@@ -77,6 +77,7 @@ a.c{text-decoration:none;color:inherit;display:block}
 a.c:hover{border-color:var(--ac)}
 .busca{flex:1;min-width:150px;max-width:260px}
 small.aviso{color:var(--warn)}
+[hidden]{display:none!important}
 .profile-button{background:none;border:0;color:#b8c4d9;font:inherit;font-size:12px;cursor:pointer;margin-right:6px;padding:4px 6px;border-radius:6px}
 .profile-button:hover,.profile-button:focus-visible{color:#fff;background:rgba(255,255,255,.1)}
 input,select{font:inherit;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}
@@ -101,6 +102,19 @@ table.keep td:first-child,table.keep th:first-child{position:sticky;left:0;backg
 main{padding:12px}
 header{padding:12px 12px 0}
 input,select{font-size:16px}
+/* no celular a barra lateral de 260px engolia a tela: vira uma faixa de abas que rola na horizontal */
+.app-shell{flex-direction:column}
+.sidebar{width:auto;flex-direction:row;align-items:center;position:sticky;top:0;z-index:20}
+.sidebar-header{padding:10px 12px;border:0;flex:none}
+.sidebar-header h1{font-size:15px}
+.sidebar-header small{display:none}
+.sidebar-nav{display:flex;padding:0;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.sidebar-nav::-webkit-scrollbar{display:none}
+.sidebar-nav a{padding:12px;white-space:nowrap;border-left:0;border-bottom:3px solid transparent}
+.sidebar-nav a.active{border-left:0;border-bottom-color:var(--ac);background:rgba(255,255,255,.08)}
+.sidebar>div:last-child{padding:0 8px;border:0;flex:none}
+#logout-btn{width:auto;min-height:0;padding:6px;border:0;font-size:0}
+#logout-btn span{font-size:20px}
 button.pri,button.ghost{min-height:42px}
 button.sm{padding:7px 12px;font-size:14px}
 .tw table:not(.keep),table:not(.keep) tbody{display:block;min-width:0}
@@ -628,9 +642,25 @@ menuId=id;
 }
 document.addEventListener('click',fechaMenu);
 addEventListener('resize',fechaMenu);
+addEventListener('scroll',fechaMenu,true);
 // itens: ['rótulo','js',classe] · '-' vira separador · {cab:'título'} vira cabeçalho
 const acoes=(id,itens)=>`<div style="position:relative;white-space:nowrap"><button class="sm men" title="Ações" aria-label="Ações" onclick="abreMenu(event,'${id}')">⋮</button><div class="menu" id="m-${id}" hidden onclick="event.stopPropagation()">${itens.filter(Boolean).map(x=>x==='-'?'<hr>':x.cab?`<div class="cab">${esc(x.cab)}</div>`:`<button class="${x[2]||''}" onclick="fechaMenu();${x[1]}">${esc(x[0])}</button>`).join('')}</div></div>`;
 const selo=s=>`<span class="pill s-${esc((s||'Pendente').toLowerCase())}">${esc(s||'Pendente')}</span>`;
+// busca filtra as linhas no próprio DOM: sem re-render, o cursor não salta do campo
+function filtra(input){
+const q=input.value.trim().toLowerCase();
+const tab=input.closest('.bar')?.parentNode?.querySelector('table');
+if(!tab)return;
+let n=0;
+[...tab.rows].forEach(tr=>{
+if(tr.querySelector('th'))return;
+const bate=!q||tr.textContent.toLowerCase().includes(q);
+tr.hidden=!bate;if(bate)n++;
+});
+const av=input.parentNode.querySelector('.achou');
+if(av)av.textContent=q?n+' de '+([...tab.rows].length-1):'';
+}
+const campoBusca=ph=>`<span style="display:flex;align-items:center;gap:8px;flex:1"><input class="busca" type="search" placeholder="${esc(ph)}" oninput="filtra(this)" aria-label="${esc(ph)}"><small class="achou" style="color:var(--mut)"></small></span>`;
 // número no painel leva para a tela que resolve aquele número
 function irPara(t,f){if(f){pedFiltro=f;try{localStorage.setItem('pedFiltro',f)}catch(e){}}tab=t;render();return false}
 function rotula(root){
@@ -700,7 +730,7 @@ return `<tr><td>${foto(p,'fmini')}</td><td>${esc(p.ref)}</td>
  <td class="n">${pct(c,+p.preco)}${cg!==c||pg!==+p.preco?`<small>G1–G4 ${pct(cg,pg)}</small>`:''}</td>
  <td class="n ${baixo?'low':''}">${tot(p)}${baixo?'<small>abaixo do mínimo</small>':''}</td>
  <td>${acoes('pr'+p.id,[['Ver ficha técnica',`verFicha('${p.id}')`],['Editar produto',`fProd('${p.id}')`],'-',['Excluir produto',`del('produtos','${p.id}')`,'del']])}</td></tr>`}).join('');
-return `<div class="bar end"><button class="pri" onclick="fProd()">+ Novo produto</button></div>
+return `<div class="bar">${campoBusca('Buscar por referência ou descrição')}<button class="pri" onclick="fProd()">+ Novo produto</button></div>
  <div class="tw"><table><tr><th></th><th>Ref.</th><th>Descrição</th><th class="n">Preço</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>${r||'<tr><td colspan="7" class="empty">Nenhum produto cadastrado. Comece pelo botão acima.</td></tr>'}</table></div>
  <p style="color:var(--mut)">A margem desconta imposto, despesas e a maior comissão cadastrada (${nf(comMax(),2)}%). Passe o mouse nela para ver a conta, ou abra a ficha técnica para o custo detalhado.</p>`;
 }
@@ -888,12 +918,19 @@ return {linhas,mp,mo,fixo,extra,total:mp+mo+fixo+extra};
 const custoP=(p,g)=>p.tecidoId?custoFicha(p,g).total:(+p.custo||0);
 function materia(){
 const ms=S.materiais.slice().sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='tecido'?-1:1)||(a.nome||'').localeCompare(b.nome||''));
-  const r=ms.map(m=>`<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td>${m.tipo==='tecido'?'Tecido':'Aviamento'}</td><td>${esc([m.comp,+m.gram?m.gram+' g/m²':'',+m.larg?nf(m.larg,2)+' m de largura':''].filter(Boolean).join(' · '))}</td><td>${esc(m.forn)}</td><td class="n">${m.tipo==='tecido'?brl(m.preco)+(m.cobr==='mt'?'/m':'/kg'):brl(m.preco)+((+m.qtdC||1)!==1?' / '+nf(m.qtdC,0)+' '+esc(matUn(m)):' / '+esc(matUn(m)))}</td><td class="n">${m.tipo==='tecido'?m.cobr==='mt'?'—':(+m.rend?nf(m.rend,2)+' m/kg':'<span class="low">informe</span>'):''}</td><td class="n"><b>${brl4(matCusto(m))}</b>/${esc(matUn(m))}</td><td><button class="sm" onclick="fMat('${m.id}')">Editar</button><button class="sm del" onclick="del('materiais','${m.id}')">Excluir</button></td></tr>`).join('');
+  const r=ms.map(m=>{
+const tec=m.tipo==='tecido',det=[m.cor,m.comp,+m.gram?m.gram+' g/m²':'',+m.larg?nf(m.larg,2)+' m de largura':''].filter(Boolean).join(' · ');
+return `<tr><td>${esc(m.nome)}${det?`<small>${esc(det)}</small>`:''}</td>
+ <td>${tec?'Tecido':'Aviamento'}</td>
+ <td>${esc(m.forn)||'<small>sem fornecedor</small>'}</td>
+ <td class="n">${tec?brl(m.preco)+(m.cobr==='mt'?'/m':'/kg'):brl(m.preco)+' / '+((+m.qtdC||1)!==1?nf(m.qtdC,0)+' ':'')+esc(matUn(m))}${tec&&m.cobr==='kg'?(+m.rend?`<small>${nf(m.rend,2)} m/kg</small>`:'<small class="aviso">informe o rendimento</small>'):''}</td>
+ <td class="n"><b>${brl4(matCusto(m))}</b>/${esc(matUn(m))}</td>
+ <td>${acoes('mt'+m.id,[['Editar',`fMat('${m.id}')`],'-',['Excluir',`del('materiais','${m.id}')`,'del']])}</td></tr>`}).join('');
 const f=fichaPad();
 const fr=(f.itens||[]).map(i=>{const m=mat(i.matId);if(!m)return '';const cu=matCusto(m);return `<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td class="n">${nf(i.qtd)}</td><td>${esc(matUn(m))}</td><td class="n">${brl4(cu)}</td><td class="n">${brl4(cu*(+i.qtd||0))}</td></tr>`}).join('');
 const sub=(f.itens||[]).reduce((a,i)=>a+matCusto(mat(i.matId))*(+i.qtd||0),0);
-return `<div class="bar end"><button class="pri" onclick="fMat()">+ Nova matéria-prima</button></div>
-  <div class="tw"><table><tr><th>Nome</th><th>Cor</th><th>Tipo</th><th>Composição / gramatura</th><th>Fornecedor</th><th class="n">Preço de compra</th><th class="n">Rendimento</th><th class="n">Custo de uso</th><th></th></tr>${r||'<tr><td colspan="9" class="empty">Nenhuma matéria-prima cadastrada.</td></tr>'}</table></div>
+return `<div class="bar">${campoBusca('Buscar por nome ou fornecedor')}<button class="pri" onclick="fMat()">+ Nova matéria-prima</button></div>
+  <div class="tw"><table><tr><th>Nome</th><th>Tipo</th><th>Fornecedor</th><th class="n">Preço de compra</th><th class="n">Custo de uso</th><th></th></tr>${r||'<tr><td colspan="6" class="empty">Nenhuma matéria-prima cadastrada. Comece pelo botão acima.</td></tr>'}</table></div>
  <div class="bar"><h2>Ficha técnica padrão</h2><button class="pri" onclick="fFicha()">Editar ficha padrão</button></div>
  <p style="color:var(--mut);margin-top:0">Itens iguais em todas as referências. O tecido e o consumo de cada referência são informados no cadastro do produto.</p>
  <div class="tw"><table><tr><th>Item</th><th>Cor</th><th class="n">Qtde</th><th>Un</th><th class="n">Custo un.</th><th class="n">Custo total</th></tr>${fr||'<tr><td colspan="6" class="empty">Nenhum item na ficha padrão.</td></tr>'}
@@ -1183,7 +1220,7 @@ const r=lista.map(o=>`<tr><td>#${o.numero}<small>${esc((o.data||'').split('-').r
  <td class="n">${brl(pedTotal(o))}${admin&&pedDesatual(o)?'<small class="aviso" title="Preço diferente do cadastro do produto">preço desatualizado</small>':''}</td>
  <td>${selo(st(o))}</td>
  <td>${acoes('pd'+o.id,[['Ver itens',`verPed('${o.id}')`],...(admin?[['Trocar representante',`fRepPed('${o.id}')`],{cab:'Mudar status para'},...ST.filter(s=>s!==st(o)).map(s=>[s,`setSt('${o.id}','${s}')`]),'-',['Excluir pedido',`delPed('${o.id}')`,'del']]:[])])}</td></tr>`).join('');
-return `<div class="bar end">${admin&&S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></div>
+return `<div class="bar">${campoBusca('Buscar por número ou cliente')}<span style="display:flex;gap:8px">${admin&&S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></span></div>
  ${todos.length?chips:''}
  <div class="tw"><table><tr><th>Nº</th><th>Cliente</th><th class="n">Peças</th><th class="n">Total</th><th>Status</th><th></th></tr>${r||`<tr><td colspan="6" class="empty">${todos.length?'Nenhum pedido com status '+esc(pedFiltro)+'.':'Nenhum pedido lançado. Comece pelo botão acima.'}</td></tr>`}</table></div>`;
 }
@@ -1364,6 +1401,7 @@ let fabVista=(()=>{try{return localStorage.getItem('fabVista')}catch(e){return n
 // shortcut: mesa e altura do enfesto ficam no navegador de quem planeja, não no banco; mover para a config se outra pessoa precisar dos mesmos números
 const lsNum=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:+v||0}catch(e){return d}};
 let enfCam=lsNum('enfCam',50),enfMesa=lsNum('enfMesa',5);
+function setFabVista(v){fabVista=v;try{localStorage.setItem('fabVista',v)}catch(e){}render()}
 function setEnf(k,v){const n=Math.max(0,+v||0);if(k==='cam')enfCam=n;else enfMesa=n;try{localStorage.setItem(k==='cam'?'enfCam':'enfMesa',n)}catch(e){}render()}
 // cada camada do enfesto rende 1 peça de cada tamanho do risco; o risco cresce até a mesa acabar e as camadas param no menor saldo (não sobra peça)
 function planoEnfesto(qtds,consTam,maxCam,mesa){
@@ -1494,7 +1532,7 @@ const corpo=fabVista==='enfesto'?enfesto
 :fabVista==='lista'?(resumo?`<div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Total</th><th>De quais pedidos</th></tr>${resumo}</table></div>`:vazio)
 :(blocos||vazio)+(sem.length?`<p style="color:var(--mut)">Já cobertos pelo estoque: ${sem.map(x=>'#'+x.o.numero).join(', ')}.</p>`:'');
 return `<div class="cards"><div class="c"><small>Peças a fabricar</small><b>${total}</b></div><div class="c"><small>Pedidos com itens a fabricar</small><b>${com.length}</b></div></div>
- <div class="bar end"><label style="margin:0;display:flex;align-items:center;gap:8px">Mostrar<select id="fabvista" style="width:auto" onchange="fabVista=this.value;try{localStorage.setItem('fabVista',fabVista)}catch(e){};render()">${VISTAS.map(([k,l])=>`<option value="${k}"${k===fabVista?' selected':''}>${l}</option>`).join('')}</select></label></div>
+ <div class="chips">${VISTAS.map(([k,l])=>`<button class="${k===fabVista?'on':''}" onclick="setFabVista('${k}')">${l}</button>`).join('')}</div>
  ${corpo}
  <p style="color:var(--mut)">Considera pedidos Pendente ou Faturado. O estoque (por cor e tamanho) é reservado primeiro para os pedidos mais antigos. Os pedidos não alteram o estoque: quando a produção ficar pronta, lance a entrada na aba Estoque.</p>`;
 }
