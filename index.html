@@ -1317,7 +1317,73 @@ out.push({tams:risco,cam,risco:L,metros:L*cam,pecas:cam*risco.length});
 }
 return out;
 }
+// encaixe real sobre os polígonos do molde: preenchimento inferior-esquerdo numa grade de 2 cm,
+// testando algumas estratégias e ficando com o risco mais curto. Heurística gulosa sozinha erra:
+// girar um painel pode encostá-lo na ourela e estragar o resto do risco.
+const ENC_RES=20;
+function rasterPol(pts,giro){
+let p=giro?pts.map(([x,y])=>[-x,-y]):pts;
+let x0=1/0,y0=1/0,x1=-1/0,y1=-1/0;
+for(const q of p){if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<y0)y0=q[1];if(q[1]>y1)y1=q[1]}
+p=p.map(([x,y])=>[x-x0,y-y0]);
+const cw=Math.max(1,Math.ceil((x1-x0)/ENC_RES)),ch=Math.max(1,Math.ceil((y1-y0)/ENC_RES)),m=new Uint8Array(cw*ch);
+const dentro=(px,py)=>{let d=false;for(let i=0,j=p.length-1;i<p.length;j=i++){const [xi,yi]=p[i],[xj,yj]=p[j];
+if((yi>py)!==(yj>py)&&px<(xj-xi)*(py-yi)/(yj-yi)+xi)d=!d}return d};
+for(let cy=0;cy<ch;cy++)for(let cx=0;cx<cw;cx++)if(dentro((cx+.5)*ENC_RES,(cy+.5)*ENC_RES))m[cy*cw+cx]=1;
+return {cw,ch,m};
+}
+function encaixaBLF(lista,largCel,maxCel,custo){
+const occ=new Uint8Array(maxCel*largCel);let maxX=0;
+const livre=(r,ox,oy)=>{if(oy+r.ch>largCel||ox+r.cw>maxCel)return false;
+for(let cy=0;cy<r.ch;cy++)for(let cx=0;cx<r.cw;cx++)if(r.m[cy*r.cw+cx]&&occ[(ox+cx)*largCel+oy+cy])return false;
+return true};
+for(const pc of lista){
+let b=null;
+for(let ox=0;ox<=maxX&&!b;ox++){const cand=[];
+pc.rot.forEach((r,i)=>{for(let oy=0;oy+r.ch<=largCel;oy++)if(livre(r,ox,oy)){cand.push({r,ox,oy,i});break}});
+if(cand.length){cand.sort((x,y)=>custo(x)-custo(y));b=cand[0]}}
+if(!b)b={r:pc.rot[0],ox:maxX,oy:0};
+for(let cy=0;cy<b.r.ch;cy++)for(let cx=0;cx<b.r.cw;cx++)if(b.r.m[cy*b.r.cw+cx])occ[(b.ox+cx)*largCel+b.oy+cy]=1;
+maxX=Math.max(maxX,b.ox+b.r.cw);
+}
+return maxX;
+}
+// comprimento do risco, em metros, para `copias` peças completas no tecido de `largMm` de largura útil
+function encaixeMol(pecas,largMm,copias){
+const largCel=Math.floor(largMm/ENC_RES);
+if(!(largCel>0)||!(copias>0))return null;
+const lista=[];
+for(const q of pecas||[]){
+if(!(q.pts&&q.pts.length>2))return null;
+const rot=[rasterPol(q.pts,0),rasterPol(q.pts,1)].filter(r=>r.ch<=largCel);
+if(!rot.length)return null;
+const n=Math.max(0,Math.round(+q.qtd||0));
+for(let c=0;c<copias*n;c++)lista.push({a:(+q.w||0)*(+q.h||0),rot});
+}
+if(!lista.length)return null;
+const maxCel=lista.reduce((a,x)=>a+x.rot[0].cw,0)+4;
+let melhor=null;
+for(const ord of [(a,b)=>b.a-a.a,(a,b)=>b.rot[0].ch-a.rot[0].ch||b.a-a.a])
+for(const custo of [c=>c.oy*1e4+c.ox+c.r.cw,c=>(c.ox+c.r.cw)*1e4+c.oy,c=>c.i*1e4+c.oy]){
+const n=encaixaBLF(lista.slice().sort(ord),largCel,maxCel,custo);
+if(melhor==null||n<melhor)melhor=n;
+}
+return melhor==null?null:melhor*ENC_RES/1000;
+}
+// shortcut: todos os tamanhos do risco usam os painéis do molde importado, sem gradação;
+// trocar quando houver um molde por tamanho. Por isso o ganho é conservador nos riscos com muitos tamanhos.
+let encCache=new Map();
+function encaixeRisco(p,larg,copias,perda){
+if(!p||!p.mol||!(p.mol.pecas||[]).length||!(larg>0))return null;
+const k=p.id+'|'+copias+'|'+larg;
+if(encCache.has(k))return encCache.get(k);
+const v=encaixeMol(p.mol.pecas,larg*1000,copias);
+const r=v==null?null:v*(1+Math.max(0,+perda||0)/100);
+encCache.set(k,r);
+return r;
+}
 function fabricar(){
+encCache=new Map();
 const P=fabricarPedidos();
 const com=P.filter(x=>x.linhas.length),sem=P.filter(x=>!x.linhas.length);
 const todas=com.flatMap(x=>x.linhas);
@@ -1344,15 +1410,21 @@ const enfSecs=Object.values(ge).sort((a,b)=>String(a.ref).localeCompare(String(b
 const p=prod(e.id);
 if(!p||!(consDe(p,false)>0)){semCons.push('Ref. '+e.ref+' · '+e.c);return ''}
 const pl=planoEnfesto(e.q,t=>consDe(p,SZ.indexOf(t)>=4),enfCam,enfMesa);
-const mt=pl.reduce((a,x)=>a+x.metros,0),pc=pl.reduce((a,x)=>a+x.pecas,0),cu=matCusto(mat(p.tecidoId));
-const rows=pl.map((x,i)=>`<tr><td>${i+1}</td><td>${x.tams.join(' · ')}</td><td class="n">${x.cam}</td><td class="n${enfMesa>0&&x.risco>enfMesa?' low':''}">${nf(x.risco,2)}</td><td class="n">${nf(x.metros,2)}</td><td class="n">${x.pecas}</td></tr>`).join('');
-return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padding:12px 14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><strong style="font-size:16px">Ref. ${esc(e.ref)} · ${esc(e.nome)} · ${esc(e.c)}</strong><small>${pl.length} enfesto(s) · ${pc} peças · ${nf(mt,2)} m de tecido${cu?' · '+brl(mt*cu):''}</small></div><strong class="low">${nf(mt,2)} m</strong></div><div class="tw" style="border:0;border-radius:0"><table><tr><th>Enfesto</th><th>Tamanhos no risco</th><th class="n">Camadas</th><th class="n">Risco (m)</th><th class="n">Tecido (m)</th><th class="n">Peças</th></tr>${rows}</table></div></section>`;
+const tec=mat(p.tecidoId),largT=tec&&+tec.larg>0?+tec.larg:0;
+// com molde importado, o comprimento do risco deixa de ser soma de retângulos e passa a ser medido
+pl.forEach(x=>{const r=encaixeRisco(p,largT,x.tams.length,p.perda);if(r!=null){x.real=r;x.metros=r*x.cam}});
+const mtEst=pl.reduce((a,x)=>a+x.risco*x.cam,0);
+const mt=pl.reduce((a,x)=>a+x.metros,0),pc=pl.reduce((a,x)=>a+x.pecas,0),cu=matCusto(tec);
+const enc=pl.some(x=>x.real!=null),eco=mtEst-mt;
+const rows=pl.map((x,i)=>{const L=x.real!=null?x.real:x.risco;
+return `<tr><td>${i+1}</td><td>${x.tams.join(' · ')}</td><td class="n">${x.cam}</td><td class="n${enfMesa>0&&L>enfMesa?' low':''}">${nf(L,2)}</td><td class="n">${x.real!=null?nf(x.risco,2):'—'}</td><td class="n">${nf(x.metros,2)}</td><td class="n">${x.pecas}</td></tr>`}).join('');
+return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padding:12px 14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><strong style="font-size:16px">Ref. ${esc(e.ref)} · ${esc(e.nome)} · ${esc(e.c)}</strong><small>${pl.length} enfesto(s) · ${pc} peças · ${nf(mt,2)} m de tecido${cu?' · '+brl(mt*cu):''}${!enc?'':eco>0.005?' · encaixe real poupa '+nf(eco,2)+' m ('+Math.round(eco/mtEst*100)+'%)'+(cu?', '+brl(eco*cu):''):eco<-0.005?' · encaixe real pede '+nf(-eco,2)+' m a mais que a estimativa':' · encaixe real confirma a estimativa'}</small></div><strong class="low">${nf(mt,2)} m</strong></div><div class="tw" style="border:0;border-radius:0"><table><tr><th>Enfesto</th><th>Tamanhos no risco</th><th class="n">Camadas</th><th class="n">Risco (m)</th><th class="n" title="Comprimento que a conta por retângulo daria">Estimado (m)</th><th class="n">Tecido (m)</th><th class="n">Peças</th></tr>${rows}</table></div></section>`;
 }).join('');
 const enfesto=`<div class="r2" style="margin-bottom:10px"><label style="margin:0">Máximo de camadas por enfesto<input type="number" min="0" step="1" value="${enfCam||''}" onchange="setEnf('cam',this.value)" placeholder="sem limite"></label>
  <label style="margin:0">Comprimento útil da mesa (m)<input type="number" min="0" step="0.1" value="${enfMesa||''}" onchange="setEnf('mesa',this.value)" placeholder="sem limite"></label></div>
  ${enfSecs||(semCons.length?'':'<div class="c empty">Nada a fabricar: o estoque cobre todos os pedidos em aberto.</div>')}
  ${semCons.length?`<div class="alert">⚠ Sem plano para ${esc(semCons.join(', '))}: informe o consumo de tecido na ficha técnica do produto.</div>`:''}
- <p style="color:var(--mut)">Cada camada do enfesto rende uma peça de cada tamanho do risco. O risco só entra na mesa se couber no comprimento informado — em vermelho, não coube nem com um tamanho só.</p>`;
+ <p style="color:var(--mut)">Cada camada do enfesto rende uma peça de cada tamanho do risco. O risco só entra na mesa se couber no comprimento informado — em vermelho, não coube nem com um tamanho só. Quando o produto tem molde importado e o tecido tem largura útil, o comprimento do risco é medido encaixando os painéis de verdade; a coluna "Estimado" mostra o que a conta por retângulo daria. Todos os tamanhos do risco usam os painéis do molde importado, sem gradação, então o ganho mostrado é conservador. O medido pode ficar <em>acima</em> do estimado quando o risco tem poucas peças para um tecido largo: a estimativa divide a faixa entre muitas peças, mas o risco de verdade precisa ser cortado como está. Nesse caso, repetir tamanhos no mesmo risco enche a largura e derruba o consumo por peça.</p>`;
 const VISTAS=[['pedido','Por pedido'],['referencia','Por referência'],['lista','Lista detalhada (cor e tamanho)'],['enfesto','Plano de enfesto']];
 if(!VISTAS.some(v=>v[0]===fabVista))fabVista='pedido';
 const vazio='<div class="c empty">Nada a fabricar: o estoque cobre todos os pedidos em aberto.</div>';
@@ -1586,7 +1658,21 @@ return [['PU separa os 3 contornos',cs.length,3],
 ['painel com quantidade 0 nao conta',consPecas(1.6,[{w:300,h:100,qtd:1},{w:300,h:100,qtd:0}],0),0.01875],
 ['painel maior que o tecido nos dois sentidos nao estima',consPecas(1.6,[{w:2000,h:1800,qtd:1}],0),null],
 ['perda de 10% entra no consumo do painel',consPecas(1.6,[{w:300,h:100,qtd:1}],10),0.01875*1.1],
-['consumo nunca fica abaixo da area do painel sobre a largura',+(consPecas(1.6,[{w:300,h:100,qtd:1}],0)*100*160>=300-1e-9),1]]})()];
+['consumo nunca fica abaixo da area do painel sobre a largura',+(consPecas(1.6,[{w:300,h:100,qtd:1}],0)*100*160>=300-1e-9),1]]})(),
+...(()=>{
+// encaixe real: quadrado de 10 cm, grade de 2 cm, tecido de 20 cm de largura util
+const sq=[[0,0],[100,0],[100,100],[0,100]];
+const r=rasterPol(sq,0),cheio=r.m.reduce((a,b)=>a+b,0);
+const um=[{w:100,h:100,qtd:1,pts:sq}],dois=[{w:100,h:100,qtd:2,pts:sq}],quatro=[{w:100,h:100,qtd:4,pts:sq}];
+return [['quadrado de 10 cm vira 5 x 5 celulas',r.cw*10+r.ch,55],
+['raster preenche o quadrado inteiro',cheio,25],
+['1 peca em 20 cm de largura: risco de 10 cm',encaixeMol(um,200,1),0.1],
+['2 pecas cabem lado a lado e o risco nao cresce',encaixeMol(dois,200,1),0.1],
+['4 pecas: duas fileiras, risco dobra',encaixeMol(quatro,200,1),0.2],
+['copias do risco multiplicam as pecas',encaixeMol(um,200,2),0.1],
+['peca mais larga que o tecido nao encaixa',encaixeMol(um,60,1),null],
+['sem molde importado nao ha encaixe real',encaixeRisco({id:'x'},1.6,1,0),null],
+['encaixe real nunca fica abaixo da area sobre a largura',+(encaixeMol(quatro,200,1)*1000*200>=4e4-1e-9),1]]})()];
 Object.assign(S,O);
 const bad=t.filter(([,g,e])=>e===null?g!==null:!(Math.abs(g-e)<1e-9));
 console[bad.length?'error':'log'](bad.length?'FALHA no custo/margem: '+bad.map(([n,g,e])=>n+' deu '+g+', esperado '+e).join(' | '):'✓ custo/margem: '+t.length+' asserções OK');
