@@ -656,6 +656,7 @@ return `<div class="bar"><h2>Produtos</h2><button class="pri" onclick="fProd()">
 }
 function fProd(id){
 const p=id?prod(id):{};
+pltMol=null;
 const campoFoto=k=>{const n=p['img'+k],lbl=k==='F'?'Frente':'Costas';
 return `<div style="flex:1"><small style="display:block;margin-bottom:4px">${lbl}</small>${n?`<img class="fmed" src="${imgUrl(n)}" alt="${lbl}">`:'<div class="fmed semfoto"></div>'}<input type="file" name="foto${k}" accept="image/*" style="margin-top:6px"><label style="display:${n?'flex':'none'};gap:6px;align-items:center;margin:4px 0 0;font-size:13px"><input type="checkbox" name="del${k}" style="width:auto;margin:0">Remover</label></div>`};
 modal(id?'Editar produto':'Novo produto',`
@@ -680,6 +681,9 @@ modal(id?'Editar produto':'Novo produto',`
  <label>Perda de encaixe (%)<input name="perda" type="number" step="0.1" min="0" max="90" value="${p.perda||''}" placeholder="Ex.: 12"></label></div>
  <button type="button" class="ghost" onclick="estimarCons(this.form)">Estimar consumo pelo molde</button>
  <small id="consprev" style="display:block;margin-top:4px">Preenche os dois consumos acima a partir da largura útil do tecido. Estimativa por retângulo: o encaixe real costuma gastar menos.</small>
+ <label style="margin:10px 0 0">Molde digitalizado (.plt)<input type="file" name="plt" accept=".plt,.hgl,.hpgl" onchange="lerPlt(this.form)"></label>
+ <small>Arquivo de plotter em HP-GL, como os que saem do CAD ou da digitalização. O app separa os painéis, descarta piques e moldura, e calcula o consumo painel por painel.${p.mol?' <b>Este produto já tem molde: '+((p.mol.pecas||[]).length)+' painéis'+(p.mol.arq?' ('+esc(p.mol.arq)+')':'')+'.</b> Escolher outro arquivo substitui.':''}</small>
+ <div id="pltprev"></div>
  <label style="display:flex;align-items:center;gap:8px;margin:10px 0 4px"><input type="checkbox" id="fichaProp" style="width:auto;margin:0" ${p.ficha?'checked':''} onchange="toggleFichaProp(this)">Esta referência tem ficha própria</label>
  <small id="fichaPadMsg" style="display:${p.ficha?'none':'block'}">Os aviamentos, a mão de obra e o custo fixo vêm da ficha padrão (aba Matéria-prima). Marque acima para esta referência ter os seus.</small>
  <div id="fichaprop" style="display:${p.ficha?'':'none'}">
@@ -693,6 +697,7 @@ modal(id?'Editar produto':'Novo produto',`
 async(f,form)=>{
 const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.preco||0,precoG:+f.precoG||0,est:lerEst(form),tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0,molL:+f.molL||0,molC:+f.molC||0,molLG:+f.molLG||0,molCG:+f.molCG||0,perda:+f.perda||0};delete d.id;
 if(form.querySelector('#fichaProp').checked)d.ficha=lerFicha(form,f.pmo,f.pfixo);else delete d.ficha;
+if(pltMol)d.mol={arq:pltMol.arq,un:'mm',pecas:pltMol.pecas.map(q=>({w:q.w,h:q.h,qtd:q.qtd,pts:q.pts}))};
 const upF=form.fotoF.files[0],upC=form.fotoC.files[0];
 if(f.delF&&!upF&&p.imgF){await sb.storage.from('produtos').remove([p.imgF]);d.imgF=''}
 if(f.delC&&!upC&&p.imgC){await sb.storage.from('produtos').remove([p.imgC]);d.imgC=''}
@@ -739,6 +744,88 @@ fm.cons.value=a.toFixed(3);
 if(b!=null)fm.consG.value=b.toFixed(3);
 const n=Math.floor((+t.larg*100)/(+fm.molL.value));
 msg('Estimado com '+nf(t.larg,2)+' m de largura: '+n+' peça(s) lado a lado · '+nf(a)+' m por peça (P–GG)'+(b!=null?' · '+nf(b)+' m (G1–G4)':'')+'. Ajuste à mão se o encaixe real for melhor.');
+}
+// PLT em HP-GL, do CAD ou da mesa de digitalização: 1 unidade de plotter = 1/40 mm.
+// PU levanta a caneta e começa outro contorno; PD desenha até o ponto.
+function parsePlt(txt){
+const U=1/40,out=[];let at=null;
+for(const m of String(txt).matchAll(/(PU|PD)\s*(-?\d+)\s*,\s*(-?\d+)/gi)){
+const p=[+m[2]*U,+m[3]*U];
+if(m[1].toUpperCase()==='PU'){if(at&&at.length>2)out.push(at);at=[p]}
+else if(at)at.push(p);else at=[p];
+}
+if(at&&at.length>2)out.push(at);
+return out;
+}
+const areaPol=p=>{let s=0;for(let i=0,n=p.length;i<n;i++){const a=p[i],b=p[(i+1)%n];s+=a[0]*b[1]-b[0]*a[1]}return Math.abs(s)/2};
+const bboxPol=p=>{let x0=1/0,y0=1/0,x1=-1/0,y1=-1/0;for(const q of p){if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<y0)y0=q[1];if(q[1]>y1)y1=q[1]}return {x0,y0,w:x1-x0,h:y1-y0}};
+// separa painel de ruído: fora traço curto (pique, sentido do fio, texto) e a moldura de impressão,
+// que é um retângulo de poucos pontos cobrindo quase toda a folha
+function moldesDePlt(txt,minArea=2000){
+const cs=parsePlt(txt);
+if(!cs.length)return [];
+const fo=bboxPol(cs.flat()),af=fo.w*fo.h;
+return cs.map(pts=>({pts,...bboxPol(pts),area:areaPol(pts)}))
+.filter(c=>c.area>=minArea&&!(c.pts.length<=6&&af>0&&c.area>=af*0.7))
+.sort((a,b)=>b.area-a.area);
+}
+// consumo somando o retângulo de cada painel, na orientação que gasta menos
+// shortcut: ignora o sentido do fio e o encaixe entre painéis; trocar pelo encaixe real sobre os polígonos
+function consPecas(largTecido,pecas,perda){
+let t=0;
+for(const q of pecas||[]){
+const n=Math.max(0,Math.round(+q.qtd||0));
+if(!n)continue;
+const a=consEstimado(largTecido,q.w/10,q.h/10,perda),b=consEstimado(largTecido,q.h/10,q.w/10,perda);
+const c=a==null?b:b==null?a:Math.min(a,b);
+if(c==null)return null;
+t+=c*n;
+}
+return t>0?t:null;
+}
+let pltMol=null;
+const pltForm=()=>document.querySelector('dialog[open] form');
+async function lerPlt(fm){
+const prev=$('#pltprev'),f=fm.plt.files[0];
+pltMol=null;
+if(!prev)return;
+if(!f){prev.innerHTML='';return}
+let txt='';
+try{txt=await f.text()}catch(e){prev.innerHTML='<p class="low">Não consegui ler esse arquivo.</p>';return}
+const cs=moldesDePlt(txt);
+if(!cs.length){prev.innerHTML='<p class="low">Não achei contorno de painel aí. Confirme que é um PLT em HP-GL, com comandos PU e PD.</p>';return}
+pltMol={arq:f.name,pecas:cs.map(c=>({w:Math.round(c.w),h:Math.round(c.h),area:Math.round(c.area),qtd:1,x0:Math.round(c.x0),y0:Math.round(c.y0),pts:c.pts.map(p=>[Math.round(p[0]-c.x0),Math.round(p[1]-c.y0)])}))};
+pltPrev();
+}
+function pltQtd(i,v){if(pltMol&&pltMol.pecas[i]){pltMol.pecas[i].qtd=Math.max(0,Math.round(+v||0));pltPrev()}}
+function pltSvg(){
+const P=pltMol.pecas.filter(q=>q.qtd>0);
+if(!P.length)return '';
+const x1=Math.max(...P.map(q=>q.x0+q.w)),y1=Math.max(...P.map(q=>q.y0+q.h));
+const s=Math.min(1.4,460/Math.max(x1,1));
+const d=P.map(q=>'M'+q.pts.map(p=>((p[0]+q.x0)*s).toFixed(1)+','+((p[1]+q.y0)*s).toFixed(1)).join('L')+'Z').join(' ');
+return `<svg width="${Math.round(x1*s)}" height="${Math.round(y1*s)}" style="max-width:100%;height:auto;border:1px solid var(--bd);border-radius:6px;background:var(--card)"><path d="${d}" fill="var(--ac)" fill-opacity=".18" stroke="var(--ac)" stroke-width="1.1"/></svg>`;
+}
+function pltPrev(){
+const fm=pltForm(),prev=$('#pltprev');
+if(!fm||!pltMol||!prev)return;
+const t=mat(fm.tecidoId.value),larg=t&&+t.larg>0?+t.larg:0;
+const u=pltMol.pecas.filter(q=>q.qtd>0),np=u.reduce((a,q)=>a+q.qtd,0);
+const c=larg?consPecas(larg,pltMol.pecas,fm.perda.value):null;
+const rows=pltMol.pecas.map((q,i)=>`<tr><td class="n">${i+1}</td><td class="n">${nf(q.w/10,1)} × ${nf(q.h/10,1)}</td><td class="n">${nf(q.area/100,0)}</td><td class="n">${q.pts.length}</td><td><input type="number" min="0" step="1" value="${q.qtd}" style="width:70px" onchange="pltQtd(${i},this.value)"></td></tr>`).join('');
+prev.innerHTML=`<div class="tw" style="margin:6px 0"><table><tr><th class="n">#</th><th class="n">cm</th><th class="n">cm²</th><th class="n">pontos</th><th>Peças por produto</th></tr>${rows}</table></div>
+ ${pltSvg()}
+ <p style="margin:6px 0">${esc(pltMol.arq)}: ${pltMol.pecas.length} painel(is) reconhecido(s), ${np} peça(s) por produto. ${c!=null?'Consumo pelos painéis: <b>'+nf(c)+' m</b> com '+nf(larg,2)+' m de largura útil.':larg?'Informe a quantidade de pelo menos um painel.':'Escolha um tecido com largura útil cadastrada para calcular o consumo.'}</p>
+ ${c!=null?'<button type="button" class="ghost" onclick="pltAplicar()">Usar este consumo</button>':''}`;
+}
+function pltAplicar(){
+const fm=pltForm();
+if(!fm||!pltMol)return;
+const t=mat(fm.tecidoId.value),c=t?consPecas(+t.larg,pltMol.pecas,fm.perda.value):null;
+if(c==null)return;
+fm.cons.value=c.toFixed(3);
+if(!(+fm.consG.value>0))fm.consG.value=c.toFixed(3);
+$('#consprev').textContent='Consumo calculado painel por painel a partir de '+pltMol.arq+'. Os campos de molde abaixo valem só para a estimativa manual.';
 }
 function custoFicha(p,g){
 const f=fichaDe(p),linhas=[];
@@ -1482,7 +1569,24 @@ return [['3 moldes de 50cm em 1,60m: 70cm/3',c1,0.7/3],
 ['limite de camadas quebra o enfesto',plC.every(x=>x.cam<=3),true],
 ['limite de camadas tambem nao sobra peca',soma(plC),24],
 ['mesa de 1,5m so aceita 1 tamanho por risco',plM.every(x=>x.tams.length===1),true],
-['mesa curta nao perde peca',soma(plM),10]]})()];
+['mesa curta nao perde peca',soma(plM),10]]})(),
+...(()=>{
+// importacao de molde em PLT: moldura de 300x250mm, painel de 200x100mm e um pique de 1mm
+const plt='IN;LT;SP1;QL0;\nPU0,0;PD12000,0;PD12000,10000;PD0,10000;PD0,0;'
++'PU400,400;PD8400,400;PD8400,4400;PD6000,4400;PD3000,4000;PD400,4400;PD400,400;'
++'PU9000,9000;PD9040,9000;PD9040,9040;PD9000,9040;';
+const cs=parsePlt(plt),ms=moldesDePlt(plt);
+return [['PU separa os 3 contornos',cs.length,3],
+['unidade de plotter vira mm',cs[1][0][0],10],
+['moldura e pique saem, sobra 1 painel',ms.length,1],
+['painel mede 200 x 100 mm',Math.round(ms[0].w)*1000+Math.round(ms[0].h),200100],
+['arquivo sem PU/PD nao tem painel',moldesDePlt('IN;SP1;').length,0],
+['painel 300x100mm em 1,60m: deitado gasta menos',consPecas(1.6,[{w:300,h:100,qtd:1}],0),0.01875],
+['quantidade multiplica o consumo',consPecas(1.6,[{w:300,h:100,qtd:2}],0),0.0375],
+['painel com quantidade 0 nao conta',consPecas(1.6,[{w:300,h:100,qtd:1},{w:300,h:100,qtd:0}],0),0.01875],
+['painel maior que o tecido nos dois sentidos nao estima',consPecas(1.6,[{w:2000,h:1800,qtd:1}],0),null],
+['perda de 10% entra no consumo do painel',consPecas(1.6,[{w:300,h:100,qtd:1}],10),0.01875*1.1],
+['consumo nunca fica abaixo da area do painel sobre a largura',+(consPecas(1.6,[{w:300,h:100,qtd:1}],0)*100*160>=300-1e-9),1]]})()];
 Object.assign(S,O);
 const bad=t.filter(([,g,e])=>e===null?g!==null:!(Math.abs(g-e)<1e-9));
 console[bad.length?'error':'log'](bad.length?'FALHA no custo/margem: '+bad.map(([n,g,e])=>n+' deu '+g+', esperado '+e).join(' | '):'✓ custo/margem: '+t.length+' asserções OK');
