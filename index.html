@@ -36,6 +36,16 @@ main{flex:1;padding:24px;max-width:none;margin:0}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:16px}
 .c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px}
 .c small{color:var(--mut);display:block}.c b{font-size:22px}
+.cat{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+.cat .c{padding:0;overflow:hidden}
+.cat .ci{padding:10px 12px}
+.foto{display:block;width:100%;aspect-ratio:3/4;object-fit:cover;background:var(--bg)}
+.fmed{display:block;width:120px;aspect-ratio:3/4;object-fit:cover;background:var(--bg);border:1px solid var(--bd);border-radius:8px}
+.fmini{display:block;width:38px;height:50px;object-fit:cover;background:var(--bg);border:1px solid var(--bd);border-radius:4px;flex:none}
+.semfoto{display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:12px}
+.semfoto::after{content:'sem foto'}
+.fmini.semfoto::after{content:'—'}
+img[data-verso]{cursor:pointer}
 .tw{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:10px;margin-bottom:16px}
 table{border-collapse:collapse;width:100%;min-width:560px}
 th,td{padding:9px 12px;text-align:left;border-bottom:1px solid var(--bd);white-space:nowrap}
@@ -324,15 +334,31 @@ async function sair(){await sb.auth.signOut();location.reload()}
 function recuperarSenha(){
 const typed=String($('#login-usuario-texto')?.value||'').trim();
 const email=typed.includes('@')?typed:'';
-modal('Recuperar senha',`<p>Informe o e-mail associado à conta de administrador. Ao salvar, o sistema enviará instruções apenas se houver uma conta com esse endereço. Por segurança, não informamos se o e-mail está cadastrado. O usuário antigo terminado em @fabrica.interno não recebe mensagens.</p><label>E-mail da conta<input name="email" type="email" required autocomplete="email" value="${esc(email)}"></label><div id="recovery-captcha" style="margin:12px 0"></div>`,async form=>{
+modal('Recuperar senha',`<p>Informe o e-mail da conta. Você receberá um código de verificação para redefinir a senha.</p><label>E-mail da conta<input name="email" type="email" required autocomplete="email" value="${esc(email)}"></label><div id="recovery-captcha" style="margin:12px 0"></div>`,async form=>{
 const address=String(form.email||'').trim().toLowerCase();
 if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address))throw new Error('Informe um e-mail válido.');
 if(!recoveryCaptchaToken && !IS_DEV)throw new Error('Conclua a verificação de segurança antes de continuar.');
 const captchaToken = IS_DEV ? undefined : recoveryCaptchaToken;recoveryCaptchaToken=null;
 if(recoveryCaptchaWidget!==null)window.turnstile.reset(recoveryCaptchaWidget);
-const {error}=await sb.auth.resetPasswordForEmail(address,{redirectTo:location.origin+location.pathname+'#type=recovery',captchaToken});
-if(error)throw new Error(ptErro(error));
-setTimeout(()=>aviso('Se o e-mail corresponder a uma conta, você receberá as instruções de recuperação.'),100);
+const res=await fetch(SB_URL+'/functions/v1/request-password-code',{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},body:JSON.stringify({email:address})});
+if(!res.ok)throw new Error('Não foi possível solicitar código.');
+const j=await res.json().catch(()=>({}));
+if(j.notFound){
+modal('E-mail não encontrado',`<p>O e-mail informado não está cadastrado.</p>`,async()=>{});
+return;
+}
+setTimeout(()=>aviso('Se o e-mail corresponder a uma conta, um código foi gerado.'),100);
+await new Promise(r=>setTimeout(r,200));
+modal('Código de verificação',`<p>Informe o código recebido e a nova senha.</p><label>Código<input name="code" type="text" required maxlength="6" inputmode="numeric"></label><label>Nova senha<input name="newPassword" type="password" required minlength="8"></label>`,async form2=>{
+const code=String(form2.code||'').trim();
+const newPassword=String(form2.newPassword||'');
+if(!/^\d{6}$/.test(code))throw new Error('Código inválido.');
+if(newPassword.length<8)throw new Error('Senha muito curta.');
+const res2=await fetch(SB_URL+'/functions/v1/confirm-password-code',{method:'POST',headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY},body:JSON.stringify({email:address,code,newPassword})});
+const j=await res2.json().catch(()=>({}));
+if(!res2.ok)throw new Error(j.error||'Falha ao confirmar código.');
+aviso('Senha redefinida com sucesso.');
+});
 });
 renderRecoveryCaptcha();
 }
@@ -602,20 +628,36 @@ const pedidos=S.pedidos.filter(o=>o.repId===appProfile.rep_id&&o.status!=='Cance
 const vendas=pedidos.reduce((a,o)=>a+pedTotal(o),0),comissao=+r.com||0;
 return `<div class="cards"><div class="c"><small>Representante</small><b>${esc(r.nome||'—')}</b></div><div class="c"><small>Vendas não canceladas</small><b>${brl(vendas)}</b></div><div class="c"><small>Comissão (${comissao}%)</small><b>${brl(vendas*comissao/100)}</b></div><div class="c"><small>Pedidos vinculados</small><b>${pedidos.length}</b></div></div><p style="color:var(--mut)">Os valores consideram apenas pedidos vinculados ao seu cadastro. Pedidos cancelados não entram na comissão.</p>`;
 }
+const imgUrl=n=>n?SB_URL+'/storage/v1/object/public/produtos/'+encodeURIComponent(n):'';
+// uma única porta para a foto do produto: catálogo, tabela, ficha e pedido
+function foto(p,cls){
+const f=imgUrl(p&&p.imgF),c=imgUrl(p&&p.imgC);
+if(!f&&!c)return `<div class="${cls} semfoto"></div>`;
+const dois=f&&c;
+return `<img class="${cls}" src="${f||c}" alt="${esc(((p.ref||'')+' '+(p.nome||'')).trim())}" loading="lazy"${dois?` data-f="${f}" data-c="${c}" data-verso="0" onclick="viraFoto(event,this)" title="Clique para ver as costas"`:''}>`;
+}
+function viraFoto(e,img){
+e.stopPropagation();
+const v=img.dataset.verso==='1'?'0':'1';
+img.dataset.verso=v;img.src=v==='1'?img.dataset.c:img.dataset.f;
+img.title=v==='1'?'Clique para ver a frente':'Clique para ver as costas';
+}
 function catalogo(){
-const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>`<tr><td>${esc(p.ref)}</td><td>${esc(p.nome)}</td><td class="n">${brl(p.preco)}</td><td class="n">${brl(precoG(p))}</td></tr>`).join('');
-return `<div class="bar"><h2>Catálogo</h2><button class="pri" onclick="tab='pedidos';render()">+ Novo pedido</button></div><div class="tw"><table><tr><th>Ref.</th><th>Produto</th><th class="n">Preço P–GG</th><th class="n">Preço G1–G4</th></tr>${r||'<tr><td colspan="4" class="empty">Nenhum produto disponível.</td></tr>'}</table></div>`;
+const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>`<div class="c">${foto(p,'foto')}<div class="ci"><strong>${esc(p.ref)}</strong> · ${esc(p.nome)}<small style="margin-top:4px">P–GG ${brl(p.preco)} · G1–G4 ${brl(precoG(p))}</small></div></div>`).join('');
+return `<div class="bar"><h2>Catálogo</h2><button class="pri" onclick="tab='pedidos';render()">+ Novo pedido</button></div>${r?`<div class="cards cat">${r}</div>`:'<div class="c empty">Nenhum produto disponível.</div>'}`;
 }
 
 function produtos(){
-const pct=(c,v)=>v>0?Math.round((v-c)/v*100)+'%':'—';
-const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>{const c=custoP(p,false),cg=custoP(p,true);return `<tr><td>${esc(p.ref)}</td><td>${esc(p.nome)}${p.tecidoId?`<small>${esc(mat(p.tecidoId)?.nome||'')}</small>`:''}</td><td class="n">${brl(c)}</td><td class="n">${brl(cg)}</td><td class="n">${brl(p.preco)}</td><td class="n">${brl(precoG(p))}</td><td class="n">${pct(c,+p.preco)} / ${pct(cg,precoG(p))}</td><td class="n ${tot(p)<=(+p.min||0)?'low':''}">${tot(p)}</td><td><button class="sm" onclick="verFicha('${p.id}')">Ficha</button><button class="sm" onclick="fProd('${p.id}')">Editar</button><button class="sm del" onclick="del('produtos','${p.id}')">Excluir</button></td></tr>`}).join('');
+const pct=(c,v)=>{const m=margem(c,v);return m.pct==null?'—':`<span class="${m.lucro<=0?'low':''}" title="${brl(v)} − custo ${brl(c)} − ${nf(m.imp+m.desp+m.com,2)}% de imposto/despesa/comissão (${brl(m.ded)}) = ${brl(m.lucro)} por peça">${Math.round(m.pct)}%</span>`};
+const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>{const c=custoP(p,false),cg=custoP(p,true);return `<tr><td>${foto(p,'fmini')}</td><td>${esc(p.ref)}</td><td>${esc(p.nome)}${p.tecidoId?`<small>${esc(mat(p.tecidoId)?.nome||'')} · ${p.ficha?'ficha própria':'ficha padrão'}</small>`:''}</td><td class="n">${brl(c)}</td><td class="n">${brl(cg)}</td><td class="n">${brl(p.preco)}</td><td class="n">${brl(precoG(p))}</td><td class="n">${pct(c,+p.preco)} / ${pct(cg,precoG(p))}</td><td class="n ${tot(p)<=(+p.min||0)?'low':''}">${tot(p)}</td><td><button class="sm" onclick="verFicha('${p.id}')">Ficha</button><button class="sm" onclick="fProd('${p.id}')">Editar</button><button class="sm del" onclick="del('produtos','${p.id}')">Excluir</button></td></tr>`}).join('');
 return `<div class="bar"><h2>Produtos</h2><button class="pri" onclick="fProd()">+ Novo produto</button></div>
- <div class="tw"><table><tr><th>Ref.</th><th>Descrição</th><th class="n">Custo P–GG</th><th class="n">Custo G1–G4</th><th class="n">Preço P–GG</th><th class="n">Preço G1–G4</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>${r||'<tr><td colspan="9" class="empty">Nenhum produto cadastrado.</td></tr>'}</table></div>
- <p style="color:var(--mut)">O custo vem da ficha técnica (tecido do produto + ficha padrão da aba Matéria-prima). Produtos sem tecido escolhido usam o custo manual.</p>`;
+ <div class="tw"><table><tr><th></th><th>Ref.</th><th>Descrição</th><th class="n">Custo P–GG</th><th class="n">Custo G1–G4</th><th class="n">Preço P–GG</th><th class="n">Preço G1–G4</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>${r||'<tr><td colspan="10" class="empty">Nenhum produto cadastrado.</td></tr>'}</table></div>
+ <p style="color:var(--mut)">O custo vem da ficha técnica: tecido do produto + a ficha própria da referência, ou a ficha padrão (aba Matéria-prima) quando a referência não tem uma. Produtos sem tecido escolhido usam o custo manual. A margem já desconta imposto, despesas e a maior comissão cadastrada (${nf(comMax(),2)}%) — passe o mouse para ver a conta.</p>`;
 }
 function fProd(id){
 const p=id?prod(id):{};
+const campoFoto=k=>{const n=p['img'+k],lbl=k==='F'?'Frente':'Costas';
+return `<div style="flex:1"><small style="display:block;margin-bottom:4px">${lbl}</small>${n?`<img class="fmed" src="${imgUrl(n)}" alt="${lbl}">`:'<div class="fmed semfoto"></div>'}<input type="file" name="foto${k}" accept="image/*" style="margin-top:6px"><label style="display:${n?'flex':'none'};gap:6px;align-items:center;margin:4px 0 0;font-size:13px"><input type="checkbox" name="del${k}" style="width:auto;margin:0">Remover</label></div>`};
 modal(id?'Editar produto':'Novo produto',`
  <div class="g2"><label>Referência<input name="ref" required inputmode="numeric" pattern="[0-9]+" title="Somente números" oninput="this.value=this.value.replace(/[^0-9]/g,'')" value="${esc(p.ref)}"></label>
  <label>Descrição<input name="nome" required placeholder="Short tactel" value="${esc(p.nome)}"></label>
@@ -623,16 +665,39 @@ modal(id?'Editar produto':'Novo produto',`
  <label>Preço P ao GG (R$)<input name="preco" type="number" step="0.01" min="0" required value="${p.preco??''}"></label>
  <label>Preço G1 ao G4 (R$)<input name="precoG" type="number" step="0.01" min="0" required value="${p.precoG??p.preco??''}"></label>
  <label>Custo manual (R$)<input name="custo" type="number" step="0.01" min="0" value="${p.custo??''}" title="Usado só se o produto não tiver tecido na ficha técnica"></label></div>
+ <fieldset style="border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:8px 0"><legend style="padding:0 6px;font-weight:600">Fotos (opcional)</legend>
+ <div class="r2" style="align-items:flex-start;margin:0">${campoFoto('F')}${campoFoto('C')}</div>
+ <small>Reduzidas para 1200px e convertidas em JPEG antes de subir. Aparecem no catálogo do lojista.</small></fieldset>
  <fieldset style="border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:8px 0"><legend style="padding:0 6px;font-weight:600">Ficha técnica</legend>
   <label>Tecido<select name="tecidoId"><option value="">— sem ficha (usar custo manual) —</option>${S.materiais.filter(m=>m.tipo==='tecido').sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(m=>`<option value="${m.id}"${m.id===p.tecidoId?' selected':''}>${esc(m.nome)}${m.comp?' · '+esc(m.comp):''}${m.cor?' · '+esc(m.cor):''} (${brl4(matCusto(m))}/m)</option>`).join('')}</select></label>
  <div class="g2"><label>Consumo de tecido P–GG (m por peça)<input name="cons" type="number" step="0.001" min="0" value="${p.cons??''}"></label>
  <label>Consumo de tecido G1–G4 (m por peça)<input name="consG" type="number" step="0.001" min="0" value="${p.consG??''}" placeholder="igual ao P–GG"></label>
  <label>Custo extra (R$ por peça)<input name="extra" type="number" step="0.01" min="0" value="${p.extra??''}"></label></div>
- <small>Os aviamentos, a mão de obra e o custo fixo vêm da ficha padrão (aba Matéria-prima).</small></fieldset>
+ <div class="g2"><label>Molde P–GG: largura (cm)<input name="molL" type="number" step="0.1" min="0" value="${p.molL||''}" title="Largura do retângulo que envolve todas as partes de uma peça"></label>
+ <label>Molde P–GG: comprimento (cm)<input name="molC" type="number" step="0.1" min="0" value="${p.molC||''}"></label>
+ <label>Molde G1–G4: largura (cm)<input name="molLG" type="number" step="0.1" min="0" value="${p.molLG||''}" placeholder="igual ao P–GG"></label>
+ <label>Molde G1–G4: comprimento (cm)<input name="molCG" type="number" step="0.1" min="0" value="${p.molCG||''}" placeholder="igual ao P–GG"></label>
+ <label>Perda de encaixe (%)<input name="perda" type="number" step="0.1" min="0" max="90" value="${p.perda||''}" placeholder="Ex.: 12"></label></div>
+ <button type="button" class="ghost" onclick="estimarCons(this.form)">Estimar consumo pelo molde</button>
+ <small id="consprev" style="display:block;margin-top:4px">Preenche os dois consumos acima a partir da largura útil do tecido. Estimativa por retângulo: o encaixe real costuma gastar menos.</small>
+ <label style="display:flex;align-items:center;gap:8px;margin:10px 0 4px"><input type="checkbox" id="fichaProp" style="width:auto;margin:0" ${p.ficha?'checked':''} onchange="toggleFichaProp(this)">Esta referência tem ficha própria</label>
+ <small id="fichaPadMsg" style="display:${p.ficha?'none':'block'}">Os aviamentos, a mão de obra e o custo fixo vêm da ficha padrão (aba Matéria-prima). Marque acima para esta referência ter os seus.</small>
+ <div id="fichaprop" style="display:${p.ficha?'':'none'}">
+  <label>Aviamentos e quantidade por peça</label><div id="fitens">${(fichaDe(p).itens||[]).map(fichaLinha).join('')}</div>
+  <button type="button" class="ghost" onclick="$('#fitens').insertAdjacentHTML('beforeend',fichaLinha({}))">+ Item</button>
+  <div class="g2" style="margin-top:10px"><label>Mão de obra (R$ por peça)<input name="pmo" type="number" step="0.01" min="0" value="${fichaDe(p).mo??''}"></label>
+  <label>Custo fixo (R$ por peça)<input name="pfixo" type="number" step="0.01" min="0" value="${fichaDe(p).fixo??''}"></label></div>
+  <small>Começa com uma cópia da ficha padrão. Ajuste o que difere nesta referência.</small></div></fieldset>
  <label>Estoque por cor e tamanho (peças que você tem hoje)</label><div id="gp">${grade(coresDe(p),(c,s)=>estQ(p,c,s))}</div>
  <div class="r2"><input id="novacor" placeholder="Outra cor (ex.: Bege)"><button type="button" class="ghost" onclick="addCor()">+ Cor</button></div>`,
 async(f,form)=>{
-const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.preco||0,precoG:+f.precoG||0,est:lerEst(form),tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0};delete d.id;
+const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.preco||0,precoG:+f.precoG||0,est:lerEst(form),tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0,molL:+f.molL||0,molC:+f.molC||0,molLG:+f.molLG||0,molCG:+f.molCG||0,perda:+f.perda||0};delete d.id;
+if(form.querySelector('#fichaProp').checked)d.ficha=lerFicha(form,f.pmo,f.pfixo);else delete d.ficha;
+const upF=form.fotoF.files[0],upC=form.fotoC.files[0];
+if(f.delF&&!upF&&p.imgF){await sb.storage.from('produtos').remove([p.imgF]);d.imgF=''}
+if(f.delC&&!upC&&p.imgC){await sb.storage.from('produtos').remove([p.imgC]);d.imgC=''}
+if(upF)d.imgF=await subirFoto(upF,p.imgF);
+if(upC)d.imgC=await subirFoto(upC,p.imgC);
 id?await db.doc('produtos/'+id).set(d):await db.collection('produtos').add(d);
 });
 }
@@ -644,18 +709,49 @@ const matUn=m=>m.tipo==='tecido'?'MT':(m.un||'UN');
 const matCusto=m=>!m?0:m.tipo==='tecido'?(m.cobr==='mt'?(+m.preco||0):(+m.rend>0)?(+m.preco||0)/(+m.rend):0):(+m.preco||0)/((+m.qtdC)>0?+m.qtdC:1);
 const fichaDoc=()=>S.config.find(x=>x.tipo==='ficha');
 const fichaPad=()=>fichaDoc()||{itens:[],mo:0,fixo:0};
+const fichaDe=p=>(p&&p.ficha)||fichaPad();
+const comMax=()=>S.reps.reduce((a,r)=>Math.max(a,+r.com||0),0);
+// imposto, despesa e comissão são percentuais do preço de venda, não do custo
+function margem(custo,preco){
+const f=fichaPad(),imp=+f.imp||0,desp=+f.desp||0,com=comMax(),v=+preco||0;
+const ded=v*(imp+desp+com)/100,lucro=v-(+custo||0)-ded;
+return {imp,desp,com,ded,lucro,pct:v>0?lucro/v*100:null};
+}
+const consDe=(p,g)=>g&&p.consG!==''&&p.consG!=null?+p.consG||0:+p.cons||0;
+// shortcut: consumo pelo retângulo que envolve o molde, sem rotação nem encaixe real; trocar quando houver polígonos (fase 5)
+function consEstimado(largTecido,molL,molC,perda){
+const L=(+largTecido||0)*100,w=+molL||0,h=+molC||0;
+if(!(L>0&&w>0&&h>0))return null;
+const n=Math.floor(L/w);
+if(n<1)return null;
+return h/100/n*(1+Math.max(0,+perda||0)/100);
+}
+function estimarCons(fm){
+const msg=t=>{$('#consprev').textContent=t};
+const t=mat(fm.tecidoId.value);
+if(!t)return msg('Escolha o tecido antes de estimar.');
+if(!(+t.larg>0))return msg('O tecido "'+t.nome+'" está sem largura útil. Cadastre-a na aba Matéria-prima.');
+const perda=fm.perda.value;
+const a=consEstimado(t.larg,fm.molL.value,fm.molC.value,perda);
+if(a==null)return msg('Informe a largura e o comprimento do molde P–GG. A largura do molde não pode passar da largura útil do tecido ('+nf(t.larg,2)+' m).');
+const b=consEstimado(t.larg,fm.molLG.value||fm.molL.value,fm.molCG.value||fm.molC.value,perda);
+fm.cons.value=a.toFixed(3);
+if(b!=null)fm.consG.value=b.toFixed(3);
+const n=Math.floor((+t.larg*100)/(+fm.molL.value));
+msg('Estimado com '+nf(t.larg,2)+' m de largura: '+n+' peça(s) lado a lado · '+nf(a)+' m por peça (P–GG)'+(b!=null?' · '+nf(b)+' m (G1–G4)':'')+'. Ajuste à mão se o encaixe real for melhor.');
+}
 function custoFicha(p,g){
-const f=fichaPad(),linhas=[];
+const f=fichaDe(p),linhas=[];
 (f.itens||[]).forEach(i=>{const m=mat(i.matId);if(!m)return;const cu=matCusto(m);linhas.push({nome:m.nome,cor:m.cor||'',q:+i.qtd||0,un:matUn(m),cu,ct:cu*(+i.qtd||0)})});
 const t=mat(p.tecidoId);
-if(t){const q=g&&p.consG!==''&&p.consG!=null?+p.consG:+p.cons||0;const cu=matCusto(t);linhas.push({nome:'Tecido: '+t.nome,cor:t.cor||'Cor do produto',q,un:'MT',cu,ct:cu*q,tec:true})}
+if(t){const q=consDe(p,g);const cu=matCusto(t);linhas.push({nome:'Tecido: '+t.nome,cor:t.cor||'Cor do produto',q,un:'MT',cu,ct:cu*q,tec:true})}
 const mp=linhas.reduce((a,x)=>a+x.ct,0),mo=+f.mo||0,fixo=+f.fixo||0,extra=+p.extra||0;
 return {linhas,mp,mo,fixo,extra,total:mp+mo+fixo+extra};
 }
 const custoP=(p,g)=>p.tecidoId?custoFicha(p,g).total:(+p.custo||0);
 function materia(){
 const ms=S.materiais.slice().sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='tecido'?-1:1)||(a.nome||'').localeCompare(b.nome||''));
-  const r=ms.map(m=>`<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td>${m.tipo==='tecido'?'Tecido':'Aviamento'}</td><td>${esc([m.comp,+m.gram?m.gram+' g/m²':''].filter(Boolean).join(' · '))}</td><td>${esc(m.forn)}</td><td class="n">${m.tipo==='tecido'?brl(m.preco)+(m.cobr==='mt'?'/m':'/kg'):brl(m.preco)+((+m.qtdC||1)!==1?' / '+nf(m.qtdC,0)+' '+esc(matUn(m)):' / '+esc(matUn(m)))}</td><td class="n">${m.tipo==='tecido'?m.cobr==='mt'?'—':(+m.rend?nf(m.rend,2)+' m/kg':'<span class="low">informe</span>'):''}</td><td class="n"><b>${brl4(matCusto(m))}</b>/${esc(matUn(m))}</td><td><button class="sm" onclick="fMat('${m.id}')">Editar</button><button class="sm del" onclick="del('materiais','${m.id}')">Excluir</button></td></tr>`).join('');
+  const r=ms.map(m=>`<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td>${m.tipo==='tecido'?'Tecido':'Aviamento'}</td><td>${esc([m.comp,+m.gram?m.gram+' g/m²':'',+m.larg?nf(m.larg,2)+' m de largura':''].filter(Boolean).join(' · '))}</td><td>${esc(m.forn)}</td><td class="n">${m.tipo==='tecido'?brl(m.preco)+(m.cobr==='mt'?'/m':'/kg'):brl(m.preco)+((+m.qtdC||1)!==1?' / '+nf(m.qtdC,0)+' '+esc(matUn(m)):' / '+esc(matUn(m)))}</td><td class="n">${m.tipo==='tecido'?m.cobr==='mt'?'—':(+m.rend?nf(m.rend,2)+' m/kg':'<span class="low">informe</span>'):''}</td><td class="n"><b>${brl4(matCusto(m))}</b>/${esc(matUn(m))}</td><td><button class="sm" onclick="fMat('${m.id}')">Editar</button><button class="sm del" onclick="del('materiais','${m.id}')">Excluir</button></td></tr>`).join('');
 const f=fichaPad();
 const fr=(f.itens||[]).map(i=>{const m=mat(i.matId);if(!m)return '';const cu=matCusto(m);return `<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td class="n">${nf(i.qtd)}</td><td>${esc(matUn(m))}</td><td class="n">${brl4(cu)}</td><td class="n">${brl4(cu*(+i.qtd||0))}</td></tr>`}).join('');
 const sub=(f.itens||[]).reduce((a,i)=>a+matCusto(mat(i.matId))*(+i.qtd||0),0);
@@ -664,7 +760,11 @@ return `<div class="bar"><h2>Matéria-prima</h2><button class="pri" onclick="fMa
  <div class="bar"><h2>Ficha técnica padrão</h2><button class="pri" onclick="fFicha()">Editar ficha padrão</button></div>
  <p style="color:var(--mut);margin-top:0">Itens iguais em todas as referências. O tecido e o consumo de cada referência são informados no cadastro do produto.</p>
  <div class="tw"><table><tr><th>Item</th><th>Cor</th><th class="n">Qtde</th><th>Un</th><th class="n">Custo un.</th><th class="n">Custo total</th></tr>${fr||'<tr><td colspan="6" class="empty">Nenhum item na ficha padrão.</td></tr>'}
- <tr><th colspan="5">Aviamentos</th><th class="n">${brl4(sub)}</th></tr><tr><td colspan="5">Mão de obra (por peça)</td><td class="n">${brl(f.mo)}</td></tr><tr><td colspan="5">Custo fixo (por peça)</td><td class="n">${brl(f.fixo)}</td></tr></table></div>`;
+ <tr><th colspan="5">Aviamentos</th><th class="n">${brl4(sub)}</th></tr><tr><td colspan="5">Mão de obra (por peça)</td><td class="n">${brl(f.mo)}</td></tr><tr><td colspan="5">Custo fixo (por peça)</td><td class="n">${brl(f.fixo)}</td></tr>
+ <tr><td colspan="5">Imposto sobre a venda</td><td class="n">${nf(f.imp||0,2)}%</td></tr>
+ <tr><td colspan="5">Outras despesas sobre a venda</td><td class="n">${nf(f.desp||0,2)}%</td></tr>
+ <tr><td colspan="5">Comissão considerada (maior cadastrada)</td><td class="n">${nf(comMax(),2)}%</td></tr></table></div>
+ <p style="color:var(--mut)">${S.produtos.filter(p=>p.ficha).length} de ${S.produtos.length} referência(s) têm ficha própria e ignoram os aviamentos, a mão de obra e o custo fixo acima.</p>`;
 }
 function fMat(id){
 const m=id?mat(id):{tipo:'aviamento',un:'UN',qtdC:1};
@@ -675,36 +775,44 @@ modal(id?'Editar matéria-prima':'Nova matéria-prima',`
  <label class="av">Unidade de uso<select name="un" onchange="matPrev(this.form)">${['UN','MT','KG','PC','CX','RL','PAR'].map(u=>`<option${(m.un||'UN')===u?' selected':''}>${u}</option>`).join('')}</select></label></div>
   <div class="g2"><label class="tc">Composição<input name="comp" list="comps" value="${esc(m.comp)}" placeholder="Ex.: 100% Poliéster"></label><datalist id="comps">${[...new Set(['100% Poliéster','92% Poliéster 8% Elastano',...S.materiais.map(x=>x.comp).filter(Boolean)])].map(c=>`<option value="${esc(c)}">`).join('')}</datalist>
   <label class="tc">Gramatura (g/m²)<input name="gram" type="number" step="1" min="0" value="${m.gram??''}"></label>
+  <label class="tc">Largura útil (m)<input name="larg" type="number" step="0.01" min="0" value="${m.larg??''}" placeholder="Ex.: 1,60" title="Largura aproveitável do rolo; usada para estimar o consumo e planejar o enfesto"></label>
   <label class="tc">Cobrança do fornecedor<select name="cobr" onchange="matTipo(this.form)"><option value="kg"${m.cobr!=='mt'?' selected':''}>Por kg</option><option value="mt"${m.cobr==='mt'?' selected':''}>Por metro</option></select></label>
   <label>Fornecedor<input name="forn" value="${esc(m.forn)}"></label></div>
   <div class="g2"><label><span class="tc tck">Preço do tecido (R$ por kg)</span><span class="tc tcm">Preço do tecido (R$ por metro)</span><span class="av">Preço pago (R$)</span><input name="preco" type="number" step="0.0001" min="0" value="${m.preco??''}" oninput="matPrev(this.form)"></label>
   <label class="tc tck">Rendimento (metros por kg)<input name="rend" type="number" step="0.01" min="0" value="${m.rend??''}" oninput="matPrev(this.form)"></label>
  <label class="av">Quantidade que vem nesse preço<input name="qtdC" type="number" step="0.001" min="0" value="${m.qtdC??1}" oninput="matPrev(this.form)" title="Ex.: cone de linha com 4000 m, milheiro de ilhós = 1000"></label></div>
  <div id="matprev" class="alert" style="background:#eef6ee;border-color:#cfe3cf;color:#234"></div>`,
-  async f=>{const d={...m};delete d.id;Object.assign(d,{nome:f.nome.trim(),cor:(f.cor||'').trim(),tipo:f.tipo,un:f.tipo==='tecido'?'MT':f.un,forn:(f.forn||'').trim(),comp:f.tipo==='tecido'?(f.comp||'').trim():'',gram:f.tipo==='tecido'?+f.gram||0:0,cobr:f.tipo==='tecido'?f.cobr:'',preco:+f.preco||0,rend:+f.rend||0,qtdC:+f.qtdC||1});id?await db.doc('materiais/'+id).set(d):await db.collection('materiais').add(d)});
+  async f=>{const d={...m};delete d.id;Object.assign(d,{nome:f.nome.trim(),cor:(f.cor||'').trim(),tipo:f.tipo,un:f.tipo==='tecido'?'MT':f.un,forn:(f.forn||'').trim(),comp:f.tipo==='tecido'?(f.comp||'').trim():'',gram:f.tipo==='tecido'?+f.gram||0:0,larg:f.tipo==='tecido'?+f.larg||0:0,cobr:f.tipo==='tecido'?f.cobr:'',preco:+f.preco||0,rend:+f.rend||0,qtdC:+f.qtdC||1});id?await db.doc('materiais/'+id).set(d):await db.collection('materiais').add(d)});
 matTipo($('#dlg form'));
 }
 function matTipo(fm){const t=fm.tipo.value==='tecido';fm.querySelectorAll('.tc').forEach(e=>e.style.display=t?'':'none');fm.querySelectorAll('.av').forEach(e=>e.style.display=t?'none':'');const k=fm.cobr.value==='kg';fm.querySelectorAll('.tck').forEach(e=>e.style.display=t&&k?'':'none');fm.querySelectorAll('.tcm').forEach(e=>e.style.display=t&&!k?'':'none');matPrev(fm)}
 function matPrev(fm){const m={tipo:fm.tipo.value,cobr:fm.cobr.value,un:fm.un.value,preco:fm.preco.value,rend:fm.rend.value,qtdC:fm.qtdC.value};$('#matprev').textContent='Custo de uso: '+brl4(matCusto(m))+' por '+matUn(m)+(m.tipo==='tecido'&&m.cobr==='kg'&&!(+m.rend>0)?' (informe o rendimento)':'')}
 function fichaLinha(i){return `<div class="fr" style="display:grid;grid-template-columns:1fr 110px auto;gap:6px;margin-bottom:6px"><select>${S.materiais.filter(m=>m.tipo!=='tecido').sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(m=>`<option value="${m.id}"${m.id===i.matId?' selected':''}>${esc(m.nome)}${m.cor?' · '+esc(m.cor):''} (${esc(matUn(m))})</option>`).join('')}</select><input type="number" step="0.001" min="0" value="${i.qtd??1}" placeholder="Qtde"><button type="button" class="sm del" onclick="this.parentNode.remove()">×</button></div>`}
+function lerFicha(form,mo,fixo){return {itens:[...form.querySelectorAll('.fr')].map(r=>({matId:r.querySelector('select').value,qtd:+r.querySelector('input').value||0})).filter(i=>i.matId&&i.qtd>0),mo:+mo||0,fixo:+fixo||0}}
+function toggleFichaProp(cb){$('#fichaprop').style.display=cb.checked?'':'none';$('#fichaPadMsg').style.display=cb.checked?'none':'block'}
 function fFicha(){
 if(!S.materiais.some(m=>m.tipo!=='tecido')){aviso('Cadastre os aviamentos antes de montar a ficha padrão.');return}
 const f=fichaPad(),d0=fichaDoc();
 modal('Ficha técnica padrão',`<label>Aviamentos e quantidade por peça</label><div id="fitens">${(f.itens||[]).map(fichaLinha).join('')}</div>
  <button type="button" class="ghost" onclick="$('#fitens').insertAdjacentHTML('beforeend',fichaLinha({}))">+ Item</button>
  <div class="g2" style="margin-top:10px"><label>Mão de obra (R$ por peça)<input name="mo" type="number" step="0.01" min="0" value="${f.mo??''}"></label>
- <label>Custo fixo (R$ por peça)<input name="fixo" type="number" step="0.01" min="0" value="${f.fixo??''}"></label></div>`,
-async(v,form)=>{const itens=[...form.querySelectorAll('.fr')].map(r=>({matId:r.querySelector('select').value,qtd:+r.querySelector('input').value||0})).filter(i=>i.matId&&i.qtd>0);
-const d={tipo:'ficha',itens,mo:+v.mo||0,fixo:+v.fixo||0};d0?await db.doc('config/'+d0.id).set(d):await db.collection('config').add(d)});
+ <label>Custo fixo (R$ por peça)<input name="fixo" type="number" step="0.01" min="0" value="${f.fixo??''}"></label></div>
+ <fieldset style="border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:8px 0"><legend style="padding:0 6px;font-weight:600">Deduções sobre a venda</legend>
+ <div class="g2"><label>Imposto (%)<input name="imp" type="number" step="0.01" min="0" max="100" value="${f.imp??''}" placeholder="Ex.: 6"></label>
+ <label>Outras despesas (%)<input name="desp" type="number" step="0.01" min="0" max="100" value="${f.desp??''}" placeholder="Ex.: 3"></label></div>
+ <small>Percentuais do preço de venda, não do custo. A comissão não entra aqui: o sistema usa a maior cadastrada em Representantes (hoje ${nf(comMax(),2)}%).</small></fieldset>`,
+async(v,form)=>{const d={tipo:'ficha',...lerFicha(form,v.mo,v.fixo),imp:+v.imp||0,desp:+v.desp||0};
+d0?await db.doc('config/'+d0.id).set(d):await db.collection('config').add(d)});
 }
 function verFicha(id){
 const p=prod(id);if(!p)return;
 if(!p.tecidoId){aviso('Escolha o tecido e o consumo na ficha técnica do produto (botão Editar).');return}
 const a=custoFicha(p,false),b=custoFicha(p,true);
-const mg=(c,v)=>v>0?brl(v-c)+' ('+Math.round((v-c)/v*100)+'%)':'—';
+const mA=margem(a.total,+p.preco),mB=margem(b.total,precoG(p));
+const mg=m=>m.pct==null?'—':brl(m.lucro)+' ('+Math.round(m.pct)+'%)';
 const rows=a.linhas.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.cor)}</td><td class="n">${nf(x.q)}</td><td>${x.un}</td><td class="n">${brl4(x.cu)}</td><td class="n">${brl4(x.ct)}</td></tr>`).join('');
 const d=$('#dlg');
-d.innerHTML=`<form method="dialog"><h3>Ficha técnica · Ref. ${esc(p.ref)} · ${esc(p.nome)}</h3><div class="tw"><table><tr><th>Item</th><th>Cor</th><th class="n">Qtde</th><th>Un</th><th class="n">Custo un.</th><th class="n">Custo total</th></tr>${rows}</table></div>
+d.innerHTML=`<form method="dialog"><h3>Ficha técnica · Ref. ${esc(p.ref)} · ${esc(p.nome)}</h3>${(p.imgF||p.imgC)?`<div style="margin-bottom:10px">${foto(p,'fmed')}</div>`:''}<div class="tw"><table><tr><th>Item</th><th>Cor</th><th class="n">Qtde</th><th>Un</th><th class="n">Custo un.</th><th class="n">Custo total</th></tr>${rows}</table></div>
  <div class="tw"><table><tr><th></th><th class="n">P–GG</th><th class="n">G1–G4</th></tr>
  <tr><td>Custo matéria-prima</td><td class="n">${brl(a.mp)}</td><td class="n">${brl(b.mp)}</td></tr>
  <tr><td>Custo mão de obra</td><td class="n">${brl(a.mo)}</td><td class="n">${brl(b.mo)}</td></tr>
@@ -712,8 +820,9 @@ d.innerHTML=`<form method="dialog"><h3>Ficha técnica · Ref. ${esc(p.ref)} · $
  <tr><td>Custo extra</td><td class="n">${brl(a.extra)}</td><td class="n">${brl(b.extra)}</td></tr>
  <tr><th>Preço de custo</th><th class="n">${brl(a.total)}</th><th class="n">${brl(b.total)}</th></tr>
  <tr><td>Preço de venda</td><td class="n">${brl(p.preco)}</td><td class="n">${brl(precoG(p))}</td></tr>
- <tr><td>Margem</td><td class="n">${mg(a.total,+p.preco)}</td><td class="n">${mg(b.total,precoG(p))}</td></tr></table></div>
- <small>Consumo de tecido: ${nf(p.cons)} m (P–GG) · ${nf(p.consG!==''&&p.consG!=null?p.consG:p.cons)} m (G1–G4)</small>
+ <tr><td>− Imposto ${nf(mA.imp,2)}% + despesas ${nf(mA.desp,2)}% + comissão ${nf(mA.com,2)}%</td><td class="n">${brl(mA.ded)}</td><td class="n">${brl(mB.ded)}</td></tr>
+ <tr><th>Lucro por peça</th><th class="n ${mA.lucro<=0?'low':''}">${mg(mA)}</th><th class="n ${mB.lucro<=0?'low':''}">${mg(mB)}</th></tr></table></div>
+ <small>Consumo de tecido: ${nf(p.cons)} m (P–GG) · ${nf(p.consG!==''&&p.consG!=null?p.consG:p.cons)} m (G1–G4) · usando ${p.ficha?'a ficha própria desta referência':'a ficha padrão'}. A comissão é a maior cadastrada em Representantes (pior caso).</small>
  <div class="row end"><button type="button" class="ghost" onclick="dlg.close();fProd('${p.id}')">Editar</button><button class="pri">Fechar</button></div></form>`;
 d.showModal();
 }
@@ -936,7 +1045,7 @@ function bloco(pid,get,extra,lida){
 const p=pid===undefined?S.produtos[0]:(pid?prod(pid):null);
 const opts=(p?'':'<option value="" selected>— escolha a referência —</option>')+S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(x=>`<option value="${x.id}" ${p&&x.id===p.id?'selected':''}>${esc(x.ref)} · ${esc(x.nome)}</option>`).join('');
 const cores=p?coresDe(p,extra||[]):semProd(extra);
-return `<div class="blk${p?'':' need'}"><div class="r2"><select class="selp" onchange="trocaProd(this)">${opts}</select><button type="button" class="sm del" onclick="this.closest('.blk').remove();checaFalta()">✕</button></div>${lida?`<small class="mut">Referência lida no arquivo: ${esc(lida)}</small>`:''}<div class="gw">${grade(cores,get||(()=>0))}</div></div>`;
+return `<div class="blk${p?'':' need'}"><div class="r2"><span class="fth">${foto(p||{},'fmini')}</span><select class="selp" onchange="trocaProd(this)">${opts}</select><button type="button" class="sm del" onclick="this.closest('.blk').remove();checaFalta()">✕</button></div>${lida?`<small class="mut">Referência lida no arquivo: ${esc(lida)}</small>`:''}<div class="gw">${grade(cores,get||(()=>0))}</div></div>`;
 }
 function trocaProd(sel){
 const b=sel.closest('.blk');
@@ -944,6 +1053,7 @@ const val={};
 b.querySelectorAll('input.qi').forEach(i=>{if(+i.value)(val[i.dataset.c]=val[i.dataset.c]||{})[i.dataset.t]=i.value});
 const p=prod(sel.value),extra=Object.keys(val);
 b.querySelector('.gw').innerHTML=grade(p?coresDe(p,extra):semProd(extra),(c,s)=>(val[c]||{})[s]);
+b.querySelector('.fth').innerHTML=foto(p||{},'fmini');
 b.classList.toggle('need',!p);
 checaFalta();
 }
@@ -1013,11 +1123,25 @@ if(!data||data.error)throw new Error((data&&data.error)||'Resposta vazia da IA.'
 return data.result;
 }
 };
-async function img64(b){
-const bmp=await createImageBitmap(b);const k=Math.min(1,2000/Math.max(bmp.width,bmp.height));
+async function imgCanvas(b,max){
+const bmp=await createImageBitmap(b);const k=Math.min(1,max/Math.max(bmp.width,bmp.height));
 const c=document.createElement('canvas');c.width=Math.round(bmp.width*k);c.height=Math.round(bmp.height*k);
-c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);
-const u=c.toDataURL('image/jpeg',.85);return {mime:'image/jpeg',data:u.slice(u.indexOf(',')+1)};
+c.getContext('2d').drawImage(bmp,0,0,c.width,c.height);return c;
+}
+async function img64(b){
+const u=(await imgCanvas(b,2000)).toDataURL('image/jpeg',.85);
+return {mime:'image/jpeg',data:u.slice(u.indexOf(',')+1)};
+}
+async function subirFoto(file,antigo){
+if(!/^image\//.test(file.type))throw new Error('Envie um arquivo de imagem.');
+const c=await imgCanvas(file,1200);
+const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.82));
+if(!blob)throw new Error('Não foi possível processar a imagem.');
+const nome=crypto.randomUUID()+'.jpg';
+const {error}=await sb.storage.from('produtos').upload(nome,blob,{contentType:'image/jpeg'});
+if(error)throw new Error('Falha ao enviar a foto: '+error.message);
+if(antigo)await sb.storage.from('produtos').remove([antigo]);
+return nome;
 }
 async function importar(){
 const st=$('#impst'),f=$('#arq').files[0];
@@ -1080,7 +1204,7 @@ for(const k in ag){
 const [id,c,t]=k.split('|');const p=prod(id);if(!p)continue;
 if(!(k in rem))rem[k]=Math.max(estQ(p,c,t),0);
 const a=Math.min(rem[k],ag[k]);rem[k]-=a;
-if(ag[k]-a>0)linhas.push({ref:p.ref,nome:p.nome,c,t,d:ag[k],a,f:ag[k]-a,num:o.numero});
+if(ag[k]-a>0)linhas.push({id:p.id,ref:p.ref,nome:p.nome,c,t,d:ag[k],a,f:ag[k]-a,num:o.numero});
 }
 linhas.sort(ordLinha);
 out.push({o,linhas});
@@ -1089,6 +1213,23 @@ return out;
 }
 function fabricarLista(){return fabricarPedidos().flatMap(x=>x.linhas)}
 let fabVista=(()=>{try{return localStorage.getItem('fabVista')}catch(e){return null}})()||'pedido';
+// shortcut: mesa e altura do enfesto ficam no navegador de quem planeja, não no banco; mover para a config se outra pessoa precisar dos mesmos números
+const lsNum=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:+v||0}catch(e){return d}};
+let enfCam=lsNum('enfCam',50),enfMesa=lsNum('enfMesa',0);
+function setEnf(k,v){const n=Math.max(0,+v||0);if(k==='cam')enfCam=n;else enfMesa=n;try{localStorage.setItem(k==='cam'?'enfCam':'enfMesa',n)}catch(e){}render()}
+// cada camada do enfesto rende 1 peça de cada tamanho do risco; o risco cresce até a mesa acabar e as camadas param no menor saldo (não sobra peça)
+function planoEnfesto(qtds,consTam,maxCam,mesa){
+const rem={};SZ.forEach(t=>{const q=Math.floor(+qtds[t]||0);if(q>0)rem[t]=q});
+const out=[];
+while(Object.keys(rem).length&&out.length<200){
+const risco=[];let L=0;
+for(const t of SZ){if(!rem[t])continue;const c=+consTam(t)||0;if(risco.length&&mesa>0&&L+c>mesa)break;risco.push(t);L+=c}
+const cam=Math.min(maxCam>0?maxCam:Infinity,...risco.map(t=>rem[t]));
+risco.forEach(t=>{rem[t]-=cam;if(rem[t]<=0)delete rem[t]});
+out.push({tams:risco,cam,risco:L,metros:L*cam,pecas:cam*risco.length});
+}
+return out;
+}
 function fabricar(){
 const P=fabricarPedidos();
 const com=P.filter(x=>x.linhas.length),sem=P.filter(x=>!x.linhas.length);
@@ -1110,10 +1251,26 @@ const rows=cores.map(c=>`<tr><td>${esc(c)}</td>${SZ.map(t=>`<td class="n">${e.ce
 const tot=`<tr><th>Total</th>${SZ.map(t=>`<th class="n">${cores.reduce((a,c)=>a+(e.cel[c+'|'+t]||0),0)||''}</th>`).join('')}<th class="n">${e.f}</th></tr>`;
 return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padding:12px 14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><strong style="font-size:16px">Ref. ${esc(e.ref)} · ${esc(e.nome)}</strong><small>Pedidos: ${e.peds.sort((x,y)=>x-y).map(n=>'#'+n).join(', ')}</small></div><strong class="low">${e.f} peças</strong></div><div class="tw" style="border:0;border-radius:0"><table><tr><th>Cor</th>${SZ.map(t=>`<th class="n">${t}</th>`).join('')}<th class="n">Total</th></tr>${rows}${tot}</table></div></section>`;
 }).join('');
-const VISTAS=[['pedido','Por pedido'],['referencia','Por referência'],['lista','Lista detalhada (cor e tamanho)']];
+const ge={},semCons=[];
+todas.forEach(x=>{const k=x.id+'|'+x.c;const e=ge[k]=ge[k]||{id:x.id,ref:x.ref,nome:x.nome,c:x.c,q:{}};e.q[x.t]=(e.q[x.t]||0)+x.f});
+const enfSecs=Object.values(ge).sort((a,b)=>String(a.ref).localeCompare(String(b.ref))||coresIdx(a.c)-coresIdx(b.c)).map(e=>{
+const p=prod(e.id);
+if(!p||!(consDe(p,false)>0)){semCons.push('Ref. '+e.ref+' · '+e.c);return ''}
+const pl=planoEnfesto(e.q,t=>consDe(p,SZ.indexOf(t)>=4),enfCam,enfMesa);
+const mt=pl.reduce((a,x)=>a+x.metros,0),pc=pl.reduce((a,x)=>a+x.pecas,0),cu=matCusto(mat(p.tecidoId));
+const rows=pl.map((x,i)=>`<tr><td>${i+1}</td><td>${x.tams.join(' · ')}</td><td class="n">${x.cam}</td><td class="n${enfMesa>0&&x.risco>enfMesa?' low':''}">${nf(x.risco,2)}</td><td class="n">${nf(x.metros,2)}</td><td class="n">${x.pecas}</td></tr>`).join('');
+return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padding:12px 14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><strong style="font-size:16px">Ref. ${esc(e.ref)} · ${esc(e.nome)} · ${esc(e.c)}</strong><small>${pl.length} enfesto(s) · ${pc} peças · ${nf(mt,2)} m de tecido${cu?' · '+brl(mt*cu):''}</small></div><strong class="low">${nf(mt,2)} m</strong></div><div class="tw" style="border:0;border-radius:0"><table><tr><th>Enfesto</th><th>Tamanhos no risco</th><th class="n">Camadas</th><th class="n">Risco (m)</th><th class="n">Tecido (m)</th><th class="n">Peças</th></tr>${rows}</table></div></section>`;
+}).join('');
+const enfesto=`<div class="r2" style="margin-bottom:10px"><label style="margin:0">Máximo de camadas por enfesto<input type="number" min="0" step="1" value="${enfCam||''}" onchange="setEnf('cam',this.value)" placeholder="sem limite"></label>
+ <label style="margin:0">Comprimento útil da mesa (m)<input type="number" min="0" step="0.1" value="${enfMesa||''}" onchange="setEnf('mesa',this.value)" placeholder="sem limite"></label></div>
+ ${enfSecs||(semCons.length?'':'<div class="c empty">Nada a fabricar: o estoque cobre todos os pedidos em aberto.</div>')}
+ ${semCons.length?`<div class="alert">⚠ Sem plano para ${esc(semCons.join(', '))}: informe o consumo de tecido na ficha técnica do produto.</div>`:''}
+ <p style="color:var(--mut)">Cada camada do enfesto rende uma peça de cada tamanho do risco. O risco só entra na mesa se couber no comprimento informado — em vermelho, não coube nem com um tamanho só.</p>`;
+const VISTAS=[['pedido','Por pedido'],['referencia','Por referência'],['lista','Lista detalhada (cor e tamanho)'],['enfesto','Plano de enfesto']];
 if(!VISTAS.some(v=>v[0]===fabVista))fabVista='pedido';
 const vazio='<div class="c empty">Nada a fabricar: o estoque cobre todos os pedidos em aberto.</div>';
-const corpo=fabVista==='referencia'?(porRef||vazio)
+const corpo=fabVista==='enfesto'?enfesto
+:fabVista==='referencia'?(porRef||vazio)
 :fabVista==='lista'?(resumo?`<div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Total</th><th>De quais pedidos</th></tr>${resumo}</table></div>`:vazio)
 :(blocos||vazio)+(sem.length?`<p style="color:var(--mut)">Já cobertos pelo estoque: ${sem.map(x=>'#'+x.o.numero).join(', ')}.</p>`:'');
 return `<div class="cards"><div class="c"><small>Peças a fabricar</small><b>${total}</b></div><div class="c"><small>Pedidos com itens a fabricar</small><b>${com.length}</b></div></div>
@@ -1287,6 +1444,49 @@ d.close();
 };
 d.showModal();
 }
+
+// self-check do cálculo de custo/margem; roda só em localhost, com dados falsos, e restaura o estado
+if(IS_DEV)setTimeout(function(){
+const O={materiais:S.materiais,config:S.config,reps:S.reps};
+S.materiais=[{id:'t1',tipo:'tecido',nome:'Tactel',cobr:'mt',preco:10},{id:'a1',tipo:'aviamento',nome:'Linha',un:'UN',preco:20,qtdC:10}];
+S.config=[{tipo:'ficha',itens:[{matId:'a1',qtd:2}],mo:3,fixo:1,imp:6,desp:3}];
+S.reps=[{com:5},{com:10}];
+const p={tecidoId:'t1',cons:2,consG:3,extra:0.5};
+const a=custoFicha(p,false),b=custoFicha(p,true),pr=custoFicha({...p,ficha:{itens:[],mo:0,fixo:0}},false),m=margem(28.5,100);
+const t=[['aviamento 20/10un x2 + tecido 10x2m',a.mp,24],
+['total P-GG (+mo3 +fixo1 +extra0,5)',a.total,28.5],
+['total G1-G4 usa consG=3m',b.total,38.5],
+['ficha propria sobrepoe a padrao',pr.total,20.5],
+['deducao = 19% de 100',m.ded,19],
+['lucro = 100 - 28,5 - 19',m.lucro,52.5],
+['margem %',m.pct,52.5],
+['comissao = a maior cadastrada',m.com,10],
+['preco zero nao divide por zero',margem(10,0).pct,null],
+['produto sem foto vira placeholder',+foto({},'foto').includes('semfoto'),1],
+['so frente nao oferece virar',+foto({imgF:'a.jpg'},'foto').includes('data-verso'),0],
+['frente+costas oferece virar',+foto({imgF:'a.jpg',imgC:'b.jpg'},'foto').includes('data-verso'),1],
+['url aponta para o bucket publico',+imgUrl('a b.jpg').endsWith('/storage/v1/object/public/produtos/a%20b.jpg'),1],
+['alt escapa aspas da descricao',+foto({imgF:'a.jpg',nome:'short 4"'},'foto').includes('&quot;'),1],
+...(()=>{
+// enfesto e consumo estimado
+const c1=consEstimado(1.6,50,70,0),c2=consEstimado(1.6,50,70,10);
+const cons=()=>1,pl=planoEnfesto({P:10,M:10,G:4},cons,0,0),plC=planoEnfesto({P:10,M:10,G:4},cons,3,0),plM=planoEnfesto({P:5,M:5},cons,0,1.5);
+const soma=a=>a.reduce((x,y)=>x+y.pecas,0);
+return [['3 moldes de 50cm em 1,60m: 70cm/3',c1,0.7/3],
+['perda de 10% entra no consumo',c2,c1*1.1],
+['molde mais largo que o tecido nao estima',consEstimado(1.6,170,70,0),null],
+['molde sem medida nao estima',consEstimado(1.6,0,70,0),null],
+['enfesto agrupa os 3 tamanhos e depois so P e M',pl.length,2],
+['primeiro enfesto para no menor saldo (G=4)',pl[0].cam,4],
+['nao sobra peca',soma(pl),24],
+['limite de camadas quebra o enfesto',plC.every(x=>x.cam<=3),true],
+['limite de camadas tambem nao sobra peca',soma(plC),24],
+['mesa de 1,5m so aceita 1 tamanho por risco',plM.every(x=>x.tams.length===1),true],
+['mesa curta nao perde peca',soma(plM),10]]})()];
+Object.assign(S,O);
+const bad=t.filter(([,g,e])=>e===null?g!==null:!(Math.abs(g-e)<1e-9));
+console[bad.length?'error':'log'](bad.length?'FALHA no custo/margem: '+bad.map(([n,g,e])=>n+' deu '+g+', esperado '+e).join(' | '):'✓ custo/margem: '+t.length+' asserções OK');
+},0);
 </script>
 </body>
 </html>
