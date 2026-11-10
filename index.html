@@ -57,6 +57,26 @@ button.pri{background:var(--ac);color:var(--acx)}
 button.ghost,button.sm{background:none;color:var(--ac)}
 button.sm{padding:3px 9px;font-size:13px;margin-right:4px}
 button.sm.del{color:var(--bad);border-color:var(--bad)}
+td small{display:block;color:var(--mut);font-size:12px;white-space:normal}
+.bar.end{justify-content:flex-end}
+.pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid currentColor}
+.pill.s-pendente{color:#b26a00}.pill.s-faturado{color:var(--ac)}.pill.s-enviado{color:#6a3fb5}
+.pill.s-entregue{color:var(--ok)}.pill.s-cancelado{color:var(--mut)}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.chips button{font:inherit;font-size:13px;padding:5px 12px;border-radius:999px;border:1px solid var(--bd);background:var(--card);color:var(--mut);cursor:pointer}
+.chips button.on{border-color:var(--ac);color:var(--ac);font-weight:600}
+button.men{padding:3px 9px;font-size:17px;line-height:1.15}
+.menu{position:fixed;z-index:50;background:var(--card);border:1px solid var(--bd);border-radius:10px;box-shadow:0 10px 28px rgba(0,0,0,.18);padding:4px;min-width:186px;display:flex;flex-direction:column}
+.menu[hidden]{display:none}
+.menu button{font:inherit;font-size:14px;text-align:left;background:none;border:0;color:var(--tx);padding:9px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.menu button:hover{background:var(--bg)}
+.menu button.del{color:var(--bad)}
+.menu hr{border:0;border-top:1px solid var(--bd);margin:4px 2px}
+.menu .cab{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);padding:6px 10px 2px}
+a.c{text-decoration:none;color:inherit;display:block}
+a.c:hover{border-color:var(--ac)}
+.busca{flex:1;min-width:150px;max-width:260px}
+small.aviso{color:var(--warn)}
 .profile-button{background:none;border:0;color:#b8c4d9;font:inherit;font-size:12px;cursor:pointer;margin-right:6px;padding:4px 6px;border-radius:6px}
 .profile-button:hover,.profile-button:focus-visible{color:#fff;background:rgba(255,255,255,.1)}
 input,select{font:inherit;padding:8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);width:100%}
@@ -418,7 +438,7 @@ function iconForTab(k){
 switch(k){
 case 'painel':return 'dashboard';
 case 'produtos':return 'inventory_2';
-case 'materia':return 'fabric';
+case 'materia':return 'texture';
 case 'pedidos':return 'receipt_long';
 case 'fabricar':return 'precision_manufacturing';
 case 'reps':return 'groups';
@@ -525,7 +545,7 @@ if(tab==='administradores'&&!adminAccounts.length&&!adminAccountsLoading&&!admin
 let adminAccounts=[],adminAccountsLoading=false,adminAccountsError='';
 function adminAccountsPage(){
 const rows=adminAccounts.map(account=>`<tr><td>${esc(account.email)}</td><td>${esc(account.contact_whatsapp||'—')}</td><td><button class="sm" onclick="editarAdministrador('${esc(account.user_id)}')">Editar</button></td></tr>`).join('');
-return `<div class="bar"><h2>Administradores</h2><div class="row"><button class="ghost" onclick="carregarAdministradores()">Atualizar</button><button class="pri" onclick="novoAdministrador()">Novo administrador</button></div></div><p class="mut">O e-mail cadastrado também será o login e receberá os convites e as instruções de recuperação de senha.</p>${adminAccountsError?`<div class="alert">${esc(adminAccountsError)}</div>`:''}${adminAccountsLoading?'<p class="mut">Carregando administradores…</p>':''}<div class="tw"><table><tr><th>E-mail de login e contato</th><th>WhatsApp</th><th>Ações</th></tr>${rows||'<tr><td colspan="3">Nenhum administrador carregado.</td></tr>'}</table></div>`;
+return `<div class="bar end"><div class="row"><button class="ghost" onclick="carregarAdministradores()">Atualizar</button><button class="pri" onclick="novoAdministrador()">Novo administrador</button></div></div><p class="mut">O e-mail cadastrado também será o login e receberá os convites e as instruções de recuperação de senha.</p>${adminAccountsError?`<div class="alert">${esc(adminAccountsError)}</div>`:''}${adminAccountsLoading?'<p class="mut">Carregando administradores…</p>':''}<div class="tw"><table><tr><th>E-mail de login e contato</th><th>WhatsApp</th><th>Ações</th></tr>${rows||'<tr><td colspan="3">Nenhum administrador carregado.</td></tr>'}</table></div>`;
 }
 async function chamarGerenciadorAdmin(body){
 await sessaoOk();
@@ -590,6 +610,29 @@ setTimeout(()=>aviso('Dados do administrador atualizados.'),100);
 });
 }
 
+// Um botão de ações por linha, no lugar de três. Fica em position:fixed porque
+// a tabela rola na horizontal e cortaria um menu posicionado dentro dela.
+let menuId=null;
+function fechaMenu(){if(menuId){const m=$('#m-'+menuId);if(m)m.hidden=true;menuId=null}}
+function abreMenu(ev,id){
+ev.stopPropagation();
+const m=$('#m-'+id);if(!m)return;
+const abrir=m.hidden;fechaMenu();
+if(!abrir)return;
+const r=ev.currentTarget.getBoundingClientRect();
+m.hidden=false;
+const lg=m.offsetWidth||186,alt=m.offsetHeight;
+m.style.left=Math.max(8,Math.min(r.right-lg,innerWidth-lg-8))+'px';
+m.style.top=(innerHeight-r.bottom>alt+12?r.bottom+4:Math.max(8,r.top-alt-4))+'px';
+menuId=id;
+}
+document.addEventListener('click',fechaMenu);
+addEventListener('resize',fechaMenu);
+// itens: ['rótulo','js',classe] · '-' vira separador · {cab:'título'} vira cabeçalho
+const acoes=(id,itens)=>`<div style="position:relative;white-space:nowrap"><button class="sm men" title="Ações" aria-label="Ações" onclick="abreMenu(event,'${id}')">⋮</button><div class="menu" id="m-${id}" hidden onclick="event.stopPropagation()">${itens.filter(Boolean).map(x=>x==='-'?'<hr>':x.cab?`<div class="cab">${esc(x.cab)}</div>`:`<button class="${x[2]||''}" onclick="fechaMenu();${x[1]}">${esc(x[0])}</button>`).join('')}</div></div>`;
+const selo=s=>`<span class="pill s-${esc((s||'Pendente').toLowerCase())}">${esc(s||'Pendente')}</span>`;
+// número no painel leva para a tela que resolve aquele número
+function irPara(t,f){if(f){pedFiltro=f;try{localStorage.setItem('pedFiltro',f)}catch(e){}}tab=t;render();return false}
 function rotula(root){
 root.querySelectorAll('table').forEach(t=>{
 if(t.classList.contains('keep'))return;
@@ -611,13 +654,13 @@ const pend=S.pedidos.filter(o=>o.status==='Pendente').length;
 const sc=ok.filter(o=>!rep(o.repId)).length;
 const fab=fabricarLista().reduce((a,x)=>a+x.f,0);
 const linhas=S.reps.map(r=>{const v=ok.filter(o=>o.repId===r.id).reduce((a,o)=>a+pedTotal(o),0);return `<tr><td>${esc(r.nome)}</td><td>${esc(r.regiao)}</td><td class="n">${brl(v)}</td><td class="n">${r.com||0}%</td><td class="n">${brl(v*(r.com||0)/100)}</td></tr>`}).join('');
+const nomes=baixos.slice(0,3).map(p=>esc(p.ref+' '+p.nome)).join(', ');
 return `<div class="cards">
- <div class="c"><small>Faturamento (sem cancelados)</small><b>${brl(fat)}</b></div>
- <div class="c"><small>Pedidos pendentes</small><b>${pend}</b></div>
- <div class="c"><small>Peças em estoque</small><b>${pecas}</b></div>
- <div class="c"><small>Produtos com estoque baixo</small><b class="${baixos.length?'low':''}">${baixos.length}</b></div>
- <div class="c"><small>Peças a fabricar</small><b class="${fab?'low':''}">${fab}</b></div></div>
- ${baixos.length?`<div class="alert">⚠ Estoque baixo: ${baixos.map(p=>esc(p.ref+' '+p.nome)+' ('+tot(p)+')').join(', ')}</div>`:''}
+ <a class="c" href="#" onclick="return irPara('pedidos')"><small>Faturamento (sem cancelados)</small><b>${brl(fat)}</b></a>
+ <a class="c" href="#" onclick="return irPara('pedidos','Pendente')"><small>Pedidos pendentes</small><b>${pend}</b></a>
+ <a class="c" href="#" onclick="return irPara('fabricar')"><small>Peças a fabricar</small><b class="${fab?'low':''}">${fab}</b></a>
+ <a class="c" href="#" onclick="return irPara('estoque')"><small>Peças em estoque</small><b>${pecas}</b>${baixos.length?`<small class="low">${baixos.length} produto(s) abaixo do mínimo</small>`:''}</a></div>
+ ${baixos.length?`<div class="alert">⚠ Estoque baixo em ${nomes}${baixos.length>3?' e mais '+(baixos.length-3):''}. <a href="#" onclick="return irPara('produtos')">Ver produtos</a></div>`:''}
  ${sc?`<div class="alert">⚠ ${sc} pedido(s) com representante sem cadastro não entram na comissão. Cadastre o representante e corrija o pedido na aba Pedidos.</div>`:''}
  <div class="bar"><h2>Vendas e comissões por representante</h2></div>
  <div class="tw"><table><tr><th>Representante</th><th>Região</th><th class="n">Vendas</th><th class="n">Comissão %</th><th class="n">A pagar</th></tr>${linhas||'<tr><td colspan="5" class="empty">Cadastre representantes e pedidos para ver os números.</td></tr>'}</table></div>`;
@@ -644,15 +687,22 @@ img.title=v==='1'?'Clique para ver a frente':'Clique para ver as costas';
 }
 function catalogo(){
 const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>`<div class="c">${foto(p,'foto')}<div class="ci"><strong>${esc(p.ref)}</strong> · ${esc(p.nome)}<small style="margin-top:4px">P–GG ${brl(p.preco)} · G1–G4 ${brl(precoG(p))}</small></div></div>`).join('');
-return `<div class="bar"><h2>Catálogo</h2><button class="pri" onclick="tab='pedidos';render()">+ Novo pedido</button></div>${r?`<div class="cards cat">${r}</div>`:'<div class="c empty">Nenhum produto disponível.</div>'}`;
+return `<div class="bar end"><button class="pri" onclick="tab='pedidos';render()">+ Novo pedido</button></div>${r?`<div class="cards cat">${r}</div>`:'<div class="c empty">Nenhum produto disponível.</div>'}`;
 }
 
 function produtos(){
 const pct=(c,v)=>{const m=margem(c,v);return m.pct==null?'—':`<span class="${m.lucro<=0?'low':''}" title="${brl(v)} − custo ${brl(c)} − ${nf(m.imp+m.desp+m.com,2)}% de imposto/despesa/comissão (${brl(m.ded)}) = ${brl(m.lucro)} por peça">${Math.round(m.pct)}%</span>`};
-const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>{const c=custoP(p,false),cg=custoP(p,true);return `<tr><td>${foto(p,'fmini')}</td><td>${esc(p.ref)}</td><td>${esc(p.nome)}${p.tecidoId?`<small>${esc(mat(p.tecidoId)?.nome||'')} · ${p.ficha?'ficha própria':'ficha padrão'}</small>`:''}</td><td class="n">${brl(c)}</td><td class="n">${brl(cg)}</td><td class="n">${brl(p.preco)}</td><td class="n">${brl(precoG(p))}</td><td class="n">${pct(c,+p.preco)} / ${pct(cg,precoG(p))}</td><td class="n ${tot(p)<=(+p.min||0)?'low':''}">${tot(p)}</td><td><button class="sm" onclick="verFicha('${p.id}')">Ficha</button><button class="sm" onclick="fProd('${p.id}')">Editar</button><button class="sm del" onclick="del('produtos','${p.id}')">Excluir</button></td></tr>`}).join('');
-return `<div class="bar"><h2>Produtos</h2><button class="pri" onclick="fProd()">+ Novo produto</button></div>
- <div class="tw"><table><tr><th></th><th>Ref.</th><th>Descrição</th><th class="n">Custo P–GG</th><th class="n">Custo G1–G4</th><th class="n">Preço P–GG</th><th class="n">Preço G1–G4</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>${r||'<tr><td colspan="10" class="empty">Nenhum produto cadastrado.</td></tr>'}</table></div>
- <p style="color:var(--mut)">O custo vem da ficha técnica: tecido do produto + a ficha própria da referência, ou a ficha padrão (aba Matéria-prima) quando a referência não tem uma. Produtos sem tecido escolhido usam o custo manual. A margem já desconta imposto, despesas e a maior comissão cadastrada (${nf(comMax(),2)}%) — passe o mouse para ver a conta.</p>`;
+const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>{
+const c=custoP(p,false),cg=custoP(p,true),pg=precoG(p),baixo=tot(p)<=(+p.min||0);
+return `<tr><td>${foto(p,'fmini')}</td><td>${esc(p.ref)}</td>
+ <td>${esc(p.nome)}${p.tecidoId?`<small>${esc(mat(p.tecidoId)?.nome||'')} · ${p.ficha?'ficha própria':'ficha padrão'}</small>`:'<small>custo manual</small>'}</td>
+ <td class="n">${brl(p.preco)}${pg!==+p.preco?`<small>G1–G4 ${brl(pg)}</small>`:''}</td>
+ <td class="n">${pct(c,+p.preco)}${cg!==c||pg!==+p.preco?`<small>G1–G4 ${pct(cg,pg)}</small>`:''}</td>
+ <td class="n ${baixo?'low':''}">${tot(p)}${baixo?'<small>abaixo do mínimo</small>':''}</td>
+ <td>${acoes('pr'+p.id,[['Ver ficha técnica',`verFicha('${p.id}')`],['Editar produto',`fProd('${p.id}')`],'-',['Excluir produto',`del('produtos','${p.id}')`,'del']])}</td></tr>`}).join('');
+return `<div class="bar end"><button class="pri" onclick="fProd()">+ Novo produto</button></div>
+ <div class="tw"><table><tr><th></th><th>Ref.</th><th>Descrição</th><th class="n">Preço</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>${r||'<tr><td colspan="7" class="empty">Nenhum produto cadastrado. Comece pelo botão acima.</td></tr>'}</table></div>
+ <p style="color:var(--mut)">A margem desconta imposto, despesas e a maior comissão cadastrada (${nf(comMax(),2)}%). Passe o mouse nela para ver a conta, ou abra a ficha técnica para o custo detalhado.</p>`;
 }
 function fProd(id){
 const p=id?prod(id):{};
@@ -842,7 +892,7 @@ const ms=S.materiais.slice().sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='tecido'?-1
 const f=fichaPad();
 const fr=(f.itens||[]).map(i=>{const m=mat(i.matId);if(!m)return '';const cu=matCusto(m);return `<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td class="n">${nf(i.qtd)}</td><td>${esc(matUn(m))}</td><td class="n">${brl4(cu)}</td><td class="n">${brl4(cu*(+i.qtd||0))}</td></tr>`}).join('');
 const sub=(f.itens||[]).reduce((a,i)=>a+matCusto(mat(i.matId))*(+i.qtd||0),0);
-return `<div class="bar"><h2>Matéria-prima</h2><button class="pri" onclick="fMat()">+ Nova matéria-prima</button></div>
+return `<div class="bar end"><button class="pri" onclick="fMat()">+ Nova matéria-prima</button></div>
   <div class="tw"><table><tr><th>Nome</th><th>Cor</th><th>Tipo</th><th>Composição / gramatura</th><th>Fornecedor</th><th class="n">Preço de compra</th><th class="n">Rendimento</th><th class="n">Custo de uso</th><th></th></tr>${r||'<tr><td colspan="9" class="empty">Nenhuma matéria-prima cadastrada.</td></tr>'}</table></div>
  <div class="bar"><h2>Ficha técnica padrão</h2><button class="pri" onclick="fFicha()">Editar ficha padrão</button></div>
  <p style="color:var(--mut);margin-top:0">Itens iguais em todas as referências. O tecido e o consumo de cada referência são informados no cadastro do produto.</p>
@@ -915,7 +965,7 @@ d.showModal();
 }
 function reps(){
 const r=S.reps.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.fone)}</td><td>${esc(x.email)}</td><td>${esc([x.cidade,x.uf].filter(Boolean).join('/'))}</td><td>${esc(x.regiao)}</td><td class="n">${x.com||0}%</td><td><button class="sm" onclick="fRep('${x.id}')">Editar</button><button class="sm del" onclick="del('reps','${x.id}')">Excluir</button></td></tr>`).join('');
-return `<div class="bar"><h2>Representantes</h2><button class="pri" onclick="fRep()">+ Novo representante</button></div>
+return `<div class="bar end"><button class="pri" onclick="fRep()">+ Novo representante</button></div>
  <div class="tw"><table><tr><th>Nome</th><th>Celular</th><th>E-mail</th><th>Cidade/UF</th><th>Região</th><th class="n">Comissão</th><th></th></tr>${r||'<tr><td colspan="7" class="empty">Nenhum representante cadastrado.</td></tr>'}</table></div>`;
 }
 const REP_CAMPOS=['nome','cpf','fone','email','endereco','bairro','cidade','uf','cep','regiao'];
@@ -1010,7 +1060,7 @@ else aviso('Acesso desativado.');
 document.addEventListener('click',e=>{const target=e.target instanceof Element?e.target:null;const btn=target?.closest('[data-access-action]');if(btn)decidirAcesso(btn.dataset.accessUsername,btn.dataset.accessAction)});
 function cadastros(){
 if(!statusAcessosCarregado&&!statusAcessosCarregando)carregarStatusAcessos();
-return `<div class="bar"><h2>Cadastros iniciais</h2></div><div class="roles"><button class="${cadastroAba==='lojista'?'pri':'ghost'}" onclick="cadastroAba='lojista';render()">Lojistas</button><button class="${cadastroAba==='representante'?'pri':'ghost'}" onclick="cadastroAba='representante';render()">Representante</button></div>${cadastroAba==='lojista'?cadastroLojista():cadastroRepresentante()}`;
+return `<div class="roles"><button class="${cadastroAba==='lojista'?'pri':'ghost'}" onclick="cadastroAba='lojista';render()">Lojistas</button><button class="${cadastroAba==='representante'?'pri':'ghost'}" onclick="cadastroAba='representante';render()">Representante</button></div>${cadastroAba==='lojista'?cadastroLojista():cadastroRepresentante()}`;
 }
 function fCadastro(username){
 const base=preCadastro(username);if(!base)return;
@@ -1118,13 +1168,24 @@ if(status)status.textContent=mensagem;
 finally{form.dataset.cnpjBuscando='0'}
 }
 
+let pedFiltro=(()=>{try{return localStorage.getItem('pedFiltro')}catch(e){return null}})()||'todos';
+function setPedFiltro(v){pedFiltro=v;try{localStorage.setItem('pedFiltro',v)}catch(e){}render()}
 function pedidos(){
 const admin=appProfile.role==='admin';
-const r=S.pedidos.slice().sort((a,b)=>(b.numero||0)-(a.numero||0)).map(o=>`<tr><td>#${o.numero}</td><td>${esc((o.data||'').split('-').reverse().join('/'))}</td><td>${esc(o.cliente)}</td><td>${esc(rep(o.repId)?.nome||o.repNome||'—')}${admin&&!rep(o.repId)?' <span class="tag">sem cadastro</span>':''}</td><td class="n">${(o.itens||[]).reduce((a,i)=>a+i.qtd,0)}</td><td class="n">${admin&&pedDesatual(o)?'<span class="tag" title="Preço diferente do cadastro do produto">desatualizado</span> ':''}${brl(pedTotal(o))}</td>
- ${admin?`<td><select onchange="setSt('${o.id}',this.value)">${ST.map(s=>`<option ${s===o.status?'selected':''}>${s}</option>`).join('')}</select></td>`:`<td>${esc(o.status||'Pendente')}</td>`}
- <td><button class="sm" onclick="verPed('${o.id}')">Itens</button>${admin?`<button class="sm" onclick="fRepPed('${o.id}')">Representante</button><button class="sm del" onclick="delPed('${o.id}')">Excluir</button>`:''}</td></tr>`).join('');
-return `<div class="bar"><h2>Pedidos</h2><div class="r2" style="margin:0">${admin&&S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></div></div>
- <div class="tw"><table><tr><th>Nº</th><th>Data</th><th>Cliente</th><th>Representante</th><th class="n">Peças</th><th class="n">Total</th><th>Status</th><th></th></tr>${r||'<tr><td colspan="8" class="empty">Nenhum pedido lançado.</td></tr>'}</table></div>`;
+const todos=S.pedidos.slice().sort((a,b)=>(b.numero||0)-(a.numero||0));
+if(pedFiltro!=='todos'&&!ST.includes(pedFiltro))pedFiltro='todos';
+const st=o=>o.status||'Pendente';
+const lista=pedFiltro==='todos'?todos:todos.filter(o=>st(o)===pedFiltro);
+const chips=`<div class="chips"><button class="${pedFiltro==='todos'?'on':''}" onclick="setPedFiltro('todos')">Todos · ${todos.length}</button>${ST.map(s=>{const n=todos.filter(o=>st(o)===s).length;return n?`<button class="${pedFiltro===s?'on':''}" onclick="setPedFiltro('${s}')">${s} · ${n}</button>`:''}).join('')}</div>`;
+const r=lista.map(o=>`<tr><td>#${o.numero}<small>${esc((o.data||'').split('-').reverse().join('/'))}</small></td>
+ <td>${esc(o.cliente)}<small>${esc(rep(o.repId)?.nome||o.repNome||'sem representante')}${admin&&!rep(o.repId)?' · sem cadastro':''}</small></td>
+ <td class="n">${(o.itens||[]).reduce((a,i)=>a+i.qtd,0)}</td>
+ <td class="n">${brl(pedTotal(o))}${admin&&pedDesatual(o)?'<small class="aviso" title="Preço diferente do cadastro do produto">preço desatualizado</small>':''}</td>
+ <td>${selo(st(o))}</td>
+ <td>${acoes('pd'+o.id,[['Ver itens',`verPed('${o.id}')`],...(admin?[['Trocar representante',`fRepPed('${o.id}')`],{cab:'Mudar status para'},...ST.filter(s=>s!==st(o)).map(s=>[s,`setSt('${o.id}','${s}')`]),'-',['Excluir pedido',`delPed('${o.id}')`,'del']]:[])])}</td></tr>`).join('');
+return `<div class="bar end">${admin&&S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></div>
+ ${todos.length?chips:''}
+ <div class="tw"><table><tr><th>Nº</th><th>Cliente</th><th class="n">Peças</th><th class="n">Total</th><th>Status</th><th></th></tr>${r||`<tr><td colspan="6" class="empty">${todos.length?'Nenhum pedido com status '+esc(pedFiltro)+'.':'Nenhum pedido lançado. Comece pelo botão acima.'}</td></tr>`}</table></div>`;
 }
 
 function semProd(extra){return [...CORES_BASE,...(extra||[]).filter(c=>!CORES_BASE.includes(c))]}
@@ -1433,7 +1494,7 @@ const corpo=fabVista==='enfesto'?enfesto
 :fabVista==='lista'?(resumo?`<div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Total</th><th>De quais pedidos</th></tr>${resumo}</table></div>`:vazio)
 :(blocos||vazio)+(sem.length?`<p style="color:var(--mut)">Já cobertos pelo estoque: ${sem.map(x=>'#'+x.o.numero).join(', ')}.</p>`:'');
 return `<div class="cards"><div class="c"><small>Peças a fabricar</small><b>${total}</b></div><div class="c"><small>Pedidos com itens a fabricar</small><b>${com.length}</b></div></div>
- <div class="bar"><h2>Fabricar</h2><label style="margin:0;display:flex;align-items:center;gap:8px">Mostrar<select id="fabvista" style="width:auto" onchange="fabVista=this.value;try{localStorage.setItem('fabVista',fabVista)}catch(e){};render()">${VISTAS.map(([k,l])=>`<option value="${k}"${k===fabVista?' selected':''}>${l}</option>`).join('')}</select></label></div>
+ <div class="bar end"><label style="margin:0;display:flex;align-items:center;gap:8px">Mostrar<select id="fabvista" style="width:auto" onchange="fabVista=this.value;try{localStorage.setItem('fabVista',fabVista)}catch(e){};render()">${VISTAS.map(([k,l])=>`<option value="${k}"${k===fabVista?' selected':''}>${l}</option>`).join('')}</select></label></div>
  ${corpo}
  <p style="color:var(--mut)">Considera pedidos Pendente ou Faturado. O estoque (por cor e tamanho) é reservado primeiro para os pedidos mais antigos. Os pedidos não alteram o estoque: quando a produção ficar pronta, lance a entrada na aba Estoque.</p>`;
 }
