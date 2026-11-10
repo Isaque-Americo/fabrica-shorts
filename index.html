@@ -45,6 +45,10 @@ main{flex:1;padding:24px;max-width:none;margin:0}
 .semfoto{display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:12px}
 .semfoto::after{content:'sem foto'}
 .fmini.semfoto::after{content:'—'}
+.semfoto.add{cursor:pointer;border-style:dashed;font:inherit;padding:0;color:var(--ac)}
+.semfoto.add:hover{border-color:var(--ac);background:var(--card)}
+.fmini.semfoto.add::after{content:'+';font-size:18px;line-height:1}
+tr.grp td{background:var(--bg);font-weight:600;font-size:12px;color:var(--mut);text-transform:uppercase;letter-spacing:.4px;padding:7px 12px}
 img[data-verso]{cursor:pointer}
 .tw{overflow-x:auto;background:var(--card);border:1px solid var(--bd);border-radius:10px;margin-bottom:16px}
 table{border-collapse:collapse;width:100%;min-width:560px}
@@ -654,6 +658,7 @@ if(!tab)return;
 let n=0;
 [...tab.rows].forEach(tr=>{
 if(tr.querySelector('th'))return;
+if(tr.cells.length===1&&tr.cells[0].colSpan>1){tr.hidden=!!q;return} // cabeçalho de grupo não conta nem sobrevive à busca
 const bate=!q||tr.textContent.toLowerCase().includes(q);
 tr.hidden=!bate;if(bate)n++;
 });
@@ -703,9 +708,10 @@ return `<div class="cards"><div class="c"><small>Representante</small><b>${esc(r
 }
 const imgUrl=n=>n?SB_URL+'/storage/v1/object/public/produtos/'+encodeURIComponent(n):'';
 // uma única porta para a foto do produto: catálogo, tabela, ficha e pedido
-function foto(p,cls){
+function foto(p,cls,editar){
 const f=imgUrl(p&&p.imgF),c=imgUrl(p&&p.imgC);
-if(!f&&!c)return `<div class="${cls} semfoto"></div>`;
+// sem foto, o espaço vazio vira o convite para cadastrar uma
+if(!f&&!c)return editar&&p&&p.id?`<button class="${cls} semfoto add" title="Adicionar foto a ${esc(p.ref||'')}" aria-label="Adicionar foto" onclick="fProd('${p.id}')"></button>`:`<div class="${cls} semfoto"></div>`;
 const dois=f&&c;
 return `<img class="${cls}" src="${f||c}" alt="${esc(((p.ref||'')+' '+(p.nome||'')).trim())}" loading="lazy"${dois?` data-f="${f}" data-c="${c}" data-verso="0" onclick="viraFoto(event,this)" title="Clique para ver as costas"`:''}>`;
 }
@@ -720,17 +726,26 @@ const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map
 return `<div class="bar end"><button class="pri" onclick="tab='pedidos';render()">+ Novo pedido</button></div>${r?`<div class="cards cat">${r}</div>`:'<div class="c empty">Nenhum produto disponível.</div>'}`;
 }
 
+let prodGrupo=(()=>{try{return localStorage.getItem('prodGrupo')}catch(e){return null}})()||'nenhum';
+function setProdGrupo(v){prodGrupo=v;try{localStorage.setItem('prodGrupo',v)}catch(e){}render()}
 function produtos(){
 const pct=(c,v)=>{const m=margem(c,v);return m.pct==null?'—':`<span class="${m.lucro<=0?'low':''}" title="${brl(v)} − custo ${brl(c)} − ${nf(m.imp+m.desp+m.com,2)}% de imposto/despesa/comissão (${brl(m.ded)}) = ${brl(m.lucro)} por peça">${Math.round(m.pct)}%</span>`};
-const r=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>{
+const tecDe=p=>p.tecidoId?(mat(p.tecidoId)?.nome||'Tecido removido do cadastro'):'Sem tecido na ficha';
+const agrupa=prodGrupo==='tecido';
+const ordem=S.produtos.slice().sort((a,b)=>(agrupa?tecDe(a).localeCompare(tecDe(b)):0)||(a.ref||'').localeCompare(b.ref||''));
+let grupoAtual=null;
+const r=ordem.map(p=>{
 const c=custoP(p,false),cg=custoP(p,true),pg=precoG(p),baixo=tot(p)<=(+p.min||0);
-return `<tr><td>${foto(p,'fmini')}</td><td>${esc(p.ref)}</td>
+let cab='';
+if(agrupa&&tecDe(p)!==grupoAtual){grupoAtual=tecDe(p);cab=`<tr class="grp"><td colspan="7">${esc(grupoAtual)} · ${ordem.filter(x=>tecDe(x)===grupoAtual).length} produto(s)</td></tr>`}
+return cab+`<tr><td>${foto(p,'fmini',true)}</td><td>${esc(p.ref)}</td>
  <td>${esc(p.nome)}${p.tecidoId?`<small>${esc(mat(p.tecidoId)?.nome||'')} · ${p.ficha?'ficha própria':'ficha padrão'}</small>`:'<small>custo manual</small>'}</td>
  <td class="n">${brl(p.preco)}${pg!==+p.preco?`<small>G1–G4 ${brl(pg)}</small>`:''}</td>
  <td class="n">${pct(c,+p.preco)}${cg!==c||pg!==+p.preco?`<small>G1–G4 ${pct(cg,pg)}</small>`:''}</td>
  <td class="n ${baixo?'low':''}">${tot(p)}${baixo?'<small>abaixo do mínimo</small>':''}</td>
  <td>${acoes('pr'+p.id,[['Ver ficha técnica',`verFicha('${p.id}')`],['Editar produto',`fProd('${p.id}')`],'-',['Excluir produto',`del('produtos','${p.id}')`,'del']])}</td></tr>`}).join('');
 return `<div class="bar">${campoBusca('Buscar por referência ou descrição')}<button class="pri" onclick="fProd()">+ Novo produto</button></div>
+ ${S.produtos.length>3?`<div class="chips"><button class="${agrupa?'':'on'}" onclick="setProdGrupo('nenhum')">Por referência</button><button class="${agrupa?'on':''}" onclick="setProdGrupo('tecido')">Agrupar por tecido</button></div>`:''}
  <div class="tw"><table><tr><th></th><th>Ref.</th><th>Descrição</th><th class="n">Preço</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>${r||'<tr><td colspan="7" class="empty">Nenhum produto cadastrado. Comece pelo botão acima.</td></tr>'}</table></div>
  <p style="color:var(--mut)">A margem desconta imposto, despesas e a maior comissão cadastrada (${nf(comMax(),2)}%). Passe o mouse nela para ver a conta, ou abra a ficha técnica para o custo detalhado.</p>`;
 }
@@ -1646,16 +1661,28 @@ d.innerHTML=`<h3>Pedido #${o.numero} · ${esc(o.cliente)}</h3><div class="tw"><t
 d.showModal();
 }
 
+function abreEst(id,btn){
+const abrir=btn.getAttribute('aria-expanded')!=='true';
+document.querySelectorAll('tr[data-est="'+id+'"]').forEach(tr=>tr.hidden=!abrir);
+btn.setAttribute('aria-expanded',abrir);
+btn.textContent=btn.dataset.n+' cores '+(abrir?'▴':'▾');
+}
 function estoque(){
 const rows=S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(p=>{
 const cores=coresDe(p);
-const lin=cores.map((c,k)=>`<tr><td>${k?'':esc(p.ref)+' · '+esc(p.nome)}</td><td>${esc(c)}</td>${SZ.map(s=>{const v=estQ(p,c,s);return `<td class="n ${v<=0?'mut':''}">${v}</td>`}).join('')}<td class="n">${SZ.reduce((a,s)=>a+estQ(p,c,s),0)}</td><td>${k?'':`<button class="sm" onclick="fEntrada('${p.id}')">Entrada / ajuste</button>`}</td></tr>`).join('');
-const sub=`<tr><td></td><td><b>Total</b></td>${SZ.map(s=>`<td class="n"><b>${cores.reduce((a,c)=>a+estQ(p,c,s),0)}</b></td>`).join('')}<td class="n ${tot(p)<=(+p.min||0)?'low':''}"><b>${tot(p)}</b></td><td></td></tr>`;
-return lin+sub;
+// uma linha por produto, com os totais por tamanho; as cores ficam guardadas atrás do botão
+const varias=cores.length>1,baixo=tot(p)<=(+p.min||0);
+const resumo=`<tr><td><b>${esc(p.ref)} · ${esc(p.nome)}</b></td>
+ <td>${varias?`<button class="sm" data-n="${cores.length}" aria-expanded="false" onclick="abreEst('${p.id}',this)">${cores.length} cores ▾</button>`:`<small>${esc(cores[0]||'—')}</small>`}</td>
+ ${SZ.map(s=>{const v=cores.reduce((a,c)=>a+estQ(p,c,s),0);return `<td class="n ${v<=0?'mut':''}"><b>${v}</b></td>`}).join('')}
+ <td class="n ${baixo?'low':''}"><b>${tot(p)}</b></td>
+ <td>${acoes('es'+p.id,[['Entrada / ajuste',`fEntrada('${p.id}')`],['Editar produto',`fProd('${p.id}')`]])}</td></tr>`;
+const lin=varias?cores.map(c=>`<tr data-est="${p.id}" hidden><td></td><td>${esc(c)}</td>${SZ.map(s=>{const v=estQ(p,c,s);return `<td class="n ${v<=0?'mut':''}">${v}</td>`}).join('')}<td class="n">${SZ.reduce((a,s)=>a+estQ(p,c,s),0)}</td><td></td></tr>`).join(''):'';
+return resumo+lin;
 }).join('');
 return `<div class="bar"><h2>Estoque por cor e tamanho</h2></div>
  <div class="tw"><table class="keep"><tr><th>Produto</th><th>Cor</th>${SZ.map(s=>`<th class="n">${s}</th>`).join('')}<th class="n">Total</th><th></th></tr>${rows||'<tr><td colspan="12" class="empty">Cadastre produtos para controlar o estoque.</td></tr>'}</table></div>
- <p style="color:var(--mut)">Os pedidos não alteram o estoque. Use “Entrada / ajuste” para lançar produção pronta (valores positivos) ou saídas e perdas (negativos). Para mudar as quantidades de uma vez, use Editar na aba Produtos. O que falta aparece na aba Fabricar.</p>`;
+ <p style="color:var(--mut)">Cada linha mostra o total por tamanho; clique em “N cores” para abrir a divisão por cor. Os pedidos não alteram o estoque. Use “Entrada / ajuste” para lançar produção pronta (valores positivos) ou saídas e perdas (negativos). Para mudar as quantidades de uma vez, use Editar na aba Produtos. O que falta aparece na aba Fabricar.</p>`;
 }
 function fEntrada(id){
 const p=prod(id);
