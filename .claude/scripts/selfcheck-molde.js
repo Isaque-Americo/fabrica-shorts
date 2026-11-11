@@ -213,6 +213,26 @@ testes.push(
   ['naCaixa parcial fica fora', D.naCaixa(dr, P(-1, -1), P(301, 10)).length, 1],
 );
 
+// peças: retângulo dr (0,0)–(300,500); rr[0] = barra de baixo (0,0)→(300,0)
+const pm = structuredClone(dr), np1 = D.novaPeca(pm, [...rr, Object.keys(pm.pontos)[0]]), np2 = D.novaPeca(pm, rr);
+const pc1 = np1.peca, solta = D.novaPeca(structuredClone(dr), [rr[0], rr[1]]);
+const pmQ = structuredClone(pm); D.apagar(pmQ, [rr[0]]);
+testes.push(
+  ['novaPeca ok ignora ponto', [np1.ok, pc1.tracos.length], [true, 4]],
+  ['novaPeca padroes', [pc1.nome, pc1.cortar, pc1.par, pc1.margem, pc1.dobra, pc1.visivel, pc1.travada], ['PEÇA 1', 1, false, 10, null, true, false]],
+  ['novaPeca fio vertical no centro', pc1.fio, { a: P(150, 100), b: P(150, 400) }],
+  ['novaPeca segunda PEÇA 2 id novo', [np2.peca.nome, np2.peca.id !== pc1.id, pm.pecas.length], ['PEÇA 2', true, 2]],
+  ['novaPeca aberta da ponta', [solta.ok, !!solta.ponta], [false, true]],
+  ['novaPeca sem traco', D.novaPeca(structuredClone(dr), []).ok, false],
+  ['geoPeca corte 1 cm', G.bbox(D.geoPeca(pm, pc1).corte), { x0: -10, y0: -10, w: 320, h: 520 }],
+  ['geoPeca traco apagado quebra', D.geoPeca(pmQ, pmQ.pecas[0]), null],
+  ['pique 5 mm para dentro do corte', D.pique(pm, pc1, { tracoId: rr[0], t: 0.5 }), [P(150, -10), P(150, -5)]],
+  ['pique na bainha 3 cm', D.pique(pm, { ...pc1, margemTraco: { [rr[0]]: 30 } }, { tracoId: rr[0], t: 0.5 }), [P(150, -30), P(150, -25)]],
+  ['pique traco invertido', D.pique(pm, { ...pc1, tracos: [{ id: rr[0], inv: true }] }, { tracoId: rr[0], t: 0.5 }), [P(150, 10), P(150, 5)]],
+  ['naPeca acha traco e t', (h => [h.tracoId, h.t, h.d, h.L])(D.naPeca(pm, pc1, P(100, 2))), [rr[0], 1 / 3, 2, 300], 1e-6],
+  ['noTraco polilinha', D.noTraco([P(0, 0), P(100, 0), P(100, 100)], P(105, 50)), { t: 0.75, d: 5 }],
+);
+
 const perto = (a, b, tol) => typeof a === 'number' ? Math.abs(a - b) <= tol
   : a && typeof a === 'object' ? Object.keys(b).length === Object.keys(a).length && Object.keys(b).every(k => perto(a[k], b[k], tol)) : a === b;
 

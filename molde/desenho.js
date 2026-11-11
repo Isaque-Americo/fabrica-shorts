@@ -191,7 +191,69 @@
     return { ids: novos };
   }
 
-  const MoldeDesenho = { distSeg, medida, cm, polar, angulo, simplificar, uid, ponto, usados, reta, retangulo, medir, naCaixa, transformar, girar, apagar, cortar, estender, arredondar, espelhar };
+  // ---- peças ----
+  // ponto da polilinha mais perto de p: t = fração do comprimento (0..1), d = distância
+  function noTraco(linha, p) {
+    const L = G.comprimento(linha);
+    let s = 0, mel = { t: 0, d: Infinity };
+    for (let i = 1; i < linha.length; i++) {
+      const a = linha[i - 1], b = linha[i], dx = b.x - a.x, dy = b.y - a.y, l = Math.hypot(dx, dy);
+      const k = l ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (l * l))) : 0;
+      const d = Math.hypot(p.x - a.x - k * dx, p.y - a.y - k * dy);
+      if (d < mel.d) mel = { t: L ? (s + k * l) / L : 0, d };
+      s += l;
+    }
+    return mel;
+  }
+  // traço do contorno da peça mais perto de p, com t no sentido do próprio traço e L = comprimento dele
+  function naPeca(m, peca, p) {
+    let mel = null;
+    for (const { id } of peca.tracos) {
+      const t = m.tracos.find(x => x.id === id);
+      if (!t) continue;
+      const l = pts(m, t), r = noTraco(l, p);
+      if (!mel || r.d < mel.d) mel = { tracoId: id, t: r.t, d: r.d, L: G.comprimento(l) };
+    }
+    return mel;
+  }
+
+  // costura e corte; null = contorno quebrado (traço apagado ou que não fecha mais)
+  function geoPeca(m, peca) {
+    const ids = peca.tracos.map(t => t.id), ok = q => q.length > 2 && q.every(p => Number.isFinite(p.x) && Number.isFinite(p.y));
+    try {
+      if (!ids.length || !MM.encadear(m, ids).ok) return null;
+      const cost = MM.costura(m, peca), corte = MM.corte(m, peca);
+      return ok(cost) && ok(corte) ? { cost, corte } : null;
+    } catch (e) { return null; }
+  }
+
+  // peça nova "PEÇA n" com os traços (os que não são traço ficam de fora); fio vertical no centro
+  function novaPeca(m, ids) {
+    const tr = ids.filter(id => m.tracos.some(t => t.id === id));
+    if (!tr.length) return { ok: false, erro: 'Selecione os traços do contorno da peça.' };
+    const r = MM.encadear(m, tr);
+    if (!r.ok) return r;
+    let n = m.pecas.length + 1;
+    while (m.pecas.some(p => p.nome === 'PEÇA ' + n)) n++;
+    const peca = { id: uid(m, 'pc'), nome: 'PEÇA ' + n, cortar: 1, par: false, tracos: r.tracos, dobra: null, fio: null,
+      margem: 10, margemTraco: {}, piques: [], pences: [], visivel: true, travada: false };
+    const b = G.bbox(MM.costura(m, peca)), x = b.x0 + b.w / 2;
+    peca.fio = { a: { x, y: b.y0 + b.h * 0.2 }, b: { x, y: b.y0 + b.h * 0.8 } };
+    m.pecas.push(peca);
+    return { ok: true, peca };
+  }
+
+  // pique: traço de 5 mm do corte para dentro, na normal do contorno (para fora = direita no anti-horário)
+  function pique(m, peca, { tracoId, t }) {
+    const tr = peca.tracos.find(x => x.id === tracoId), tt = m.tracos.find(x => x.id === tracoId);
+    if (!tr || !tt) return null;
+    const { p, tangente: u } = G.pontoEm(pts(m, tt), t), s = tr.inv ? -1 : 1;
+    const nx = u.y * s, ny = -u.x * s, d = peca.margemTraco[tracoId] ?? peca.margem;
+    return [{ x: p.x + nx * d, y: p.y + ny * d }, { x: p.x + nx * (d - 5), y: p.y + ny * (d - 5) }];
+  }
+
+  const MoldeDesenho = { distSeg, medida, cm, polar, angulo, simplificar, uid, ponto, usados, reta, retangulo, medir, naCaixa, transformar, girar, apagar, cortar, estender, arredondar, espelhar,
+    noTraco, naPeca, geoPeca, novaPeca, pique };
   g.MoldeDesenho = MoldeDesenho;
   if (typeof module !== 'undefined') module.exports = MoldeDesenho;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -64,6 +64,31 @@ dialog h3{margin:0 0 12px}
 #tela .caixa{fill:var(--ac);fill-opacity:.08;stroke:var(--ac);stroke-width:1px;stroke-dasharray:4 3;vector-effect:non-scaling-stroke}
 #tela .ima{fill:none;stroke:var(--ok);stroke-width:2px;vector-effect:non-scaling-stroke}
 #regua{pointer-events:none}#regua rect{fill:var(--card)}#regua line{stroke:var(--mut);stroke-width:1px;vector-effect:non-scaling-stroke}#regua text{fill:var(--mut);font-family:'Inter',sans-serif}
+#pecas{pointer-events:none}
+#tela .pc .cost{fill:var(--ac);fill-opacity:.06;stroke:var(--ac);stroke-width:1.5px;vector-effect:non-scaling-stroke}
+#tela .pc.sel .cost{fill-opacity:.14;stroke-width:2.5px}
+#tela .pc .corte{fill:none;stroke:var(--tx);stroke-width:1px;stroke-dasharray:6 4;vector-effect:non-scaling-stroke}
+#tela .pc .fio,#tela .pc .piq{fill:none;stroke:var(--tx);stroke-width:1.2px;vector-effect:non-scaling-stroke}
+#tela .pc-tx{fill:var(--tx);font-family:'Inter',sans-serif}
+#tela .ponta-erro{fill:none;stroke:var(--bad);stroke-width:2.5px;vector-effect:non-scaling-stroke}
+#btn-extrair{width:100%;margin-bottom:8px}
+.pc-item{display:flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--bd);border-radius:8px;margin-bottom:6px}
+.pc-item.sel{border-color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac)}
+.pc-item .mini{width:36px;height:36px;flex:none}
+.pc-item .mini path{fill:var(--ac);fill-opacity:.15;stroke:var(--ac);stroke-width:1.5px;vector-effect:non-scaling-stroke}
+.pc-nome{flex:1;min-width:0;text-align:left;background:none;border:0;color:var(--tx);font:inherit;font-size:13px;cursor:pointer;padding:2px;overflow-wrap:anywhere}
+.pc-nome small{display:block;color:var(--bad);font-weight:600}
+.pc-item .ic{flex:none;width:26px;height:26px;padding:0;border:1px solid var(--bd);border-radius:6px;background:none;color:var(--tx);font-size:14px;cursor:pointer}
+.pc-item .ic[aria-pressed="true"],#props [aria-pressed="true"]{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+.pc-ren{flex:1;min-width:0;font-size:13px;padding:2px 4px}
+#props{border:1px solid var(--bd);border-radius:8px;margin:8px 0 0;padding:8px;min-width:0}
+#props legend{font-weight:600;font-size:14px;padding:0 4px}
+#props label{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:6px 0;font-size:13px}
+#props input:not([type=checkbox]),#props select{width:112px}
+#props .modos{display:flex;flex-wrap:wrap;gap:4px;margin-top:8px}
+#props p{margin:8px 0 0}
+select{font:inherit;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
+select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 #medida{position:fixed;z-index:50;width:190px;box-shadow:0 4px 12px rgba(0,0,0,.2)}
 #medida[aria-invalid="true"]{border-color:var(--bad)}
 @media (max-width:760px){
@@ -100,8 +125,25 @@ dialog h3{margin:0 0 12px}
     <rect id="fundo" x="-5000" y="-5000" width="10000" height="10000" fill="url(#grade)"/>
     <g id="diagrama"></g><g id="pecas"></g><g id="regua"></g>
   </svg>
-  <!-- Task 6: lista de peças e propriedades -->
-  <aside id="painel" aria-label="Moldes"><h2>Moldes</h2><div id="lista-pecas"><p class="vazio">Nenhuma peça ainda.</p></div></aside>
+  <aside id="painel" aria-label="Moldes"><h2>Moldes</h2>
+    <button class="sm" type="button" id="btn-extrair" title="Cria uma peça com os traços selecionados (contorno fechado)">Extrair molde</button>
+    <div id="lista-pecas"></div>
+    <fieldset id="props" hidden>
+      <legend>Propriedades</legend>
+      <label>Nome <input id="p-nome" autocomplete="off"></label>
+      <label>Cortar <input id="p-cortar" type="number" min="1" step="1"></label>
+      <label><span><input id="p-par" type="checkbox"> em par (espelhado)</span></label>
+      <label>Margem (cm) <input id="p-margem" inputmode="decimal" autocomplete="off"></label>
+      <label>Dobra <select id="p-dobra"></select></label>
+      <div class="modos" role="group" aria-label="Marcar no contorno">
+        <button class="sm" type="button" data-modo="bainha" title="Margem só de um traço (ex.: bainha)">Margem do traço</button>
+        <button class="sm" type="button" data-modo="pique">Piques</button>
+        <button class="sm" type="button" data-modo="pence">Pence</button>
+      </div>
+      <p class="vazio">Fio: arraste as pontas da seta na tela.</p>
+      <p class="vazio" id="p-info"></p>
+    </fieldset>
+  </aside>
 </div>
 <dialog id="dlg-refs" aria-labelledby="dlg-refs-t">
   <h3 id="dlg-refs-t">Referências deste molde</h3>
@@ -172,6 +214,8 @@ let ver=0,salvando=false,timer=null,erroSalvar='',ligadosSalvos=[],zoom=1;
 // desenho: vx,vy = canto da vista em mm; sel = ids de traços/pontos soltos/textos selecionados (Task 6 usa); op = ação em curso
 let vx=-20,vy=-20,ferr='sel',op=null,rato=null,imaLigado=true,espaco=false,pan=null;
 const sel=new Set();
+// peças: pecaSel = id da peça no painel; modoPeca = clique no contorno marca bainha/pique/pence; pontaErro = ponta solta do último Extrair
+let pecaSel=null,modoPeca=null,pontaErro=null;
 const RASC=()=>'molde:'+molId;
 
 function bloquear(msg,entrar){
@@ -195,12 +239,13 @@ $('#zoom-v').textContent=Math.round(zoom*100)+'%';
 $('#refs-n').textContent=M.produtoIds.length?'('+M.produtoIds.length+')':'';
 document.title=(M.nome||'Molde')+' · Editor de molde';
 desenharDiagrama(w,h);
+desenharPecas();
 }
 
 // alteração que vale como passo do histórico
 function alterou(){H.gravar(M);sujou()}
 // marca não salvo, redesenha e agenda salvar (sem passo no histórico)
-function sujou(){ver++;erroSalvar='';marcar('nao-salvo');desenhar();agendar()}
+function sujou(){ver++;erroSalvar='';pontaErro=null;marcar('nao-salvo');desenhar();desenharPainel();agendar()}
 function agendar(ms=1500){clearTimeout(timer);timer=setTimeout(salvar,ms)}
 function aplicar(m){M=MM.normalizar(m);$('#nome').value=M.nome;sujou()}
 
@@ -303,7 +348,7 @@ else try{localStorage.removeItem(RASC())}catch(e){}
 }
 H=MM.historico();H.gravar(M);
 $('#aviso').hidden=true;$('#editor').hidden=false;$('#nome').value=M.nome;
-marcar('salvo');if(pendente)sujou();else desenhar();
+marcar('salvo');if(pendente)sujou();else{desenhar();desenharPainel()}
 }
 
 async function iniciar(){
@@ -360,7 +405,7 @@ for(const id of sel)if(!existe.has(id))sel.delete(id);
 let s='';
 for(const t of M.tracos){const p=tracoSeguro(t);if(p)s+=`<path class="tr${sel.has(t.id)?' sel':''}" d="${caminho(p,t.tipo==='circulo')}"/>`}
 for(const [id,p] of Object.entries(M.pontos))s+=`<circle class="pt${u.has(id)?'':' solto'}${sel.has(id)?' sel':''}" cx="${n2(p.x)}" cy="${n2(p.y)}" r="${3/zoom}"/>`;
-for(const x of M.textos)s+=`<text class="tx${sel.has(x.id)?' sel':''}" x="${n2(x.x)}" y="${n2(x.y)}" font-size="${x.tam||10}">${esc(x.texto)}</text>`;
+for(const x of M.textos)s+=`<text class="tx${sel.has(x.id)?' sel':''}" x="${n2(x.x)}" y="${n2(x.y)}" font-size="${+x.tam||10}">${esc(x.texto)}</text>`;
 for(const t of M.tracos)if(t.tipo==='curva'&&sel.has(t.id)&&M.pontos[t.a]&&M.pontos[t.b])for(const [k,e] of [['c1','a'],['c2','b']]){
 const c=t[k],q=M.pontos[t[e]];s+=`<line class="alca" x1="${n2(q.x)}" y1="${n2(q.y)}" x2="${n2(c.x)}" y2="${n2(c.y)}"/><circle class="alca-p" cx="${n2(c.x)}" cy="${n2(c.y)}" r="${4/zoom}"/>`}
 s+=previa();
@@ -399,7 +444,7 @@ if(pt&&!u.has(pt))return pt;
 let mel=null,md=r;
 for(const t of M.tracos){const q=tracoSeguro(t);if(!q)continue;if(t.tipo==='circulo')q.push(q[0]);for(let i=1;i<q.length;i++){const d=MD.distSeg(p,q[i-1],q[i]);if(d<md){md=d;mel=t.id}}}
 if(mel)return mel;
-const x=M.textos.find(x=>{const tm=x.tam||10;return p.x>=x.x-r&&p.x<=x.x+tm*.6*x.texto.length+r&&p.y>=x.y-tm-r&&p.y<=x.y+r});
+const x=M.textos.find(x=>{const tm=x.tam||10;return p.x>=x.x-r&&p.x<=x.x+tm*.6*String(x.texto).length+r&&p.y>=x.y-tm-r&&p.y<=x.y+r});
 return x?x.id:null;
 }
 function alcaSob(p){for(const t of M.tracos)if(t.tipo==='curva'&&sel.has(t.id))for(const k of ['c1','c2'])if(dist(p,t[k])<=6/zoom)return {t,k};return null}
@@ -423,7 +468,7 @@ function criarRet(B){const r=MD.retangulo(M,op.A,B);op=null;if(r.erro){toast(r.e
 function criarCirc(r){if(!(r>0))return toast('Raio inválido.');M.tracos.push({id:MD.uid(M,'t'),tipo:'circulo',c:MD.ponto(M,op.C),r});op=null;alterou()}
 const T={
 sel:{dica:'Clique para selecionar (Shift soma). Arraste no vazio para selecionar por caixa, sobre um traço para mover, sobre um ponto para mudá-lo de lugar.',
-down(p,e){const a=alcaSob(p);op=a?{tipo:'alca',...a}:{tipo:'talvez',ini:p,ult:p,pid:pontoSob(p),id:achar(p),shift:e.shiftKey}},
+down(p,e){const fk=fioSob(p);if(fk){op={tipo:'fio',k:fk};return}const a=alcaSob(p);op=a?{tipo:'alca',...a}:{tipo:'talvez',ini:p,ult:p,pid:pontoSob(p),id:achar(p),shift:e.shiftKey}},
 move(p,e){
 if(!op)return;
 if(op.tipo==='talvez'){
@@ -437,6 +482,7 @@ if(op.tipo==='alca')moverAlca(op,p,e.altKey);
 else if(op.tipo==='ponto'){const q=M.pontos[op.pid];q.x+=dx;q.y+=dy}
 else if(op.tipo==='mover')MD.transformar(M,[...sel],q=>G.mover(q,dx,dy));
 else if(op.tipo==='caixa')op.fim=p;
+else if(op.tipo==='fio')pecaAtual().fio[op.k]={x:p.x,y:p.y};
 op.ult=p;
 },
 up(p){
@@ -476,7 +522,7 @@ up(p){const t=prompt('Texto:');if(t&&t.trim()){M.textos.push({id:MD.uid(M,'x'),x
 };
 
 function escolher(f){
-ferr=f;op=null;fecharMedida();
+ferr=f;op=null;modoPeca=null;fecharMedida();if(M)preencherProps();
 document.querySelectorAll('#ferramentas [data-f]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===f));
 $('#dica').textContent=T[f].dica;if(M)desenhar();
 }
@@ -485,24 +531,31 @@ function edicao(n){
 const ids=[...sel];
 if(!ids.length)return toast('Selecione os traços primeiro.');
 if(n==='medir'){const t='Medida: '+MD.cm(MD.medir(M,ids))+' cm';$('#dica').textContent=t;toast(t);return}
+// a edição que quebra o contorno de uma peça pede confirmação
+const antes=structuredClone(M),inteiras=new Set(M.pecas.filter(pc=>MD.geoPeca(M,pc)).map(pc=>pc.id));
 let r;
 if(n==='girar'){const g=(MD.medida(prompt('Girar quantos graus? (positivo = anti-horário)','90'))||[])[0];if(g==null)return;r=MD.girar(M,ids,g)}
 else if(n==='arredondar'){const v=(MD.medida(prompt('Raio do canto (cm):','1'))||[])[0];if(v==null)return;r=MD.arredondar(M,ids,v*10)}
 else r=MD[n](M,ids);
 if(r.erro)return toast(r.erro);
+const quebra=M.pecas.filter(pc=>inteiras.has(pc.id)&&!MD.geoPeca(M,pc));
+if(quebra.length&&!confirm(`Isto quebra o contorno de: ${quebra.map(pc=>pc.nome).join(', ')}. Continuar? A peça fica marcada como "contorno quebrado".`)){M=antes;desenhar();return}
 sel.clear();r.ids.forEach(id=>sel.add(id));
 alterou();
 }
 
 // caixinha de medida exata: abre ao digitar com uma reta/retângulo/círculo começado
 const caixa=$('#medida');
-function abrirMedida(k,x,y){caixa.value=k;caixa.placeholder=T[ferr].medida;caixa.removeAttribute('aria-invalid');caixa.style.left=Math.min(x+12,innerWidth-200)+'px';caixa.style.top=Math.min(y+12,innerHeight-40)+'px';caixa.hidden=false;caixa.focus()}
+// fn: caixa aberta por uma peça (bainha, pence); recebe (medida lida, texto) e devolve false se inválida
+let aoMedir=null;
+function abrirMedida(k,x,y,ph,fn){aoMedir=fn||null;caixa.value=k;caixa.placeholder=ph||T[ferr].medida;caixa.removeAttribute('aria-invalid');caixa.style.left=Math.min(x+12,innerWidth-200)+'px';caixa.style.top=Math.min(y+12,innerHeight-40)+'px';caixa.hidden=false;caixa.focus()}
 function fecharMedida(){caixa.hidden=true}
 caixa.addEventListener('keydown',e=>{
 if(e.key==='Escape'){fecharMedida();e.stopPropagation()}
 if(e.key!=='Enter')return;
 e.preventDefault();
 const v=MD.medida(caixa.value);
+if(aoMedir){if(aoMedir(v,caixa.value)===false){caixa.setAttribute('aria-invalid','true');toast('Medida inválida: '+caixa.placeholder)}else fecharMedida();return}
 if(!v||!(v[0]>0)||!op){caixa.setAttribute('aria-invalid','true');toast('Medida inválida. Ex.: '+(ferr==='reta'?'11,5;90':'30;50'));return}
 fecharMedida();T[ferr].digitado(v);
 });
@@ -516,12 +569,127 @@ nav.append(document.createElement('hr'));
 for(const [n,ic,tit] of EDICOES)bt(ic,tit,()=>edicao(n));}
 escolher('sel');
 
+// ---- peças (Task 6). Geometria em molde/desenho.js ----
+const pecaAtual=()=>M.pecas.find(p=>p.id===pecaSel)||null;
+const mm10=cm=>Math.round(cm*100)/10; // cm digitado → mm com 0,1 mm
+const MODOS={bainha:'Clique num traço do contorno e digite a margem dele em cm (vazio volta à margem da peça).',pique:'Clique no contorno para pôr um pique; clique num pique para tirar. Esc encerra.',pence:'Clique no contorno onde vai a pence e digite "abertura cm; profundidade cm"; clique numa pence para tirar.'};
+function extrair(){
+const r=MD.novaPeca(M,[...sel]);
+if(!r.ok){toast(r.erro);pontaErro=r.ponta||null;desenhar();return}
+sel.clear();pecaSel=r.peca.id;alterou();
+}
+// ponta da seta do fio da peça selecionada sob o cursor
+function fioSob(p){const pc=pecaAtual();if(!pc||!pc.visivel||pc.travada||!MD.geoPeca(M,pc))return null;return ['a','b'].find(k=>dist(p,pc.fio[k])<=6/zoom)||null}
+function seta(a,b){const l=dist(a,b)||1,ux=(b.x-a.x)/l,uy=(b.y-a.y)/l,k=8/zoom;return `M${n2(b.x-ux*k-uy*k/2)} ${n2(b.y-uy*k+ux*k/2)}L${n2(b.x)} ${n2(b.y)}L${n2(b.x-ux*k+uy*k/2)} ${n2(b.y-uy*k-ux*k/2)}`}
+function desenharPecas(){
+let s='';
+for(const pc of M.pecas){
+const g=pc.visivel&&MD.geoPeca(M,pc);if(!g)continue;
+const a=pc.id===pecaSel,b=G.bbox(g.cost),cx=n2(b.x0+b.w/2),cy=b.y0+b.h/2,f=pc.fio,n=+pc.cortar||1,fs=n2(Math.max(4,Math.min(10,b.w/14)));
+s+=`<g class="pc${a?' sel':''}"><path class="cost" d="${caminho(g.cost,1)}"/><path class="corte" d="${caminho(g.corte,1)}"/>`;
+s+=`<path class="fio" d="${caminho([f.a,f.b])}${seta(f.b,f.a)}${seta(f.a,f.b)}"/>`;
+for(const q of pc.piques){const l=MD.pique(M,pc,q);if(l)s+=`<path class="piq" d="${caminho(l)}"/>`}
+s+=`<text class="pc-tx" x="${cx}" y="${n2(cy)}" font-size="${fs}" text-anchor="middle">${esc(pc.nome)} · cortar ${n}${pc.par?(n>1?' pares':' par'):''}</text>`;
+s+=`<text class="pc-tx" x="${cx}" y="${n2(cy+fs*1.4)}" font-size="${fs}" text-anchor="middle">${esc(M.base)}</text>`;
+if(a&&!pc.travada)for(const k of ['a','b'])s+=`<circle class="alca-p" cx="${n2(f[k].x)}" cy="${n2(f[k].y)}" r="${4/zoom}"/>`;
+s+='</g>';
+}
+if(pontaErro)s+=`<circle class="ponta-erro" cx="${n2(pontaErro.x)}" cy="${n2(pontaErro.y)}" r="${8/zoom}"/>`;
+$('#pecas').innerHTML=s;
+}
+// lista do painel; textos do doc só por textContent
+function desenharPainel(){
+const box=$('#lista-pecas');box.textContent='';
+if(!M.pecas.length){const p=document.createElement('p');p.className='vazio';p.textContent='Nenhuma peça ainda. Selecione os traços de um contorno fechado e clique em Extrair molde.';box.append(p)}
+for(const pc of M.pecas){
+const g=MD.geoPeca(M,pc),li=document.createElement('div');li.className='pc-item';li.dataset.id=pc.id;
+const mini=document.createElementNS('http://www.w3.org/2000/svg','svg');mini.setAttribute('class','mini');mini.setAttribute('aria-hidden','true');
+if(g){const b=G.bbox(g.cost),k=Math.max(b.w,b.h)*.08;mini.setAttribute('viewBox',`${n2(b.x0-k)} ${n2(b.y0-k)} ${n2(b.w+2*k)} ${n2(b.h+2*k)}`);mini.innerHTML=`<path d="${caminho(g.cost,1)}"/>`}
+const nm=document.createElement('button');nm.type='button';nm.className='pc-nome';nm.textContent=pc.nome||'(sem nome)';nm.title='Clique seleciona; duplo clique renomeia';
+nm.onclick=()=>{pecaSel=pc.id;modoPeca=null;preencherProps();desenhar()};
+nm.ondblclick=()=>{if(!pc.travada)renomear(pc,nm)};
+if(!g){const q=document.createElement('small');q.textContent='contorno quebrado';nm.append(q)}
+const bt=(txt,tit,fn,pr)=>{const b=document.createElement('button');b.type='button';b.className='ic';b.textContent=txt;b.title=tit;b.setAttribute('aria-label',tit+' '+pc.nome);if(pr!=null)b.setAttribute('aria-pressed',pr);b.onclick=fn;return b};
+li.append(mini,nm,
+bt('◉','Ver',()=>{pc.visivel=!pc.visivel;alterou()},pc.visivel),
+bt('⊠','Travar',()=>{pc.travada=!pc.travada;alterou()},pc.travada),
+bt('⧉','Duplicar',()=>{const c=structuredClone(pc);c.id=MD.uid(M,'pc');c.nome=pc.nome+' (cópia)';c.travada=false;M.pecas.push(c);pecaSel=c.id;alterou()}),
+bt('✕','Apagar',()=>{if(pc.travada)return toast('Peça travada: destrave para apagar.');if(confirm(`Apagar a peça "${pc.nome}"?`)){M.pecas=M.pecas.filter(x=>x!==pc);alterou()}}));
+box.append(li);
+}
+preencherProps();
+}
+function renomear(pc,nm){
+const i=document.createElement('input');i.className='pc-ren';i.value=pc.nome;i.setAttribute('aria-label','Nome da peça');
+let feito=false;
+const fim=ok=>{if(feito)return;feito=true;const v=i.value.trim();if(ok&&v&&v!==pc.nome){pc.nome=v;alterou()}else desenharPainel()};
+i.onkeydown=e=>{if(e.key==='Enter')fim(true);else if(e.key==='Escape')fim(false)};i.onblur=()=>fim(true);
+nm.replaceWith(i);i.focus();i.select();
+}
+// formulário de propriedades da peça selecionada; não mexe no campo em que o usuário está
+function preencherProps(){
+if(pecaSel&&!pecaAtual())pecaSel=null;
+const pc=pecaAtual(),f=$('#props');
+document.querySelectorAll('.pc-item').forEach(li=>li.classList.toggle('sel',li.dataset.id===pecaSel));
+f.hidden=!pc;
+if(!pc||pc.travada||!MD.geoPeca(M,pc))modoPeca=null;
+document.querySelectorAll('#props [data-modo]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.modo===modoPeca));
+$('#dica').textContent=modoPeca?MODOS[modoPeca]:T[ferr].dica;
+if(!pc)return;
+f.disabled=pc.travada;
+const por=(id,v)=>{const e=$(id);if(document.activeElement!==e)e[e.type==='checkbox'?'checked':'value']=v};
+por('#p-nome',pc.nome);por('#p-cortar',+pc.cortar||1);por('#p-par',pc.par);por('#p-margem',MD.cm(+pc.margem||0));
+const d=$('#p-dobra');
+if(document.activeElement!==d){
+d.textContent='';
+const op=(v,t)=>{const o=document.createElement('option');o.value=v;o.textContent=t;d.append(o)};
+op('','Sem dobra');
+// só traço reto inteiro e sem pence vira dobra (o modelo ignora a dobra em outro caso)
+for(const {id} of pc.tracos){const t=M.tracos.find(x=>x.id===id);if(t&&t.tipo==='reta'&&!pc.pences.some(q=>q.tracoId===id))op(id,'Traço '+id+' ('+MD.cm(MD.medir(M,[id]))+' cm)')}
+d.value=pc.dobra?pc.dobra.tracoId:'';
+}
+const mt=Object.entries(pc.margemTraco).map(([id,v])=>id+': '+MD.cm(+v||0)+' cm');
+$('#p-info').textContent=`${pc.piques.length} pique(s) · ${pc.pences.length} pence(s)`+(mt.length?' · margem do traço '+mt.join(', '):'');
+}
+// campos: aplica no 'change' (o painel é refeito a cada alteração)
+const campo=fn=>e=>{const pc=pecaAtual();if(!pc||pc.travada)return;if(fn(pc,e.target)===false){preencherProps();return}alterou()};
+$('#p-nome').addEventListener('change',campo((pc,i)=>{const v=i.value.trim();if(!v)return false;pc.nome=v}));
+$('#p-cortar').addEventListener('change',campo((pc,i)=>{const n=Math.round(+i.value);if(!(n>=1)){toast('Cortar: número inteiro a partir de 1.');return false}pc.cortar=n}));
+$('#p-par').addEventListener('change',campo((pc,i)=>{pc.par=i.checked}));
+$('#p-margem').addEventListener('change',campo((pc,i)=>{const v=MD.medida(i.value);if(!v||v.length>1||!(v[0]>=0)){toast('Margem inválida. Ex.: 1 ou 1,5');return false}pc.margem=mm10(v[0])}));
+$('#p-dobra').addEventListener('change',campo((pc,i)=>{pc.dobra=i.value?{tracoId:i.value}:null}));
+document.querySelectorAll('#props [data-modo]').forEach(b=>b.onclick=()=>{modoPeca=modoPeca===b.dataset.modo?null:b.dataset.modo;op=null;preencherProps();desenhar()});
+$('#btn-extrair').onclick=extrair;
+// clique na tela com um modo de peça ligado
+function cliquePeca(p,e){
+const pc=pecaAtual();if(!pc||pc.travada)return;
+const h=MD.naPeca(M,pc,p);
+if(!h||h.d>8/zoom)return toast('Clique sobre o contorno da peça.');
+const perto=q=>q.tracoId===h.tracoId&&Math.abs(q.t-h.t)*h.L*zoom<=8,t=+h.t.toFixed(4);
+if(modoPeca==='pique'){const i=pc.piques.findIndex(perto);if(i>=0)pc.piques.splice(i,1);else pc.piques.push({tracoId:h.tracoId,t});alterou();return}
+if(modoPeca==='pence'){
+const i=pc.pences.findIndex(perto);if(i>=0){pc.pences.splice(i,1);alterou();return}
+if(pc.dobra&&pc.dobra.tracoId===h.tracoId)return toast('O traço da dobra não leva pence.');
+abrirMedida('',e.clientX,e.clientY,'abertura cm; profundidade cm',v=>{
+if(!v||v.length!==2||!(v[0]>0)||!(v[1]>0)||v[0]*10>=h.L)return false;
+pc.pences.push({tracoId:h.tracoId,t,abertura:mm10(v[0]),profundidade:mm10(v[1])});alterou()});
+return}
+if(modoPeca==='bainha'){
+const at=pc.margemTraco[h.tracoId];
+abrirMedida(at==null?'':MD.cm(+at||0),e.clientX,e.clientY,'margem deste traço, cm',(v,txt)=>{
+if(!txt.trim())delete pc.margemTraco[h.tracoId];
+else if(!v||v.length>1||!(v[0]>=0))return false;
+else pc.margemTraco[h.tracoId]=mm10(v[0]);
+alterou()})}
+}
+
 let ultCli={x:0,y:0};
 tela.addEventListener('pointerdown',e=>{
 if(!M)return;
 if(e.button===1||(e.button===0&&espaco)){pan={x:e.clientX,y:e.clientY,vx,vy};tela.setPointerCapture(e.pointerId);e.preventDefault();return}
 if(e.button===2){op=null;desenhar();return}
 if(e.button!==0)return;
+if(modoPeca){e.preventDefault();return}
 tela.setPointerCapture(e.pointerId);
 const p=mm(e);T[ferr].down&&T[ferr].down(p,e);desenhar();
 });
@@ -532,7 +700,7 @@ const p=mm(e);
 rato=ferr==='sel'?null:grudar(p);
 T[ferr].move&&T[ferr].move(p,e);desenhar();
 });
-tela.addEventListener('pointerup',e=>{if(!M)return;if(pan){pan=null;return}if(e.button===0&&T[ferr].up)T[ferr].up(mm(e),e)});
+tela.addEventListener('pointerup',e=>{if(!M)return;if(pan){pan=null;return}if(e.button!==0)return;if(modoPeca)cliquePeca(mm(e),e);else if(T[ferr].up)T[ferr].up(mm(e),e)});
 tela.addEventListener('pointerleave',()=>{if(rato){rato=null;desenhar()}});
 tela.addEventListener('contextmenu',e=>e.preventDefault());
 tela.addEventListener('wheel',e=>{if(!M)return;e.preventDefault();zoomEm(e.clientX,e.clientY,Math.pow(1.0015,-e.deltaY))},{passive:false});
@@ -543,7 +711,7 @@ document.addEventListener('keydown',e=>{
 if(!M||e.ctrlKey||e.metaKey||e.altKey||e.target.closest('input,textarea,dialog,select'))return;
 const k=e.key;
 if(op&&T[ferr].digitado&&/^[0-9,.\-]$/.test(k)){e.preventDefault();abrirMedida(k,ultCli.x,ultCli.y);return}
-if(k==='Escape'){op=null;desenhar();return}
+if(k==='Escape'){op=null;modoPeca=null;preencherProps();desenhar();return}
 if(k==='Delete'||k==='Backspace'){e.preventDefault();if(sel.size)edicao('apagar');return}
 if(k===' '){if(!e.target.closest('button,a')){espaco=true;e.preventDefault()}return}
 const l=k.toLowerCase();
