@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Editor de molde</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="molde/geo.js"></script>
+<script src="molde/modelo.js"></script>
+<style>
+:root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;
+color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button.pri,button.ghost,button.sm{font:inherit;border-radius:8px;cursor:pointer;padding:8px 14px;border:1px solid var(--ac)}
+button.pri{background:var(--ac);color:var(--acx)}
+button.ghost,button.sm{background:none;color:var(--ac)}
+button.sm{padding:4px 10px;font-size:13px}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+input{font:inherit;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
+a{color:var(--ac)}
+dialog{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx);width:min(520px,94vw);padding:18px}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h3{margin:0 0 12px}
+.row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+#aviso{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
+#aviso .c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:24px;max-width:420px}
+#editor{height:100%;display:grid;grid-template:auto 1fr/auto 1fr 240px;grid-template-areas:"topo topo topo" "ferr tela painel"}
+#topo{grid-area:topo;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--bd)}
+#topo a.volta{text-decoration:none;font-size:14px;margin-right:4px}
+#nome{font-weight:600;min-width:160px;max-width:320px;flex:1}
+#estado{font-size:13px;color:var(--mut);white-space:nowrap}
+#estado.ok{color:var(--ok)}#estado.erro{color:var(--bad);font-weight:600}
+#topo .grupo{display:flex;align-items:center;gap:4px}
+#topo .esp{flex:1}
+#zoom-v{min-width:56px}
+#ferramentas{grid-area:ferr;display:flex;flex-direction:column;gap:4px;padding:8px;background:var(--card);border-right:1px solid var(--bd);min-width:52px}
+#tela{grid-area:tela;width:100%;height:100%;display:block;background:var(--bg);touch-action:none}
+#painel{grid-area:painel;background:var(--card);border-left:1px solid var(--bd);padding:12px;overflow:auto}
+#painel h2{margin:0 0 8px;font-size:16px;font-family:'Poppins',sans-serif;font-weight:600}
+.vazio{color:var(--mut);font-size:13px}
+#refs{max-height:50vh;overflow:auto;margin:8px 0;border:1px solid var(--bd);border-radius:8px}
+#refs label{display:flex;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--bd);cursor:pointer}
+#refs label:last-child{border-bottom:0}
+#refs small{color:var(--mut)}
+#ref-busca{width:100%}
+#toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:#fff;padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
+@media (max-width:760px){
+#editor{grid-template:auto auto 1fr auto/1fr;grid-template-areas:"topo" "ferr" "tela" "painel"}
+#ferramentas{flex-direction:row;border-right:0;border-bottom:1px solid var(--bd)}
+#painel{border-left:0;border-top:1px solid var(--bd);max-height:30vh}
+}
+</style>
+</head>
+<body>
+<div id="aviso"><div class="c" id="aviso-c">Carregando…</div></div>
+<div id="editor" hidden>
+  <header id="topo">
+    <a class="volta" href="index.html" title="Voltar ao app">← App</a>
+    <input id="nome" aria-label="Nome do molde" placeholder="Nome do molde" autocomplete="off">
+    <span id="estado" role="status" aria-live="polite">Salvo</span>
+    <span class="esp"></span>
+    <button class="sm" type="button" id="btn-refs" title="Produtos que usam este molde">Referências <span id="refs-n"></span></button>
+    <span class="grupo" role="group" aria-label="Zoom">
+      <button class="sm" type="button" id="zoom-menos" title="Diminuir zoom" aria-label="Diminuir zoom">−</button>
+      <button class="sm" type="button" id="zoom-v" title="Voltar a 100%">100%</button>
+      <button class="sm" type="button" id="zoom-mais" title="Aumentar zoom" aria-label="Aumentar zoom">+</button>
+    </span>
+    <span class="grupo" role="group" aria-label="Histórico">
+      <button class="sm" type="button" id="btn-desfazer" title="Desfazer (Ctrl+Z)">Desfazer</button>
+      <button class="sm" type="button" id="btn-refazer" title="Refazer (Ctrl+Y)">Refazer</button>
+    </span>
+  </header>
+  <!-- Task 5: ferramentas de desenho entram aqui -->
+  <nav id="ferramentas" aria-label="Ferramentas"></nav>
+  <svg id="tela" role="img" aria-label="Área de desenho do molde" xmlns="http://www.w3.org/2000/svg">
+    <defs><pattern id="grade" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="var(--bd)" stroke-width="0.4"/></pattern></defs>
+    <rect id="fundo" x="-5000" y="-5000" width="10000" height="10000" fill="url(#grade)"/>
+    <g id="diagrama"></g><g id="pecas"></g>
+  </svg>
+  <!-- Task 6: lista de peças e propriedades -->
+  <aside id="painel" aria-label="Moldes"><h2>Moldes</h2><div id="lista-pecas"><p class="vazio">Nenhuma peça ainda.</p></div></aside>
+</div>
+<dialog id="dlg-refs" aria-labelledby="dlg-refs-t">
+  <h3 id="dlg-refs-t">Referências deste molde</h3>
+  <small style="color:var(--mut)">Marque os produtos que usam este molde. Ao salvar, o molde vai para o cálculo de consumo de cada um.</small>
+  <input id="ref-busca" type="search" placeholder="Buscar referência ou nome" aria-label="Buscar produto" style="margin-top:10px">
+  <div id="refs"><p class="vazio" style="padding:10px">Carregando…</p></div>
+  <div class="row"><button class="pri" type="button" id="refs-ok">Fechar</button></div>
+</dialog>
+<div id="toast" role="status"></div>
+<script>
+const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
+const IS_DEV=location.hostname==='localhost'||location.hostname==='127.0.0.1';
+const Q=new URLSearchParams(location.search);
+// ?local=1 só em localhost: sem Supabase, tudo no localStorage (para testar a tela sem login)
+const LOCAL=IS_DEV&&Q.get('local')==='1';
+const sb=LOCAL?null:supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s);
+const MM=window.MoldeModelo;
+
+function ptErro(e){
+const m=String((e&&e.message)||e||'');
+if(/failed to fetch|networkerror|network request|load failed|sem conexão/i.test(m))return 'Sem conexão com o servidor.';
+if(/session|jwt|refresh token|sessão/i.test(m))return 'Sua sessão expirou. Entre novamente no app.';
+if(/row-level security|permission denied|not authorized|sem permissão/i.test(m))return 'Sem permissão para salvar.';
+return m||'Erro ao salvar.';
+}
+function toast(t){const d=$('#toast');d.textContent=t;d.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>d.style.display='none',3500)}
+
+// ---- armazenamento: Supabase (docs) ou local; o resto da página não sabe qual ----
+const B=LOCAL?(()=>{
+const K='molde-local:',ler=k=>{try{return JSON.parse(localStorage.getItem(K+k))}catch(e){return null}},gravarK=(k,v)=>localStorage.setItem(K+k,JSON.stringify(v));
+// rede derrubada (context.setOffline) ou window.simularOffline=true no console
+const rede=()=>{if(!navigator.onLine||window.simularOffline)throw new Error('Failed to fetch')};
+if(!ler('produtos'))gravarK('produtos',{
+'p-teste-1':{ref:'101',nome:'Short tactel masculino'},
+'p-teste-2':{ref:'102',nome:'Short moletom infantil'},
+'p-teste-3':{ref:'103',nome:'Bermuda sarja',mol:{arq:'BERMUDA.PLT',un:'mm',pecas:[{w:600,h:300,qtd:2,pts:[[0,0],[600,0],[600,300],[0,300]]}]}}});
+const moldes=()=>ler('moldes')||{};
+return {
+async molde(id){rede();return moldes()[id]||null},
+async moldePorProduto(pid){rede();const e=Object.entries(moldes()).find(([,d])=>(d.produtoIds||[]).includes(pid));return e?{id:e[0],data:e[1]}:null},
+async criar(d){rede();const id='m'+Date.now(),t=moldes();t[id]=d;gravarK('moldes',t);return id},
+async gravar(id,d){rede();const t=moldes();t[id]=d;gravarK('moldes',t)},
+async produtos(){rede();return Object.entries(ler('produtos')).map(([id,data])=>({id,data}))},
+async produto(id){rede();return ler('produtos')[id]||null},
+async gravarProduto(id,d){rede();const t=ler('produtos');t[id]=d;gravarK('produtos',t)}
+};
+})():(()=>{
+const ok=r=>{if(r.error)throw r.error;return r.data};
+async function sessaoOk(){const {data:{session}}=await sb.auth.getSession();if(!session)throw new Error('Sua sessão expirou.')}
+// update que não acha a linha (RLS) volta vazio sem erro: tratar como falha para não perder a alteração
+const atualizar=async(id,d)=>{await sessaoOk();if(!ok(await sb.from('docs').update({data:d}).eq('id',id).select('id')).length)throw new Error('Sem permissão para salvar.')};
+return {
+async molde(id){await sessaoOk();const r=ok(await sb.from('docs').select('data').eq('id',id).eq('col','moldes').maybeSingle());return r?r.data:null},
+async moldePorProduto(pid){await sessaoOk();return ok(await sb.from('docs').select('id,data').eq('col','moldes').contains('data',{produtoIds:[pid]}).order('created_at').limit(1))[0]||null},
+async criar(d){await sessaoOk();return ok(await sb.from('docs').insert({col:'moldes',data:d}).select('id').single()).id},
+gravar:atualizar,
+async produtos(){await sessaoOk();return ok(await sb.from('docs').select('id,data').eq('col','produtos').order('created_at'))},
+async produto(id){await sessaoOk();const r=ok(await sb.from('docs').select('data').eq('id',id).eq('col','produtos').maybeSingle());return r?r.data:null},
+gravarProduto:atualizar
+};
+})();
+
+// ---- estado global (usado pelas Tasks 5–6) ----
+let M=null,H=null,estado='salvo',molId=null;
+let ver=0,salvando=false,timer=null,erroSalvar='',ligadosSalvos=[],zoom=1;
+const RASC=()=>'molde:'+molId;
+
+function bloquear(msg,entrar){
+$('#editor').hidden=true;$('#aviso').hidden=false;
+const c=$('#aviso-c');c.textContent=msg;
+if(entrar){const a=document.createElement('a');a.href='index.html';a.textContent='Entrar';a.className='pri';a.style.cssText='display:block;margin-top:14px';c.append(a)}
+}
+
+function marcar(e){
+estado=e;const s=$('#estado');
+s.className=e==='salvo'?'ok':erroSalvar&&e==='nao-salvo'?'erro':'';
+s.textContent=e==='salvo'?'Salvo':e==='salvando'?'Salvando…':erroSalvar?'Não salvo — tentando de novo':'Não salvo';
+s.title=e==='nao-salvo'&&erroSalvar?erroSalvar:'';
+}
+
+// redesenha a tela a partir de M. Tasks 5–6 desenham diagrama (#diagrama) e peças (#pecas) aqui.
+function desenhar(){
+const svg=$('#tela'),r=svg.getBoundingClientRect(),w=(r.width||800)/zoom,h=(r.height||600)/zoom;
+svg.setAttribute('viewBox',`${-20/zoom} ${-20/zoom} ${w} ${h}`);
+$('#zoom-v').textContent=Math.round(zoom*100)+'%';
+$('#refs-n').textContent=M.produtoIds.length?'('+M.produtoIds.length+')':'';
+document.title=(M.nome||'Molde')+' · Editor de molde';
+}
+
+// alteração que vale como passo do histórico
+function alterou(){H.gravar(M);sujou()}
+// marca não salvo, redesenha e agenda salvar (sem passo no histórico)
+function sujou(){ver++;erroSalvar='';marcar('nao-salvo');desenhar();agendar()}
+function agendar(ms=1500){clearTimeout(timer);timer=setTimeout(salvar,ms)}
+function aplicar(m){M=MM.normalizar(m);$('#nome').value=M.nome;sujou()}
+
+async function salvar(){
+clearTimeout(timer);
+if(salvando){agendar();return}
+if(estado==='salvo')return;
+salvando=true;
+const v=ver,t=Date.now(),doc={...structuredClone(M),salvoEm:t};
+try{localStorage.setItem(RASC(),JSON.stringify({em:t,m:doc}))}catch(e){}
+marcar('salvando');
+try{
+await B.gravar(molId,doc);
+await ligarProdutos(doc);
+if(ver===v){try{localStorage.removeItem(RASC())}catch(e){}marcar('salvo')}else{marcar('nao-salvo');agendar()}
+}catch(e){
+console.error(e);erroSalvar=ptErro(e);marcar('nao-salvo');agendar(10000);
+}finally{salvando=false}
+}
+
+// grava molId e mol nos produtos marcados; tira dos desmarcados desde o último salvamento
+async function ligarProdutos(doc){
+const mol=MM.molParaProduto(doc);
+for(const pid of doc.produtoIds){
+const p=await B.produto(pid);
+if(!p||(p.molId===molId&&JSON.stringify(p.mol)===JSON.stringify(mol)))continue;
+await B.gravarProduto(pid,{...p,molId,mol});
+}
+for(const pid of ligadosSalvos.filter(x=>!doc.produtoIds.includes(x))){
+const p=await B.produto(pid);
+if(p&&p.molId===molId){const {molId:_,mol:__,...resto}=p;await B.gravarProduto(pid,resto)}
+}
+ligadosSalvos=[...doc.produtoIds];
+}
+
+// produto que já tem molde (de PLT ou de outro molde): pergunta antes de substituir
+function podeLigar(p){
+if(!p||!p.mol||p.molId===molId)return true;
+const nome=(p.ref?p.ref+' · ':'')+(p.nome||'');
+return confirm(p.molId
+?`${nome} já está ligado a outro molde (${p.mol.arq||''}). Passar para este molde?`
+:`${nome} já tem um molde importado${p.mol.arq?' ('+p.mol.arq+')':''}. Ao salvar, ele será substituído por este. Continuar?`);
+}
+
+async function abrirRefs(){
+const dlg=$('#dlg-refs'),box=$('#refs');
+$('#ref-busca').value='';dlg.showModal();
+try{
+const lista=await B.produtos();
+box.textContent='';
+if(!lista.length){box.innerHTML='<p class="vazio" style="padding:10px">Nenhum produto cadastrado.</p>';return}
+for(const {id,data:p} of lista){
+const l=document.createElement('label'),c=document.createElement('input'),s=document.createElement('span');
+c.type='checkbox';c.checked=M.produtoIds.includes(id);
+s.textContent=(p.ref||'—')+' · '+(p.nome||'');
+if(p.mol&&p.molId!==molId){const k=document.createElement('small');k.textContent=p.molId?' (outro molde)':' (molde PLT)';s.append(k)}
+c.onchange=()=>{
+if(c.checked&&!podeLigar(p)){c.checked=false;return}
+M.produtoIds=c.checked?[...M.produtoIds,id]:M.produtoIds.filter(x=>x!==id);
+alterou();
+};
+l.dataset.busca=s.textContent.toLowerCase();l.append(c,s);box.append(l);
+}
+}catch(e){box.innerHTML='';const p=document.createElement('p');p.className='vazio';p.style.padding='10px';p.textContent='Não foi possível carregar os produtos: '+ptErro(e);box.append(p)}
+}
+
+async function abrir(){
+let id=Q.get('id');const pid=Q.get('produto');
+let doc=id?await B.molde(id):null,pendente=false;
+if(id&&!doc)return bloquear('Molde não encontrado.');
+if(!id&&pid){
+const achado=await B.moldePorProduto(pid);
+if(achado){id=achado.id;doc=achado.data}
+else{
+const p=await B.produto(pid);
+if(!p)return bloquear('Produto não encontrado.');
+doc=MM.novo([p.ref,p.nome].filter(Boolean).join(' ')||'Novo molde');
+molId=null;
+if(podeLigar(p))doc.produtoIds=[pid];
+id=await B.criar(doc);
+pendente=true; // primeiro salvamento grava molId/mol no produto
+}
+}
+if(!id)return bloquear('Nenhum molde escolhido. Abra o editor pelo produto, no app.');
+molId=id;
+const u=new URLSearchParams(location.search);u.delete('produto');u.set('id',id);history.replaceState(null,'','?'+u);
+M=MM.normalizar(doc);ligadosSalvos=[...M.produtoIds];
+let r=null;try{r=JSON.parse(localStorage.getItem(RASC()))}catch(e){}
+if(r&&r.em>(doc.salvoEm||0)){
+if(confirm('Há alterações deste molde de '+new Date(r.em).toLocaleString('pt-BR')+' que não chegaram ao servidor. Recuperar?')){M=MM.normalizar(r.m);pendente=true}
+else try{localStorage.removeItem(RASC())}catch(e){}
+}
+H=MM.historico();H.gravar(M);
+$('#aviso').hidden=true;$('#editor').hidden=false;$('#nome').value=M.nome;
+marcar('salvo');if(pendente)sujou();else desenhar();
+}
+
+async function iniciar(){
+try{
+if(!LOCAL){
+const {data:{session}}=await sb.auth.getSession();
+const {data:{user}}=session?await sb.auth.getUser():{data:{}};
+if(!session||!user)return bloquear('Entre no app para editar moldes.',true);
+const {data:perfil}=await sb.from('user_profiles').select('role').eq('user_id',user.id).maybeSingle();
+if(!perfil||perfil.role!=='admin')return bloquear('Só administradores editam moldes.');
+}
+await abrir();
+}catch(e){console.error(e);bloquear('Não foi possível abrir o molde. '+ptErro(e))}
+}
+
+$('#nome').addEventListener('input',e=>{M.nome=e.target.value;sujou()});
+$('#nome').addEventListener('change',()=>H.gravar(M));
+$('#btn-desfazer').onclick=()=>{const m=H.desfazer();if(m)aplicar(m)};
+$('#btn-refazer').onclick=()=>{const m=H.refazer();if(m)aplicar(m)};
+$('#zoom-menos').onclick=()=>{zoom=Math.max(.1,zoom/1.25);desenhar()};
+$('#zoom-mais').onclick=()=>{zoom=Math.min(20,zoom*1.25);desenhar()};
+$('#zoom-v').onclick=()=>{zoom=1;desenhar()};
+$('#btn-refs').onclick=abrirRefs;
+$('#refs-ok').onclick=()=>$('#dlg-refs').close();
+$('#ref-busca').addEventListener('input',e=>{const t=e.target.value.toLowerCase();document.querySelectorAll('#refs label').forEach(l=>l.hidden=!l.dataset.busca.includes(t))});
+document.addEventListener('keydown',e=>{
+if(!M||!(e.ctrlKey||e.metaKey)||e.target.closest('input,textarea,dialog'))return;
+const k=e.key.toLowerCase();
+if(k==='z'&&!e.shiftKey){e.preventDefault();$('#btn-desfazer').click()}
+else if(k==='y'||(k==='z'&&e.shiftKey)){e.preventDefault();$('#btn-refazer').click()}
+});
+window.addEventListener('resize',()=>M&&desenhar());
+window.addEventListener('online',()=>{if(M&&estado!=='salvo')salvar()});
+window.addEventListener('beforeunload',e=>{if(M&&estado!=='salvo'){e.preventDefault();e.returnValue=''}});
+iniciar();
+</script>
+</body>
+</html>
