@@ -999,19 +999,35 @@ if(!p.tecidoId){aviso('Escolha o tecido e o consumo na ficha técnica do produto
 const a=custoFicha(p,false),b=custoFicha(p,true);
 const mA=margem(a.total,+p.preco),mB=margem(b.total,precoG(p));
 const mg=m=>m.pct==null?'—':brl(m.lucro)+' ('+Math.round(m.pct)+'%)';
-const rows=a.linhas.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.cor)}</td><td class="n">${nf(x.q)}</td><td>${x.un}</td><td class="n">${brl4(x.cu)}</td><td class="n">${brl4(x.ct)}</td></tr>`).join('');
+// uma grade só: os itens e o resumo na mesma tabela, com as duas grades lado a lado.
+// Quando P–GG e G1–G4 dão no mesmo, vira uma coluna, porque duas colunas iguais só confundem.
+const temG=b.total!==a.total||precoG(p)!==+p.preco;
+const col=(va,vb,cls='')=>temG?`<td class="n ${cls}">${va}</td><td class="n ${cls}">${vb}</td>`:`<td class="n ${cls}">${va}</td>`;
+const colh=(va,vb,cls='')=>temG?`<th class="n ${cls}">${va}</th><th class="n ${cls}">${vb}</th>`:`<th class="n ${cls}">${va}</th>`;
+const nc=temG?4:3;
+const secao=t=>`<tr class="grp"><td colspan="${nc}">${t}</td></tr>`;
+const itens=a.linhas.map((x,i)=>{
+const y=b.linhas[i]||x;
+const dif=y.q!==x.q;
+return `<tr><td>${esc(x.nome)}${x.cor?`<small>${esc(x.cor)}</small>`:''}</td>
+ <td class="n">${nf(x.q)}${dif?' / '+nf(y.q):''} ${esc(x.un)}<small>${brl4(x.cu)} por ${esc(x.un)}</small></td>
+ ${col(brl4(x.ct),brl4(y.ct))}</tr>`}).join('');
+const ded=nf(mA.imp+mA.desp+mA.com,2);
 const d=$('#dlg');
-d.innerHTML=`<form method="dialog"><h3>Ficha técnica · Ref. ${esc(p.ref)} · ${esc(p.nome)}</h3>${(p.imgF||p.imgC)?`<div style="margin-bottom:10px">${foto(p,'fmed')}</div>`:''}<div class="tw"><table><tr><th>Item</th><th>Cor</th><th class="n">Qtde</th><th>Un</th><th class="n">Custo un.</th><th class="n">Custo total</th></tr>${rows}</table></div>
- <div class="tw"><table><tr><th></th><th class="n">P–GG</th><th class="n">G1–G4</th></tr>
- <tr><td>Custo matéria-prima</td><td class="n">${brl(a.mp)}</td><td class="n">${brl(b.mp)}</td></tr>
- <tr><td>Custo mão de obra</td><td class="n">${brl(a.mo)}</td><td class="n">${brl(b.mo)}</td></tr>
- <tr><td>Custo fixo</td><td class="n">${brl(a.fixo)}</td><td class="n">${brl(b.fixo)}</td></tr>
- <tr><td>Custo extra</td><td class="n">${brl(a.extra)}</td><td class="n">${brl(b.extra)}</td></tr>
- <tr><th>Preço de custo</th><th class="n">${brl(a.total)}</th><th class="n">${brl(b.total)}</th></tr>
- <tr><td>Preço de venda</td><td class="n">${brl(p.preco)}</td><td class="n">${brl(precoG(p))}</td></tr>
- <tr><td>− Imposto ${nf(mA.imp,2)}% + despesas ${nf(mA.desp,2)}% + comissão ${nf(mA.com,2)}%</td><td class="n">${brl(mA.ded)}</td><td class="n">${brl(mB.ded)}</td></tr>
- <tr><th>Lucro por peça</th><th class="n ${mA.lucro<=0?'low':''}">${mg(mA)}</th><th class="n ${mB.lucro<=0?'low':''}">${mg(mB)}</th></tr></table></div>
- <small>Consumo de tecido: ${nf(p.cons)} m (P–GG) · ${nf(p.consG!==''&&p.consG!=null?p.consG:p.cons)} m (G1–G4) · usando ${p.ficha?'a ficha própria desta referência':'a ficha padrão'}. A comissão é a maior cadastrada em Representantes (pior caso).</small>
+d.innerHTML=`<form method="dialog"><h3>Ficha técnica · Ref. ${esc(p.ref)} · ${esc(p.nome)}</h3>${(p.imgF||p.imgC)?`<div style="margin-bottom:10px">${foto(p,'fmed')}</div>`:''}
+ <div class="tw"><table><tr><th>Item</th><th class="n">Quantidade</th>${colh(temG?'P–GG':'Por peça','G1–G4')}</tr>
+ ${secao('Matéria-prima')}${itens}
+ <tr><td><b>Subtotal da matéria-prima</b></td><td></td>${col('<b>'+brl(a.mp)+'</b>','<b>'+brl(b.mp)+'</b>')}</tr>
+ ${secao('Outros custos por peça')}
+ <tr><td>Mão de obra</td><td></td>${col(brl(a.mo),brl(b.mo))}</tr>
+ <tr><td>Custo fixo</td><td></td>${col(brl(a.fixo),brl(b.fixo))}</tr>
+ <tr><td>Custo extra</td><td></td>${col(brl(a.extra),brl(b.extra))}</tr>
+ <tr><th>Preço de custo</th><th></th>${colh(brl(a.total),brl(b.total))}</tr>
+ ${secao('Venda')}
+ <tr><td>Preço de venda</td><td></td>${col(brl(p.preco),brl(precoG(p)))}</tr>
+ <tr><td>Imposto, despesas e comissão<small>${ded}% sobre a venda</small></td><td></td>${col('− '+brl(mA.ded),'− '+brl(mB.ded))}</tr>
+ <tr><th>Lucro por peça</th><th></th>${temG?`<th class="n ${mA.lucro<=0?'low':''}">${mg(mA)}</th><th class="n ${mB.lucro<=0?'low':''}">${mg(mB)}</th>`:`<th class="n ${mA.lucro<=0?'low':''}">${mg(mA)}</th>`}</tr></table></div>
+ <small>${temG?'A coluna G1–G4 só aparece porque esta referência tem consumo ou preço diferente na grade maior. ':'P–GG e G1–G4 dão no mesmo nesta referência, então os valores valem para todos os tamanhos. '}Usa ${p.ficha?'a ficha própria desta referência':'a ficha padrão'}. A comissão é a maior cadastrada em Representantes, ou seja, o pior caso.</small>
  <div class="row end"><button type="button" class="ghost" onclick="dlg.close();fProd('${p.id}')">Editar</button><button class="pri">Fechar</button></div></form>`;
 d.showModal();
 }
