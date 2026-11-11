@@ -34,7 +34,10 @@ const L = [P(0, 0), P(100, 0), P(100, 40), P(40, 40), P(40, 100), P(0, 100)];
 const gancho = r => [P(0, 0), P(100, 0), ...G.bezier(P(100, 100 - r), P(100 - r * 0.5523, 100 - r), P(100 - r, 100 - r * 0.5523), P(100 - r, 100)), P(0, 100)];
 const g30 = gancho(30), g5 = gancho(5);
 const cL = margem(L, 10), c30 = margem(g30, 10), c5 = margem(g5, 10);
-const meiaPeca = [P(0, 0), P(50, 0), P(50, 100), P(0, 100)];
+// ponta de ~7°: o chanfro não pode passar perto da costura (mede vértice da costura → segmento do corte)
+const agudo = [P(0, 0), P(200, 0), P(0, 25)], cAgudo = margem(agudo, 10);
+const folgaSeg = (corte, cont) => Math.min(...cont.map(p => Math.min(...corte.map((a, i) => distSeg(p, a, corte[(i + 1) % corte.length])))));
+const meiaPeca =[P(0, 0), P(50, 0), P(50, 100), P(0, 100)];
 const dobra = G.abrirDobra(meiaPeca, P(0, 100), P(0, 0));
 const canto = G.arredondar(P(0, 100), P(0, 0), P(100, 0), 10);
 
@@ -63,6 +66,9 @@ const testes = [
   ['offset gancho r30 folga >= 9,5', folga(c30, g30) >= 9.5, true],
   ['offset gancho r5 sem cruzar', semCruzar(c5), true],
   ['offset gancho r5 folga >= 9,5', folga(c5, g5) >= 9.5, true],
+  ['offset ponta aguda folga >= 9,5', folgaSeg(cAgudo, agudo) >= 9.5, true],
+  ['offset ponta aguda sem cruzar', semCruzar(cAgudo), true],
+  ['offset L folga por segmento', folgaSeg(cL, L) >= 9.5, true],
   ['dobra area', G.areaAbs(dobra), 10000],
   ['dobra 4 vertices', dobra.length, 4],
   ['dobra anti-horario', G.area(dobra) > 0, true],

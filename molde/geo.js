@@ -93,14 +93,27 @@
     for (let i = 0; i < n; i++) {
       const a = pts[i], b = pts[(i + 1) % n], l = dist(a, b), d = m[i] || 0;
       if (l < EPS) continue; // ponto repetido (junção de curvas) não tem normal
-      const nx = (b.y - a.y) / l * d, ny = -(b.x - a.x) / l * d; // à direita = para fora no anti-horário
-      ar.push({ a: { x: a.x + nx, y: a.y + ny }, b: { x: b.x + nx, y: b.y + ny }, v: b, d });
+      const ux = (b.x - a.x) / l, uy = (b.y - a.y) / l; // normal à direita (uy,-ux) = para fora no anti-horário
+      ar.push({ a: { x: a.x + uy * d, y: a.y - ux * d }, b: { x: b.x + uy * d, y: b.y - ux * d }, v: b, d, ux, uy });
     }
     const por = p => { const u = out[out.length - 1]; if (!u || dist(u, p) > 1e-6) out.push(p); };
+    // ponto da reta da aresta e cuja projeção sobre w, a partir de v, vale D
+    const naReta = (e, v, w, D) => {
+      const t = (D - (e.a.x - v.x) * w.x - (e.a.y - v.y) * w.y) / (e.ux * w.x + e.uy * w.y);
+      return { x: e.a.x + e.ux * t, y: e.a.y + e.uy * t };
+    };
     ar.forEach((e, i) => {
-      const f = ar[(i + 1) % ar.length], c = cruzar(e.a, e.b, f.a, f.b);
-      if (c && dist(c.p, e.v) <= 4 * Math.max(e.d, f.d) + EPS) por(c.p);
-      else { por(e.b); por(f.a); } // esquadria longa demais ou arestas paralelas: chanfro
+      const f = ar[(i + 1) % ar.length], c = cruzar(e.a, e.b, f.a, f.b), D = Math.max(e.d, f.d);
+      const volta = e.ux * f.uy - e.uy * f.ux, ida = e.ux * f.ux + e.uy * f.uy;
+      // canto côncavo fica sempre na esquadria (laços saem em semLacos)
+      if (c && (volta < 0 || dist(c.p, e.v) <= 4 * D + EPS)) por(c.p);
+      else if (Math.abs(volta) < EPS && ida > 0) { por(e.b); por(f.a); } // colineares: degrau quando a margem muda
+      else {
+        // chanfro perpendicular à bissetriz a D do canto: nenhum ponto dele fica a menos de D da costura
+        const sx = e.uy + f.uy, sy = -e.ux - f.ux, s = Math.hypot(sx, sy);
+        const w = s > EPS ? { x: sx / s, y: sy / s } : { x: e.ux, y: e.uy }; // meia-volta: segue a aresta
+        por(naReta(e, e.v, w, D)); por(naReta(f, e.v, w, D));
+      }
     });
     if (out.length > 1 && dist(out[0], out[out.length - 1]) <= 1e-6) out.pop();
     return semLacos(out);
