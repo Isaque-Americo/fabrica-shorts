@@ -33,12 +33,7 @@
     return [...simplificar(pts.slice(0, mi + 1), tol).slice(0, -1), ...simplificar(pts.slice(mi), tol)];
   }
 
-  function uid(m, pre) {
-    const usado = new Set([...Object.keys(m.pontos), ...m.tracos.map(t => t.id), ...m.textos.map(t => t.id), ...m.pecas.map(p => p.id)]);
-    let i = usado.size + 1;
-    while (usado.has(pre + i)) i++;
-    return pre + i;
-  }
+  const uid = MM.uid;
   // id do ponto em p: reaproveita o que já está ali (ímã devolve as coordenadas exatas do ponto)
   function ponto(m, p) {
     for (const [id, q] of Object.entries(m.pontos)) if (dist(p, q) <= PERTO) return id;

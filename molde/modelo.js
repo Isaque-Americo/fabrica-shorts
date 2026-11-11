@@ -4,7 +4,15 @@
   const dist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
   const TOL = 0.5; // folga entre pontas de traços encadeados
 
+  const GRADES = { app: ['P', 'M', 'G', 'GG', 'G1', 'G2', 'G3', 'G4'], numerica: ['36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56'] };
   const novo = nome => normalizar({ nome });
+
+  function uid(m, pre) {
+    const usado = new Set([...Object.keys(m.pontos), ...m.tracos.map(t => t.id), ...m.textos.map(t => t.id), ...m.pecas.map(p => p.id)]);
+    let i = usado.size + 1;
+    while (usado.has(pre + i)) i++;
+    return pre + i;
+  }
 
   // doc antigo/parcial: todo campo ausente ganha padrão; campos desconhecidos ficam
   function normalizar(doc) {
@@ -12,10 +20,12 @@
     return {
       ...d, nome: d.nome || '', produtoIds: d.produtoIds || [], base: d.base || 'M',
       pontos: d.pontos || {}, tracos: d.tracos || [], textos: d.textos || [], v: d.v || 1,
+      grade: d.grade || [], grad: d.grad || {}, medidas: d.medidas || [], foto: d.foto || '',
       pecas: (d.pecas || []).map(p => ({
         ...p, nome: p.nome || '', cortar: p.cortar ?? 1, par: !!p.par, tracos: p.tracos || [], dobra: p.dobra || null,
         fio: p.fio || { a: { x: 0, y: 0 }, b: { x: 0, y: 100 } }, margem: p.margem ?? 10, margemTraco: p.margemTraco || {},
-        piques: p.piques || [], pences: p.pences || [], visivel: p.visivel ?? true, travada: !!p.travada
+        piques: p.piques || [], pences: p.pences || [], visivel: p.visivel ?? true, travada: !!p.travada,
+        rotacao: p.rotacao || '180', espelhar: !!p.espelhar, tubular: !!p.tubular, tecido: p.tecido || '', bainhas: p.bainhas || {}
       }))
     };
   }
@@ -106,10 +116,82 @@
     return G.offset(pts, ids.map(id => peca.margemTraco[id] ?? peca.margem));
   }
 
-  // formato de p.mol; fio no eixo X, que é o comprimento do risco no encaixe (index.html)
-  function molParaProduto(m) {
+  const tamanhos = m => m.grade && m.grade.length ? m.grade : [m.base || 'M'];
+  const desloc = (m, id, tam) => (m.grad && m.grad[id] && m.grad[id][tam]) || { dx: 0, dy: 0 };
+  const somar = (p, d) => ({ x: p.x + d.dx, y: p.y + d.dy });
+
+  // cópia do molde no tamanho: cada ponto anda grad[id][tam]; c1 da curva anda com a, c2 com b
+  function noTamanho(m, tam) {
+    const c = structuredClone(m);
+    for (const id in c.pontos) c.pontos[id] = somar(c.pontos[id], desloc(m, id, tam));
+    for (const t of c.tracos) if (t.tipo === 'curva' && t.c1 && t.c2) { t.c1 = somar(t.c1, desloc(m, t.a, tam)); t.c2 = somar(t.c2, desloc(m, t.b, tam)); }
+    return c;
+  }
+
+  // deslocamento por passo a partir do base; com salto, os passos que chegam em salto.de ou além valem o salto
+  function graduarPasso(m, pontoId, dx, dy, opts = { salto: null }) {
+    const tams = tamanhos(m), ib = tams.indexOf(m.base), s = opts && opts.salto, is = s ? tams.indexOf(s.de) : -1;
+    const passo = j => s && is >= 0 && j >= is ? s : { dx, dy };
+    const r = {};
+    tams.forEach((tam, i) => {
+      let x = 0, y = 0;
+      for (let j = ib + 1; j <= i; j++) { x += passo(j).dx; y += passo(j).dy; }
+      for (let j = i + 1; j <= ib; j++) { x -= passo(j).dx; y -= passo(j).dy; }
+      r[tam] = { dx: x, dy: y };
+    });
+    m.grad[pontoId] = r;
+  }
+  function copiarRegra(m, de, para) {
+    for (const id of para) if (m.grad[de]) m.grad[id] = structuredClone(m.grad[de]); else delete m.grad[id];
+  }
+  const removerGradacao = m => { m.grad = {}; };
+
+  // cada tamanho ≠ base vira cópia das peças visíveis, à direita do molde; depois a gradação some
+  function separarTamanhos(m, espaco = 50) {
+    const tams = tamanhos(m).filter(t => t !== m.base), pecas = m.pecas.filter(p => p.visivel !== false);
+    const bb = G.bbox(tamanhos(m).flatMap(tam => { const c = noTamanho(m, tam); return c.tracos.flatMap(t => tracoPts(c, t)); }));
+    tams.forEach((tam, k) => {
+      const c = noTamanho(m, tam), d = { dx: (k + 1) * (bb.w + espaco), dy: 0 }, pid = {}, tid = {};
+      const ponto = id => { if (!pid[id]) { pid[id] = uid(m, 'p'); m.pontos[pid[id]] = somar(c.pontos[id], d); } return pid[id]; };
+      for (const peca of pecas) {
+        for (const { id } of peca.tracos) {
+          const t0 = c.tracos.find(x => x.id === id);
+          if (tid[id] || !t0) continue;
+          const t = structuredClone(t0);
+          for (const q of ['a', 'b', 'c']) if (t[q]) t[q] = ponto(t[q]);
+          for (const q of ['c1', 'c2']) if (t[q]) t[q] = somar(t[q], d);
+          if (t.pts) t.pts = t.pts.map(p => somar(p, d));
+          t.id = tid[id] = uid(m, 't');
+          m.tracos.push(t);
+        }
+        const n = structuredClone(peca), novoId = id => tid[id] || id;
+        const chaves = o => Object.fromEntries(Object.entries(o || {}).map(([id, v]) => [novoId(id), v]));
+        const comTraco = l => (l || []).map(x => ({ ...x, tracoId: novoId(x.tracoId) }));
+        Object.assign(n, { id: uid(m, 'pc'), nome: peca.nome + ' · ' + tam, tracos: peca.tracos.map(t => ({ ...t, id: novoId(t.id) })),
+          fio: n.fio && { a: somar(n.fio.a, d), b: somar(n.fio.b, d) }, dobra: n.dobra && { ...n.dobra, tracoId: novoId(n.dobra.tracoId) },
+          margemTraco: chaves(n.margemTraco), bainhas: chaves(n.bainhas), piques: comTraco(n.piques), pences: comTraco(n.pences) });
+        m.pecas.push(n);
+      }
+    });
+    removerGradacao(m);
+  }
+
+  function medir(m, ids, tam) {
+    const c = noTamanho(m, tam);
+    return ids.reduce((s, id) => { const t = acha(c, id); return s + (!t ? 0 : t.tipo === 'circulo' ? 2 * Math.PI * t.r : G.comprimento(tracoPts(c, t))); }, 0);
+  }
+
+  function aplicarBainha(peca, tracoId, { largura, dobras, piques }) {
+    peca.bainhas = peca.bainhas || {}; peca.margemTraco = peca.margemTraco || {};
+    if (!(largura > 0)) { delete peca.bainhas[tracoId]; delete peca.margemTraco[tracoId]; return; }
+    peca.bainhas[tracoId] = { largura, dobras, piques };
+    peca.margemTraco[tracoId] = largura * dobras;
+  }
+
+  // peças de p.mol de um molde já no tamanho; fio no eixo X, que é o comprimento do risco no encaixe (index.html)
+  function pecasProduto(m) {
     const pecas = [];
-    for (const peca of normalizar(m).pecas) {
+    for (const peca of m.pecas) {
       if (!peca.visivel || !peca.tracos.length) continue;
       const { a, b } = peca.fio, ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
       // peça quebrada (traço ou ponto apagado, contorno que não fecha mais) fica fora, sem impedir o resto de salvar
@@ -118,9 +200,15 @@
       if (!c || c.length < 3 || !c.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))) continue;
       const bx = G.bbox(c);
       const pts = c.map(p => [Math.round(p.x - bx.x0), Math.round(p.y - bx.y0)]);
-      pecas.push({ w: Math.max(...pts.map(p => p[0])), h: Math.max(...pts.map(p => p[1])), qtd: peca.cortar * (peca.par ? 2 : 1), pts });
+      pecas.push({ w: Math.max(...pts.map(p => p[0])), h: Math.max(...pts.map(p => p[1])), qtd: peca.cortar * (peca.par ? 2 : 1), pts, rot: peca.rotacao, tecido: peca.tecido });
     }
-    return { arq: 'Molde: ' + (m.nome || ''), un: 'mm', origem: 'editor', pecas };
+    return pecas;
+  }
+  // formato de p.mol; pecas = tamanho base, porTam = uma lista por tamanho
+  function molParaProduto(m) {
+    const n = normalizar(m), porTam = {};
+    for (const tam of tamanhos(n)) porTam[tam] = pecasProduto(noTamanho(n, tam));
+    return { arq: 'Molde: ' + (m.nome || ''), un: 'mm', origem: 'editor', pecas: porTam[n.base] || [], porTam };
   }
 
   function historico(limite = 100) {
@@ -132,7 +220,8 @@
     };
   }
 
-  const MoldeModelo = { novo, normalizar, tracoPts, encadear, costura, corte, molParaProduto, historico };
+  const MoldeModelo = { GRADES, novo, normalizar, uid, tracoPts, encadear, costura, corte, tamanhos, noTamanho, graduarPasso, copiarRegra,
+    removerGradacao, separarTamanhos, medir, aplicarBainha, molParaProduto, historico };
   g.MoldeModelo = MoldeModelo;
   if (typeof module !== 'undefined') module.exports = MoldeModelo;
 })(typeof window !== 'undefined' ? window : globalThis);

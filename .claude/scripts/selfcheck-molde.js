@@ -140,8 +140,8 @@ testes.push(
   ['costura com dobra area', G.area(M.costura(ret, pecaDobra)), 40000],
   ['pence ponta a 50 da barra', cosPence.some(q => Math.abs(q.x - 50) < TOL && Math.abs(q.y - 50) < TOL), true],
   ['pence tira o V da area', G.area(cosPence), 20000 - 20 * 50 / 2],
-  ['molParaProduto chaves', Object.keys(prodRet).sort(), ['arq', 'origem', 'pecas', 'un']],
-  ['molParaProduto peca chaves', Object.keys(prodRet.pecas[0]).sort(), ['h', 'pts', 'qtd', 'w']],
+  ['molParaProduto chaves', Object.keys(prodRet).sort(), ['arq', 'origem', 'pecas', 'porTam', 'un']],
+  ['molParaProduto peca chaves', Object.keys(prodRet.pecas[0]).sort(), ['h', 'pts', 'qtd', 'rot', 'tecido', 'w']],
   ['molParaProduto un mm', prodRet.un, 'mm'],
   ['molParaProduto pts [x,y] inteiros', prodRet.pecas[0].pts.every(q => Array.isArray(q) && q.length === 2 && q.every(Number.isInteger)), true],
   ['molParaProduto pts no canto', (p => [Math.min(...p.map(q => q[0])), Math.min(...p.map(q => q[1]))])(prodRet.pecas[0].pts), [0, 0]],
@@ -240,6 +240,61 @@ testes.push(
   ['molParaProduto pula peca com aresta cortada', [D.geoPeca(pmCortada, pmCortada.pecas[0]), M.molParaProduto(pmCortada).pecas.length], [null, 0]],
   ['molParaProduto pula peca com canto arredondado', [D.geoPeca(pmArred, pmArred.pecas[0]), M.molParaProduto(pmArred).pecas.length], [null, 0]],
   ['noTraco polilinha', D.noTraco([P(0, 0), P(100, 0), P(100, 100)], P(105, 50)), { t: 0.75, d: 5 }],
+);
+
+// etapa 2: grade, gradação e bainha
+const semNovas = pecas => pecas.map(({ rot, tecido, ...r }) => r);
+const gp = M.normalizar({ grade: M.GRADES.app, base: 'M' });
+M.graduarPasso(gp, 'p1', 5, 0);
+const gs = M.normalizar({ grade: M.GRADES.app, base: 'M' });
+M.graduarPasso(gs, 'p1', 5, 0, { salto: { dx: 10, dy: 0, de: 'G1' } });
+const cv = M.normalizar({ grade: ['P', 'M', 'G'], pontos: { a: P(0, 0), b: P(100, 0) }, grad: { b: { G: { dx: 20, dy: 0 } } },
+  tracos: [{ id: 'k', tipo: 'curva', a: 'a', b: 'b', c1: P(30, -30), c2: P(70, -30) }] });
+const cvG = M.noTamanho(cv, 'G').tracos[0];
+// retângulo 100×200 com fio em X e os dois pontos da direita +10 por passo
+const gr = M.normalizar({ ...structuredClone(ret), grade: M.GRADES.app, base: 'M' });
+gr.pecas[0].fio = { a: P(0, 0), b: P(100, 0) };
+M.graduarPasso(gr, 'b', 10, 0); M.graduarPasso(gr, 'c', 10, 0);
+const prodGr = M.molParaProduto(gr);
+const sp = structuredClone(gr); sp.grade = ['P', 'M', 'G'];
+const areaG = G.area(M.costura(M.noTamanho(sp, 'G'), sp.pecas[0]));
+M.separarTamanhos(sp);
+const spG = sp.pecas.find(p => p.nome.endsWith(' · G'));
+const bp = pecaRet();
+M.aplicarBainha(bp, 't3', { largura: 15, dobras: 2, piques: true });
+const bp30 = [bp.margemTraco.t3, bp.bainhas.t3];
+M.aplicarBainha(bp, 't3', { largura: 0, dobras: 2, piques: true });
+const rt = structuredClone(ret); rt.grade = ['P', 'M']; Object.assign(rt.pecas[0], { rotacao: 'nenhuma', tecido: 'mat9' });
+const prodRt = M.molParaProduto(rt);
+const nPeca = M.normalizar({ pecas: [{ id: 'a' }] });
+testes.push(
+  ['review1 ret pecas iguais a etapa 1', semNovas(prodRet.pecas), [{ w: 220, h: 120, qtd: 2, pts: [[0, 120], [0, 0], [220, 0], [220, 120]] }]],
+  ['review1 qd pecas iguais a etapa 1', semNovas(prodQd.pecas), [{ w: 170, h: 170, qtd: 2, pts: [[85, 0], [170, 85], [85, 170], [0, 85]] }]],
+  ['review1 pmUma pecas iguais a etapa 1', semNovas(M.molParaProduto(pmUma).pecas), [{ w: 520, h: 320, qtd: 1, pts: [[0, 0], [520, 0], [520, 320], [0, 320]] }]],
+  ['review1 porTam so base', [Object.keys(prodRet.porTam), prodRet.porTam.M === prodRet.pecas], [['M'], true]],
+  ['review1 rot e tecido padrao', [prodRet.pecas[0].rot, prodRet.pecas[0].tecido], ['180', '']],
+  ['normalizar campos etapa 2', [nVazio.grade, nVazio.grad, nVazio.medidas, nVazio.foto], [[], {}, [], '']],
+  ['normalizar peca etapa 2', (p => [p.rotacao, p.espelhar, p.tubular, p.tecido, p.bainhas])(nPeca.pecas[0]), ['180', false, false, '', {}]],
+  ['tamanhos sem grade = base', M.tamanhos(M.normalizar({ base: '40' })), ['40']],
+  ['tamanhos com grade', M.tamanhos(gp), M.GRADES.app],
+  ['GRADES numerica', M.GRADES.numerica, ['36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56']],
+  // brief dizia G4=35, mas (índice(G4) − índice(M)) × 5 = 6 × 5 = 30, e o caso com salto (G4=50) também conta 6 passos
+  ['graduarPasso P M G G4', [gp.grad.p1.P.dx, gp.grad.p1.M.dx, gp.grad.p1.G.dx, gp.grad.p1.G4.dx], [-5, 0, 5, 30]],
+  ['graduarPasso salto GG G1 G4', [gs.grad.p1.GG.dx, gs.grad.p1.G1.dx, gs.grad.p1.G4.dx, gs.grad.p1.P.dx], [10, 20, 50, -5]],
+  ['review2 c2 segue b, c1 fica', [cvG.c1, cvG.c2], [P(30, -30), P(90, -30)]],
+  ['review2 noTamanho nao altera o original', cv.tracos[0].c2, P(70, -30)],
+  ['costura GG 120 base 100', [G.bbox(M.costura(M.noTamanho(gr, 'GG'), gr.pecas[0])).w, G.bbox(M.costura(M.noTamanho(gr, 'M'), gr.pecas[0])).w], [120, 100]],
+  ['porTam GG - M = 20', prodGr.porTam.GG[0].w - prodGr.porTam.M[0].w, 20, 1],
+  ['porTam um por tamanho', Object.keys(prodGr.porTam), M.GRADES.app],
+  ['review3 separar 3 pecas', sp.pecas.length, 3],
+  ['review3 area G igual', G.area(M.costura(sp, spG)), areaG],
+  ['review3 grad vazio', sp.grad, {}],
+  ['review3 separadas encadeiam', sp.pecas.every(p => M.encadear(sp, p.tracos.map(t => t.id)).ok), true],
+  ['review3 base fica como era', G.bbox(M.costura(sp, sp.pecas[0])), { x0: 0, y0: 0, w: 100, h: 200 }],
+  ['medir base 100 GG 120', [M.medir(gr, ['r1'], 'M'), M.medir(gr, ['r1'], 'GG')], [100, 120]],
+  ['aplicarBainha 15x2', bp30, [30, { largura: 15, dobras: 2, piques: true }]],
+  ['aplicarBainha largura 0 remove', ['t3' in bp.margemTraco, 't3' in bp.bainhas], [false, false]],
+  ['molParaProduto rot e tecido', Object.values(prodRt.porTam).flat().map(p => [p.rot, p.tecido]), [['nenhuma', 'mat9'], ['nenhuma', 'mat9']]],
 );
 
 const perto = (a, b, tol) => typeof a === 'number' ? Math.abs(a - b) <= tol
