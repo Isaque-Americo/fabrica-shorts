@@ -201,15 +201,23 @@ console.error(e);erroSalvar=ptErro(e);marcar('nao-salvo');agendar(10000);
 
 // grava molId e mol nos produtos marcados; tira dos desmarcados desde o último salvamento
 async function ligarProdutos(doc){
-const mol=MM.molParaProduto(doc);
+const mol=MM.molParaProduto(doc),temPecas=mol.pecas.length>0;
 for(const pid of doc.produtoIds){
 const p=await B.produto(pid);
-if(!p||(p.molId===molId&&JSON.stringify(p.mol)===JSON.stringify(mol)))continue;
-await B.gravarProduto(pid,{...p,molId,mol});
+if(!p)continue;
+// molde sem peça válida: só liga (molId) e mantém o mol atual do produto (ex.: PLT) até haver peça
+const novo=temPecas?{...p,molId,mol}:{...p,molId};
+if(JSON.stringify(novo)===JSON.stringify(p))continue;
+await B.gravarProduto(pid,novo);
 }
 for(const pid of ligadosSalvos.filter(x=>!doc.produtoIds.includes(x))){
 const p=await B.produto(pid);
-if(p&&p.molId===molId){const {molId:_,mol:__,...resto}=p;await B.gravarProduto(pid,resto)}
+if(p&&p.molId===molId){
+const {molId:_,...resto}=p;
+// só tira o mol que veio de um molde do editor; o PLT que nunca foi substituído fica
+if(String(p.mol&&p.mol.arq).startsWith('Molde: '))delete resto.mol;
+await B.gravarProduto(pid,resto);
+}
 }
 ligadosSalvos=[...doc.produtoIds];
 }
@@ -220,7 +228,7 @@ if(!p||!p.mol||p.molId===molId)return true;
 const nome=(p.ref?p.ref+' · ':'')+(p.nome||'');
 return confirm(p.molId
 ?`${nome} já está ligado a outro molde (${p.mol.arq||''}). Passar para este molde?`
-:`${nome} já tem um molde importado${p.mol.arq?' ('+p.mol.arq+')':''}. Ao salvar, ele será substituído por este. Continuar?`);
+:`${nome} já tem um molde importado${p.mol.arq?' ('+p.mol.arq+')':''}. Ele continua valendo até este molde ter peças; depois, será substituído por este. Continuar?`);
 }
 
 async function abrirRefs(){
