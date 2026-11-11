@@ -112,7 +112,7 @@ Todas as funções abaixo foram pedidas pelo dono ("pode aplicar todas essas fun
 - **Polígonos só no doc `moldes` (admin):** o produto guarda só um resumo leve (`p.mol` atual = tamanho base, e `p.molId`). As peças por tamanho ficam no doc `moldes`, que o enfesto (admin) lê. Assim nada de polígono vai para a view do catálogo do lojista.
 - **Consumo pelo encaixe é sugestão,** como o botão "Usar este consumo" de hoje; `cons`/`consG` continuam existindo e o `selfcheck.js` segue valendo. `cons` = metros do risco com P, M, G e GG (uma de cada) ÷ 4; `consG` = idem com G1–G4.
 - **Ajuste manual do risco não é salvo** na etapa 3: serve para ver e imprimir. Salvar fica para depois, se fizer falta.
-- **Sentido do tecido:** flag "sentido único" no cadastro do tecido (padrão desligado). Ligado, o encaixe não gira nem 180°. Peças PLT já importadas: fio = eixo vertical (Y), como o encaixe já supõe.
+- **Sentido do tecido:** flag "sentido único" no cadastro do tecido (padrão desligado). Ligado, o encaixe não gira nem 180°. No `p.mol`, o fio fica no eixo X (comprimento do risco), que é como o encaixe do `index.html` lê (X = comprimento, Y = largura do tecido).
 - **Encolhimento** mora no tecido (matéria-prima), em % de comprimento e de largura, e é aplicado na hora do encaixe/impressão; o molde guarda a medida sem encolhimento.
 
 ## Deixado para quem constrói
@@ -127,3 +127,29 @@ Todas as funções abaixo foram pedidas pelo dono ("pode aplicar todas essas fun
 1. Pode alterar o `index.html` e commitar neste trabalho (a regra de `project-conventions` não vale aqui).
 2. Gradação: a entrada principal é a **regra (dx, dy) por ponto**. A tabela de medidas é referência para conferir.
 3. A regra de acesso (RLS) para `col='moldes'` pode ser criada direto no Supabase pela conexão MCP. Antes, inspecionar as políticas atuais de `docs` e a view `catalogo_produtos`.
+
+## Adições pedidas pelo dono depois do vídeo do molde.me (2026-11-11)
+
+O dono pediu: implementar o que ainda não existe no app e deixar o que já existe compatível com o que foi criado.
+
+### Etapa 2 — Tamanhos e peça (soma ao que já estava na etapa 2)
+1. **Ferramenta Bainha:** largura, número de dobras e "piques nas dobras". Gera a margem da barra (`margemTraco`) = largura × dobras e, se pedido, piques em cada dobra.
+2. **Propriedades novas da peça:** rotação permitida (`nenhuma` | `180` | `livre`; padrão `180`), permitir espelhar, dobra no tecido tubular, tecido da peça (principal por padrão; outro tecido da matéria-prima, ex.: forro, ribana).
+3. **Gradação:** regra (dx, dy) por ponto e por passo de tamanho, tamanhos sobrepostos em cores, "separar todos os tamanhos" (gera uma peça por tamanho, sem gradação) e "remover gradação".
+4. **Novo molde:** ao criar, escolher a grade (P–GG, P–G4 do app, 36–56, ou "definir depois") e anexar a foto da ficha técnica.
+
+### Etapa 3 — Ordem de corte e risco (substitui o item 3 da ordem de entrega)
+5. **Ordem de corte** (documento novo `col='ordens'`, só admin), agrupando um ou mais enfestos, com tecido, tipo do tecido (aberto/tubular) e enfesto (altura máxima em camadas, comprimento máximo da mesa, cabeceira, ourela esquerda e direita, sentido duplo ou único).
+6. **Abas** de enfesto (Enfesto 1, 2…) e de tecido (principal, forro, ribana) dentro da ordem.
+7. **Quantidade por tamanho e por camada** com botões +/−, total = peças por camada × camadas; escolher quais peças de cada molde entram em cada enfesto.
+8. **Painel do enfesto:** aproveitamento %, comprimento, total de tecido, camadas; peças coloridas por tamanho no risco; ajuste manual (só ver e imprimir).
+9. **Resultados da ordem:** peso do tecido, das peças e desperdiçado (pela gramatura), consumo linear por peça, custo total, total de peças, grade total por tamanho.
+10. **Impressões:** minimapa (A4), relatório, e encaixe 1:1 (PDF na largura do tecido, PLT, DXF, A4 emendável) com liga/desliga de nome do molde, textos, margem, fio, bordas, limites do enfesto e cabeçalho; tamanho do papel e margens.
+
+### Compatibilidade com o que já existe (calls meus, a confirmar)
+- **Tecido da ordem = matéria-prima já cadastrada.** Nome, largura útil, fornecedor, gramatura e preço (por kg ou por metro, com rendimento) vêm da aba Matéria-prima; a ordem só escolhe o tecido. Campos novos no tecido: tipo (aberto/tubular), sentido único, encolhimento (% comprimento e largura).
+- **Grade da ordem vem dos pedidos.** Ao criar uma ordem a partir da aba Fabricar, a grade (por referência, cor e tamanho) é preenchida com o que falta fabricar dos pedidos; os botões +/− ajustam. Ordem sem pedido também é possível.
+- **Plano de enfesto atual** (aba Fabricar) continua como estimativa rápida; mesa e camadas passam a usar os valores da ordem quando houver. O botão "Criar ordem de corte" sai dali.
+- **Custo:** o consumo pelo encaixe real alimenta a sugestão de `cons`/`consG` da ficha técnica (botão "Usar este consumo"), e o custo da ordem usa `matCusto` do tecido.
+- **Processos na ficha técnica:** a ficha ganha uma lista opcional de processos (nome, minutos, custo por minuto), somada à mão de obra. Quem não preencher continua com a mão de obra única de hoje.
+- **Tamanhos:** a grade do app (`SZ` = P…G4) é a grade padrão; moldes com outra grade (36–56) funcionam no editor e na ordem, mas só P…G4 se ligam a pedidos.
