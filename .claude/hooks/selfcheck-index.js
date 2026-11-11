@@ -9,16 +9,17 @@ process.stdin.on('end', () => {
     const filePath = (payload.tool_input || {}).file_path || '';
     if (!filePath) process.exit(0);
     const normalized = filePath.replace(/\\/g, '/');
-    if (!(normalized.endsWith('/index.html') || normalized === 'index.html')) process.exit(0);
+    const molde = /(^|\/)(molde\/geo\.js|molde\/modelo\.js|molde\.html)$/.test(normalized);
+    if (!(molde || normalized.endsWith('/index.html') || normalized === 'index.html')) process.exit(0);
 
     const { spawnSync } = require('child_process');
-    const r = spawnSync(process.execPath, ['.claude/scripts/selfcheck.js'], { encoding: 'utf-8' });
+    const r = spawnSync(process.execPath, [molde ? '.claude/scripts/selfcheck-molde.js' : '.claude/scripts/selfcheck.js'], { encoding: 'utf-8' });
     if (r.error) {
       console.error('self-check não rodou: ' + r.error.message);
       process.exit(0);
     }
     if (r.status !== 0) {
-      console.error('Self-check do index.html falhou:\n' + (r.stderr || '') + (r.stdout || ''));
+      console.error('Self-check ' + (molde ? 'do molde' : 'do index.html') + ' falhou:\n' + (r.stderr || '') + (r.stdout || ''));
       process.exit(2);
     }
     process.exit(0);
