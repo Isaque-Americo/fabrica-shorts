@@ -15,7 +15,7 @@
 - Sem build; bibliotecas só por CDN com versão fixa. Nenhuma biblioteca nova nesta etapa.
 - Armazenamento em **mm**; tela e campos em **cm**, aceitando vírgula decimal ("11,5").
 - Só admin abre o editor. RLS já cobre: `docs_admin_all` libera tudo para admin; nenhuma política dá acesso de lojista/representante a `col='moldes'`. **Nenhuma mudança no banco nesta etapa.** O catálogo do lojista (`private.sync_catalog_from_docs`) copia só `ref, nome, preco, precoG`, então `p.mol` não vaza.
-- `p.mol` mantém o formato atual `{arq, un:'mm', pecas:[{w,h,qtd,pts}]}`, com `pts` relativos ao canto da caixa e fio no eixo Y. Campos novos só somam: `p.molId` (id do doc em `moldes`), `p.mol.arq = 'Molde: <nome>'`.
+- `p.mol` mantém o formato atual `{arq, un:'mm', pecas:[{w,h,qtd,pts}]}`, com `pts` relativos ao canto da caixa e fio no eixo X (comprimento do risco; Y = largura do tecido). Campos novos só somam: `p.molId` (id do doc em `moldes`), `p.mol.arq = 'Molde: <nome>'`.
 - Leitores de documento antigo usam padrão para todo campo novo (há o agente `compat-reviewer` para conferir).
 - Nunca gravar chave nova no front. `molde.html` reusa `SB_URL`/`SB_KEY` públicos (anon) já presentes no `index.html`.
 - Visual próprio do app (tokens de cor do `index.html`), sem copiar ícones/marca do molde.me.
@@ -146,7 +146,7 @@
   - `encadear(m, tracoIds: string[]) -> {ok:true, tracos:[{id,inv}]} | {ok:false, erro:string, ponta:Ponto}` — ordena e orienta traços para formar um laço fechado anti-horário (tolerância 0,5 mm entre pontas); círculo sozinho é laço válido.
   - `costura(m, peca) -> Ponto[]` (aplica dobra se houver; pences inseridas como V no traço).
   - `corte(m, peca) -> Ponto[]` (`offset` com `margemTraco[id] ?? margem` por aresta).
-  - `molParaProduto(m) -> {arq, un:'mm', pecas:[{w,h,qtd,pts}]}` — uma entrada por peça visível; `pts` = `corte` arredondado ao mm, transladado para o canto da caixa, girado para o **fio ficar no eixo Y**; `qtd = cortar * (par ? 2 : 1)`.
+  - `molParaProduto(m) -> {arq, un:'mm', pecas:[{w,h,qtd,pts}]}` — uma entrada por peça visível; `pts` = `corte` arredondado ao mm, transladado para o canto da caixa, girado para o **fio ficar no eixo X**; `qtd = cortar * (par ? 2 : 1)`.
   - `historico(limite=100) -> {gravar(m), desfazer() -> Molde|null, refazer() -> Molde|null}` (snapshots via `structuredClone`).
 
 - [ ] **Step 1: Testes:**
