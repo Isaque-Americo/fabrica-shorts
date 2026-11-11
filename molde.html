@@ -269,9 +269,12 @@ console.error(e);erroSalvar=ptErro(e);marcar('nao-salvo');agendar(10000);
 // grava molId e mol nos produtos marcados; tira dos desmarcados desde o último salvamento
 async function ligarProdutos(doc){
 const mol=MM.molParaProduto(doc),temPecas=mol.pecas.length>0;
+const soltos=[];
 for(const pid of doc.produtoIds){
 const p=await B.produto(pid);
 if(!p)continue;
+// ligado no último salvamento e agora com outro molId (PLT importado ou outro molde): foi desligado em outro lugar, não retoma
+if(ligadosSalvos.includes(pid)&&p.molId!==molId){soltos.push(pid);continue}
 // molde sem peça válida: só liga (molId) e mantém o mol atual do produto (ex.: PLT) até haver peça
 const novo=temPecas?{...p,molId,mol}:{...p,molId};
 if(JSON.stringify(novo)===JSON.stringify(p))continue;
@@ -282,11 +285,12 @@ const p=await B.produto(pid);
 if(p&&p.molId===molId){
 const {molId:_,...resto}=p;
 // só tira o mol que veio de um molde do editor; o PLT que nunca foi substituído fica
-if(String(p.mol&&p.mol.arq).startsWith('Molde: '))delete resto.mol;
+if(p.mol&&(p.mol.origem==='editor'||String(p.mol.arq).startsWith('Molde: ')))delete resto.mol;
 await B.gravarProduto(pid,resto);
 }
 }
-ligadosSalvos=[...doc.produtoIds];
+ligadosSalvos=doc.produtoIds.filter(x=>!soltos.includes(x));
+if(soltos.length){M.produtoIds=M.produtoIds.filter(x=>!soltos.includes(x));sujou()}
 }
 
 // produto que já tem molde (de PLT ou de outro molde): pergunta antes de substituir
@@ -312,6 +316,7 @@ s.textContent=(p.ref||'—')+' · '+(p.nome||'');
 if(p.mol&&p.molId!==molId){const k=document.createElement('small');k.textContent=p.molId?' (outro molde)':' (molde PLT)';s.append(k)}
 c.onchange=()=>{
 if(c.checked&&!podeLigar(p)){c.checked=false;return}
+if(!c.checked&&M.produtoIds.length===1&&!confirm('Sem produto ligado, este molde só abre pelo endereço desta página. Desligar mesmo assim?')){c.checked=true;return}
 M.produtoIds=c.checked?[...M.produtoIds,id]:M.produtoIds.filter(x=>x!==id);
 alterou();
 };
@@ -322,7 +327,7 @@ l.dataset.busca=s.textContent.toLowerCase();l.append(c,s);box.append(l);
 
 async function abrir(){
 let id=Q.get('id');const pid=Q.get('produto');
-let doc=id?await B.molde(id):null,pendente=false;
+let doc=id?await B.molde(id):null,pendente=false,criado=false;
 if(id&&!doc)return bloquear('Molde não encontrado.');
 if(!id&&pid){
 const achado=await B.moldePorProduto(pid);
@@ -332,15 +337,16 @@ const p=await B.produto(pid);
 if(!p)return bloquear('Produto não encontrado.');
 doc=MM.novo([p.ref,p.nome].filter(Boolean).join(' ')||'Novo molde');
 molId=null;
-if(podeLigar(p))doc.produtoIds=[pid];
+if(!podeLigar(p))return bloquear('Molde não criado. O produto continua com o molde que já tem.');
+doc.produtoIds=[pid];
 id=await B.criar(doc);
-pendente=true; // primeiro salvamento grava molId/mol no produto
+pendente=criado=true; // primeiro salvamento grava molId/mol no produto
 }
 }
 if(!id)return bloquear('Nenhum molde escolhido. Abra o editor pelo produto, no app.');
 molId=id;
 const u=new URLSearchParams(location.search);u.delete('produto');u.set('id',id);history.replaceState(null,'','?'+u);
-M=MM.normalizar(doc);ligadosSalvos=[...M.produtoIds];
+M=MM.normalizar(doc);ligadosSalvos=criado?[]:[...M.produtoIds]; // recém-criado: o produto ainda não tem molId, tem de ligar
 let r=null;try{r=JSON.parse(localStorage.getItem(RASC()))}catch(e){}
 if(r&&r.em>(doc.salvoEm||0)){
 if(confirm('Há alterações deste molde de '+new Date(r.em).toLocaleString('pt-BR')+' que não chegaram ao servidor. Recuperar?')){M=MM.normalizar(r.m);pendente=true}

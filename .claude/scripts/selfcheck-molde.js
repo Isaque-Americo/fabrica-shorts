@@ -140,7 +140,7 @@ testes.push(
   ['costura com dobra area', G.area(M.costura(ret, pecaDobra)), 40000],
   ['pence ponta a 50 da barra', cosPence.some(q => Math.abs(q.x - 50) < TOL && Math.abs(q.y - 50) < TOL), true],
   ['pence tira o V da area', G.area(cosPence), 20000 - 20 * 50 / 2],
-  ['molParaProduto chaves', Object.keys(prodRet).sort(), ['arq', 'pecas', 'un']],
+  ['molParaProduto chaves', Object.keys(prodRet).sort(), ['arq', 'origem', 'pecas', 'un']],
   ['molParaProduto peca chaves', Object.keys(prodRet.pecas[0]).sort(), ['h', 'pts', 'qtd', 'w']],
   ['molParaProduto un mm', prodRet.un, 'mm'],
   ['molParaProduto pts [x,y] inteiros', prodRet.pecas[0].pts.every(q => Array.isArray(q) && q.length === 2 && q.every(Number.isInteger)), true],

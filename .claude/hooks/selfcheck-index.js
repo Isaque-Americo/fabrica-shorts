@@ -9,7 +9,7 @@ process.stdin.on('end', () => {
     const filePath = (payload.tool_input || {}).file_path || '';
     if (!filePath) process.exit(0);
     const normalized = filePath.replace(/\\/g, '/');
-    const molde = /(^|\/)(molde\/geo\.js|molde\/modelo\.js|molde\.html)$/.test(normalized);
+    const molde = /(^|\/)(molde\/geo\.js|molde\/modelo\.js|molde\/desenho\.js|molde\.html)$/.test(normalized);
     if (!(molde || normalized.endsWith('/index.html') || normalized === 'index.html')) process.exit(0);
 
     const { spawnSync } = require('child_process');

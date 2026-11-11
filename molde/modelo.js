@@ -120,7 +120,7 @@
       const pts = c.map(p => [Math.round(p.x - bx.x0), Math.round(p.y - bx.y0)]);
       pecas.push({ w: Math.max(...pts.map(p => p[0])), h: Math.max(...pts.map(p => p[1])), qtd: peca.cortar * (peca.par ? 2 : 1), pts });
     }
-    return { arq: 'Molde: ' + (m.nome || ''), un: 'mm', pecas };
+    return { arq: 'Molde: ' + (m.nome || ''), un: 'mm', origem: 'editor', pecas };
   }
 
   function historico(limite = 100) {

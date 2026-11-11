@@ -795,7 +795,8 @@ const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.pre
 if(form.querySelector('#fichaProp').checked)d.ficha=lerFicha(form,f.pmo,f.pfixo);else delete d.ficha;
 if(pltMol){d.mol={arq:pltMol.arq,un:'mm',pecas:pltMol.pecas.map(q=>({w:q.w,h:q.h,qtd:q.qtd,pts:q.pts}))};delete d.molId}
 else if(id){ // o editor de molde pode ter mudado mol/molId depois que o formulário abriu
-const {data:r}=await sb.from('docs').select('data').eq('id',id).single();
+const {data:r,error:er}=await sb.from('docs').select('data').eq('id',id).single();
+if(er)setTimeout(()=>aviso('Não foi possível conferir o molde do produto; ele foi salvo com o molde que estava no formulário.'),100);
 if(r&&r.data){if(r.data.mol)d.mol=r.data.mol;else delete d.mol;if(r.data.molId)d.molId=r.data.molId;else delete d.molId}}
 const upF=form.fotoF.files[0],upC=form.fotoC.files[0];
 if(f.delF&&!upF&&p.imgF){await sb.storage.from('produtos').remove([p.imgF]);d.imgF=''}
@@ -883,7 +884,7 @@ t+=c*n;
 return t>0?t:null;
 }
 let pltMol=null,pltMolId='';
-const molOrigem=p=>p&&p.molId?'editor':p&&p.mol?'plt':null;
+const molOrigem=p=>p&&(p.molId||p.mol&&p.mol.origem==='editor')?'editor':p&&p.mol?'plt':null;
 const pltForm=()=>document.querySelector('dialog[open] form');
 async function lerPlt(fm){
 const prev=$('#pltprev'),f=fm.plt.files[0];
@@ -1772,6 +1773,7 @@ const t=[['aviamento 20/10un x2 + tecido 10x2m',a.mp,24],
 ['molde do editor tem molId',+(molOrigem({molId:'m',mol:{}})==='editor'),1],
 ['molde so PLT sem molId',+(molOrigem({mol:{}})==='plt'),1],
 ['produto sem molde',+(molOrigem({})===null),1],
+['mol com origem editor sem molId',+(molOrigem({mol:{origem:'editor'}})==='editor'),1],
 ['produto sem foto vira placeholder',+foto({},'foto').includes('semfoto'),1],
 ['so frente nao oferece virar',+foto({imgF:'a.jpg'},'foto').includes('data-verso'),0],
 ['frente+costas oferece virar',+foto({imgF:'a.jpg',imgC:'b.jpg'},'foto').includes('data-verso'),1],

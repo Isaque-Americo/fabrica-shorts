@@ -29,6 +29,8 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html _site/index.html
+          cp molde.html _site/molde.html
+          cp -r molde _site/molde
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
