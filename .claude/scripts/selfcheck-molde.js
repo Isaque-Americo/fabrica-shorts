@@ -156,6 +156,63 @@ testes.push(
   ['historico refazer', h2, { n: 2 }],
 );
 
+// ferramentas de desenho (molde/desenho.js)
+const D = require(path.join(raiz, 'desenho.js'));
+const dr = M.novo('d'), rr = D.retangulo(dr, P(0, 0), P(300, 500)).ids;
+const drCanto = structuredClone(dr), arr = D.arredondar(drCanto, [rr[0], rr[1]], 50);
+const drMedir = D.medir(drCanto, drCanto.tracos.map(t => t.id));
+// cruz: horizontal 0..100 e vertical em x=50
+const cz = M.novo('c'), cza = D.ponto(cz, P(0, 0)), czb = D.ponto(cz, P(100, 0)), czc = D.ponto(cz, P(50, -50)), czd = D.ponto(cz, P(50, 50));
+const czh = D.reta(cz, cza, czb), czv = D.reta(cz, czc, czd);
+const corte = D.cortar(cz, [czh, czv]);
+// estender: reta 0..40 até a vertical em x=100
+const es = M.novo('e'); D.reta(es, D.ponto(es, P(0, 0)), D.ponto(es, P(40, 0)));
+const esv = D.reta(es, D.ponto(es, P(100, -50)), D.ponto(es, P(100, 50)));
+const esr = D.estender(es, [es.tracos[0].id]);
+// espelho: meia peça pelo eixo x=0
+const ep = M.novo('ep'), e0 = D.ponto(ep, P(0, 0)), e1 = D.ponto(ep, P(0, 100)), e2 = D.ponto(ep, P(50, 50));
+const eixo = D.reta(ep, e0, e1), lado = [D.reta(ep, e0, e2), D.reta(ep, e2, e1)];
+const espe = D.espelhar(ep, [...lado, eixo]);
+const espTodos = [...lado, ...espe.ids];
+const ap = structuredClone(dr); D.apagar(ap, [rr[0]]);
+const gi = structuredClone(dr); D.girar(gi, rr, 90);
+testes.push(
+  ['medida 11,5;90', D.medida('11,5;90'), [11.5, 90]],
+  ['medida so comprimento', D.medida(' 30 '), [30]],
+  ['medida ; final', D.medida('30;'), [30]],
+  ['medida invalida', [D.medida(''), D.medida('abc'), D.medida('1;x'), D.medida(null)], [null, null, null, null]],
+  ['cm 1 casa virgula', D.cm(1600), '160,0'],
+  ['polar 90 sobe na tela', D.polar(P(0, 0), 100, 90), P(0, -100)],
+  ['angulo para cima', D.angulo(P(0, 0), P(0, -10)), 90],
+  ['simplificar reta', D.simplificar([P(0, 0), P(10, 0.3), P(20, -0.2), P(30, 0)], 1).length, 2],
+  ['simplificar mantem canto', D.simplificar([P(0, 0), P(50, 0), P(50, 50)], 1), [P(0, 0), P(50, 0), P(50, 50)]],
+  ['ponto reaproveita id', D.ponto(dr, P(300, 500)), dr.tracos[1].b],
+  ['retangulo 4 retas 4 pontos', [dr.tracos.length, Object.keys(dr.pontos).length], [4, 4]],
+  ['retangulo fecha', M.encadear(dr, rr).ok, true],
+  ['retangulo mede 1600', D.medir(dr, rr), 1600],
+  ['retangulo sem altura', !!D.retangulo(M.novo('x'), P(0, 0), P(10, 0)).erro, true],
+  ['arredondar cria curva', drCanto.tracos.map(t => t.tipo).sort(), ['curva', 'reta', 'reta', 'reta', 'reta']],
+  ['arredondar tira o canto', Object.values(drCanto.pontos).some(q => q.x === 300 && q.y === 0), false],
+  ['arredondar contorno fecha', M.encadear(drCanto, drCanto.tracos.map(t => t.id)).ok, true],
+  ['arredondar mede 1600-100+25pi', drMedir, 1600 - 100 + 25 * Math.PI, 0.5],
+  ['arredondar alinhadas', (m => { const a = D.ponto(m, P(0, 0)), b = D.ponto(m, P(10, 0)), c = D.ponto(m, P(20, 0));
+    return D.arredondar(m, [D.reta(m, a, b), D.reta(m, b, c)], 5).erro; })(M.novo('x')), 'As retas estão alinhadas: não há canto.'],
+  ['arredondar raio 0', !!D.arredondar(structuredClone(dr), [rr[0], rr[1]], 0).erro, true],
+  ['cortar cruz 4 retas', [corte.ids.length, cz.tracos.length], [4, 4]],
+  ['cortar ponto comum', Object.values(cz.pontos).filter(q => Math.abs(q.x - 50) < 1e-6 && Math.abs(q.y) < 1e-6).length, 1],
+  ['cortar sem cruzar', !!D.cortar(dr, [rr[0]]).erro, true],
+  ['estender ate x=100', es.pontos[es.tracos[0].b], P(100, 0)],
+  ['estender ok', !!esr.ids, true],
+  ['espelhar reusa pontos do eixo', [espe.ids.length, Object.keys(ep.pontos).length], [2, 4]],
+  ['espelhar copia em x=-50', Object.values(ep.pontos).some(q => Math.abs(q.x + 50) < 1e-6 && Math.abs(q.y - 50) < 1e-6), true],
+  ['espelhar fecha contorno', M.encadear(ep, espTodos).ok, true],
+  ['apagar tira so ponto sem uso', [ap.tracos.length, Object.keys(ap.pontos).length], [3, 4]],
+  ['apagar dois lados tira o canto', (m => (D.apagar(m, [rr[0], rr[1]]), Object.keys(m.pontos).length))(structuredClone(dr)), 3],
+  ['girar 90 anti-horario na tela', G.bbox(Object.values(gi.pontos)), { x0: -100, y0: 100, w: 500, h: 300 }],
+  ['naCaixa pega retangulo', D.naCaixa(dr, P(-1, -1), P(301, 501)).length, 4],
+  ['naCaixa parcial fica fora', D.naCaixa(dr, P(-1, -1), P(301, 10)).length, 1],
+);
+
 const perto = (a, b, tol) => typeof a === 'number' ? Math.abs(a - b) <= tol
   : a && typeof a === 'object' ? Object.keys(b).length === Object.keys(a).length && Object.keys(b).every(k => perto(a[k], b[k], tol)) : a === b;
 

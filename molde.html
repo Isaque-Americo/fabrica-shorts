@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="molde/geo.js"></script>
 <script src="molde/modelo.js"></script>
+<script src="molde/desenho.js"></script>
 <style>
 :root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;
 color-scheme:light}
@@ -50,7 +51,23 @@ dialog h3{margin:0 0 12px}
 #refs small{color:var(--mut)}
 #ref-busca{width:100%}
 #toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:#fff;padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
+#dica{font-size:13px;color:var(--mut);flex-basis:100%;order:9;min-height:1.5em}
+#ferramentas button{font:inherit;font-size:18px;line-height:1;width:38px;height:38px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer}
+#ferramentas button[aria-pressed="true"]{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+#ferramentas hr{width:100%;border:0;border-top:1px solid var(--bd);margin:4px 0}
+#tela .tr{fill:none;stroke:var(--tx);stroke-width:1.5px;vector-effect:non-scaling-stroke}
+#tela .tr.sel{stroke:var(--ac);stroke-width:3px}
+#tela .pt{fill:var(--tx)}#tela .pt.solto{fill:var(--mut)}#tela .pt.sel{fill:var(--ac)}
+#tela .tx{fill:var(--tx);font-family:'Inter',sans-serif}#tela .tx.sel{fill:var(--ac)}
+#tela .alca,#tela .prev{fill:none;stroke:var(--ac);stroke-width:1px;stroke-dasharray:5 4;vector-effect:non-scaling-stroke}
+#tela .alca-p{fill:var(--card);stroke:var(--ac);stroke-width:1.5px;vector-effect:non-scaling-stroke}
+#tela .caixa{fill:var(--ac);fill-opacity:.08;stroke:var(--ac);stroke-width:1px;stroke-dasharray:4 3;vector-effect:non-scaling-stroke}
+#tela .ima{fill:none;stroke:var(--ok);stroke-width:2px;vector-effect:non-scaling-stroke}
+#regua{pointer-events:none}#regua rect{fill:var(--card)}#regua line{stroke:var(--mut);stroke-width:1px;vector-effect:non-scaling-stroke}#regua text{fill:var(--mut);font-family:'Inter',sans-serif}
+#medida{position:fixed;z-index:50;width:190px;box-shadow:0 4px 12px rgba(0,0,0,.2)}
+#medida[aria-invalid="true"]{border-color:var(--bad)}
 @media (max-width:760px){
+#ferramentas{overflow-x:auto}#ferramentas hr{width:auto;height:auto;border-top:0;border-left:1px solid var(--bd);margin:0 4px}
 #editor{grid-template:auto auto 1fr auto/1fr;grid-template-areas:"topo" "ferr" "tela" "painel"}
 #ferramentas{flex-direction:row;border-right:0;border-bottom:1px solid var(--bd)}
 #painel{border-left:0;border-top:1px solid var(--bd);max-height:30vh}
@@ -64,6 +81,7 @@ dialog h3{margin:0 0 12px}
     <a class="volta" href="index.html" title="Voltar ao app">← App</a>
     <input id="nome" aria-label="Nome do molde" placeholder="Nome do molde" autocomplete="off">
     <span id="estado" role="status" aria-live="polite">Salvo</span>
+    <span id="dica" aria-live="polite"></span>
     <span class="esp"></span>
     <button class="sm" type="button" id="btn-refs" title="Produtos que usam este molde">Referências <span id="refs-n"></span></button>
     <span class="grupo" role="group" aria-label="Zoom">
@@ -76,12 +94,11 @@ dialog h3{margin:0 0 12px}
       <button class="sm" type="button" id="btn-refazer" title="Refazer (Ctrl+Y)">Refazer</button>
     </span>
   </header>
-  <!-- Task 5: ferramentas de desenho entram aqui -->
   <nav id="ferramentas" aria-label="Ferramentas"></nav>
   <svg id="tela" role="img" aria-label="Área de desenho do molde" xmlns="http://www.w3.org/2000/svg">
     <defs><pattern id="grade" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="var(--bd)" stroke-width="0.4"/></pattern></defs>
     <rect id="fundo" x="-5000" y="-5000" width="10000" height="10000" fill="url(#grade)"/>
-    <g id="diagrama"></g><g id="pecas"></g>
+    <g id="diagrama"></g><g id="pecas"></g><g id="regua"></g>
   </svg>
   <!-- Task 6: lista de peças e propriedades -->
   <aside id="painel" aria-label="Moldes"><h2>Moldes</h2><div id="lista-pecas"><p class="vazio">Nenhuma peça ainda.</p></div></aside>
@@ -93,6 +110,7 @@ dialog h3{margin:0 0 12px}
   <div id="refs"><p class="vazio" style="padding:10px">Carregando…</p></div>
   <div class="row"><button class="pri" type="button" id="refs-ok">Fechar</button></div>
 </dialog>
+<input id="medida" hidden autocomplete="off" aria-label="Medida exata" title="Enter fixa, Esc cancela">
 <div id="toast" role="status"></div>
 <script>
 const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
@@ -151,6 +169,9 @@ gravarProduto:atualizar
 // ---- estado global (usado pelas Tasks 5–6) ----
 let M=null,H=null,estado='salvo',molId=null;
 let ver=0,salvando=false,timer=null,erroSalvar='',ligadosSalvos=[],zoom=1;
+// desenho: vx,vy = canto da vista em mm; sel = ids de traços/pontos soltos/textos selecionados (Task 6 usa); op = ação em curso
+let vx=-20,vy=-20,ferr='sel',op=null,rato=null,imaLigado=true,espaco=false,pan=null;
+const sel=new Set();
 const RASC=()=>'molde:'+molId;
 
 function bloquear(msg,entrar){
@@ -169,10 +190,11 @@ s.title=e==='nao-salvo'&&erroSalvar?erroSalvar:'';
 // redesenha a tela a partir de M. Tasks 5–6 desenham diagrama (#diagrama) e peças (#pecas) aqui.
 function desenhar(){
 const svg=$('#tela'),r=svg.getBoundingClientRect(),w=(r.width||800)/zoom,h=(r.height||600)/zoom;
-svg.setAttribute('viewBox',`${-20/zoom} ${-20/zoom} ${w} ${h}`);
+svg.setAttribute('viewBox',`${vx} ${vy} ${w} ${h}`);
 $('#zoom-v').textContent=Math.round(zoom*100)+'%';
 $('#refs-n').textContent=M.produtoIds.length?'('+M.produtoIds.length+')':'';
 document.title=(M.nome||'Molde')+' · Editor de molde';
+desenharDiagrama(w,h);
 }
 
 // alteração que vale como passo do histórico
@@ -299,11 +321,11 @@ await abrir();
 
 $('#nome').addEventListener('input',e=>{M.nome=e.target.value;sujou()});
 $('#nome').addEventListener('change',()=>H.gravar(M));
-$('#btn-desfazer').onclick=()=>{const m=H.desfazer();if(m)aplicar(m)};
-$('#btn-refazer').onclick=()=>{const m=H.refazer();if(m)aplicar(m)};
-$('#zoom-menos').onclick=()=>{zoom=Math.max(.1,zoom/1.25);desenhar()};
-$('#zoom-mais').onclick=()=>{zoom=Math.min(20,zoom*1.25);desenhar()};
-$('#zoom-v').onclick=()=>{zoom=1;desenhar()};
+$('#btn-desfazer').onclick=()=>{const m=H.desfazer();if(m){op=null;aplicar(m)}};
+$('#btn-refazer').onclick=()=>{const m=H.refazer();if(m){op=null;aplicar(m)}};
+$('#zoom-menos').onclick=()=>zoomMeio(1/1.25);
+$('#zoom-mais').onclick=()=>zoomMeio(1.25);
+$('#zoom-v').onclick=()=>zoomMeio(1/zoom);
 $('#btn-refs').onclick=abrirRefs;
 $('#refs-ok').onclick=()=>$('#dlg-refs').close();
 $('#ref-busca').addEventListener('input',e=>{const t=e.target.value.toLowerCase();document.querySelectorAll('#refs label').forEach(l=>l.hidden=!l.dataset.busca.includes(t))});
@@ -316,6 +338,219 @@ else if(k==='y'||(k==='z'&&e.shiftKey)){e.preventDefault();$('#btn-refazer').cli
 window.addEventListener('resize',()=>M&&desenhar());
 window.addEventListener('online',()=>{if(M&&estado!=='salvo')salvar()});
 window.addEventListener('beforeunload',e=>{if(M&&estado!=='salvo'){e.preventDefault();e.returnValue=''}});
+// ---- desenho do diagrama (Task 5). Lógica dos traços em molde/desenho.js ----
+const G=window.MoldeGeo,MD=window.MoldeDesenho,tela=$('#tela');
+const dist=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y),lerp=(a,b,k)=>({x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k});
+const esc=s=>String(s).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';'),n2=v=>+v.toFixed(2);
+const caminho=(pts,z)=>'M'+pts.map(p=>n2(p.x)+' '+n2(p.y)).join('L')+(z?'Z':'');
+const FERRS=[['sel','↖','Selecionar','V'],['ponto','•','Ponto','P'],['reta','╱','Reta','L'],['ret','▭','Retângulo','R'],['circ','◯','Círculo','C'],['curva','∿','Curva','B'],['lapis','✎','Lápis','F'],['texto','T','Texto','T']];
+const EDICOES=[['apagar','✕','Apagar (Delete)'],['cortar','✂','Cortar no cruzamento'],['estender','⇥','Estender até o próximo traço'],['arredondar','◠','Arredondar canto entre duas retas'],['girar','⟲','Girar'],['espelhar','⇋','Espelhar pela última reta selecionada'],['medir','↔','Medir os traços selecionados']];
+
+function tracoSeguro(t){try{const p=MM.tracoPts(M,t);return p&&p.every(Boolean)?p:null}catch(e){return null}}
+function segsTodos(){const out=[];for(const t of M.tracos){const p=tracoSeguro(t);if(!p)continue;if(t.tipo==='circulo')p.push(p[0]);for(let i=1;i<p.length;i++)out.push([p[i-1],p[i]])}return out}
+// ímã de 8 px na tela; ponto vence linha
+function grudar(p){return imaLigado?G.ima(p,Object.values(M.pontos),segsTodos(),8/zoom):{p,tipo:null}}
+function mm(e){const q=tela.createSVGPoint();q.x=e.clientX;q.y=e.clientY;const r=q.matrixTransform(tela.getScreenCTM().inverse());return {x:r.x,y:r.y}}
+
+function desenharDiagrama(w,h){
+const f=$('#fundo');f.setAttribute('x',vx);f.setAttribute('y',vy);f.setAttribute('width',w);f.setAttribute('height',h);
+f.setAttribute('fill',10*zoom>=4?'url(#grade)':'none');$('#grade path').setAttribute('stroke-width',1/zoom);
+const u=MD.usados(M),existe=new Set([...M.tracos.map(t=>t.id),...Object.keys(M.pontos),...M.textos.map(x=>x.id)]);
+for(const id of sel)if(!existe.has(id))sel.delete(id);
+let s='';
+for(const t of M.tracos){const p=tracoSeguro(t);if(p)s+=`<path class="tr${sel.has(t.id)?' sel':''}" d="${caminho(p,t.tipo==='circulo')}"/>`}
+for(const [id,p] of Object.entries(M.pontos))s+=`<circle class="pt${u.has(id)?'':' solto'}${sel.has(id)?' sel':''}" cx="${n2(p.x)}" cy="${n2(p.y)}" r="${3/zoom}"/>`;
+for(const x of M.textos)s+=`<text class="tx${sel.has(x.id)?' sel':''}" x="${n2(x.x)}" y="${n2(x.y)}" font-size="${x.tam||10}">${esc(x.texto)}</text>`;
+for(const t of M.tracos)if(t.tipo==='curva'&&sel.has(t.id)&&M.pontos[t.a]&&M.pontos[t.b])for(const [k,e] of [['c1','a'],['c2','b']]){
+const c=t[k],q=M.pontos[t[e]];s+=`<line class="alca" x1="${n2(q.x)}" y1="${n2(q.y)}" x2="${n2(c.x)}" y2="${n2(c.y)}"/><circle class="alca-p" cx="${n2(c.x)}" cy="${n2(c.y)}" r="${4/zoom}"/>`}
+s+=previa();
+$('#diagrama').innerHTML=s;
+desenharRegua(w,h);
+}
+function previa(){
+let s='';const r=rato&&rato.p;
+if(op&&r){
+if(op.tipo==='reta'||(op.tipo==='curva'&&!op.arr))s+=`<path class="prev" d="${caminho([op.A,r])}"/>`;
+if(op.tipo==='ret')s+=`<path class="prev" d="${caminho([op.A,{x:r.x,y:op.A.y},r,{x:op.A.x,y:r.y}],1)}"/>`;
+if(op.tipo==='circ')s+=`<circle class="prev" cx="${op.C.x}" cy="${op.C.y}" r="${dist(op.C,r)}"/>`;
+}
+if(op&&op.tipo==='curva'&&op.h)s+=`<line class="alca" x1="${op.A.x}" y1="${op.A.y}" x2="${op.h.x}" y2="${op.h.y}"/>`;
+if(op&&op.tipo==='lapis')s+=`<path class="prev" d="${caminho(op.pts)}"/>`;
+if(op&&op.tipo==='caixa'){const a=op.ini,b=op.fim;s+=`<rect class="caixa" x="${Math.min(a.x,b.x)}" y="${Math.min(a.y,b.y)}" width="${Math.abs(b.x-a.x)}" height="${Math.abs(b.y-a.y)}"/>`}
+if(rato&&rato.tipo){const k=6/zoom;s+=rato.tipo==='ponto'?`<rect class="ima" x="${r.x-k}" y="${r.y-k}" width="${2*k}" height="${2*k}"/>`:`<circle class="ima" cx="${r.x}" cy="${r.y}" r="${k}"/>`}
+return s;
+}
+// régua em cm no alto e à esquerda da vista
+function desenharRegua(w,h){
+const px=1/zoom,T=16*px,P=[1,2,5,10,20,50,100,200,500,1000];
+const tk=P.find(c=>c*10*zoom>=6)||1000,lb=P.find(c=>c*10*zoom>=40)||1000,st=tk*10;
+let s=`<rect x="${vx}" y="${vy}" width="${w}" height="${T}"/><rect x="${vx}" y="${vy}" width="${T}" height="${h}"/>`;
+for(let i=Math.ceil((vx+T)/st);i*st<=vx+w;i++){const x=i*st,c=i*tk,g=c%lb===0;s+=`<line x1="${x}" x2="${x}" y1="${vy+T}" y2="${vy+T-(g?8:4)*px}"/>`;if(g)s+=`<text x="${x+2*px}" y="${vy+9*px}" font-size="${9*px}">${c}</text>`}
+for(let i=Math.ceil((vy+T)/st);i*st<=vy+h;i++){const y=i*st,c=i*tk,g=c%lb===0;s+=`<line y1="${y}" y2="${y}" x1="${vx+T}" x2="${vx+T-(g?8:4)*px}"/>`;if(g)s+=`<text x="${vx+1*px}" y="${y-2*px}" font-size="${9*px}">${c}</text>`}
+s+=`<text x="${vx+2*px}" y="${vy+T-3*px}" font-size="${8*px}">cm</text>`;
+$('#regua').innerHTML=s;
+}
+
+// o que está sob o cursor (raio de 6 px)
+function pontoSob(p){let mel=null,md=6/zoom;for(const [id,q] of Object.entries(M.pontos))if(dist(p,q)<=md){md=dist(p,q);mel=id}return mel}
+function achar(p){
+const r=6/zoom,u=MD.usados(M),pt=pontoSob(p);
+if(pt&&!u.has(pt))return pt;
+let mel=null,md=r;
+for(const t of M.tracos){const q=tracoSeguro(t);if(!q)continue;if(t.tipo==='circulo')q.push(q[0]);for(let i=1;i<q.length;i++){const d=MD.distSeg(p,q[i-1],q[i]);if(d<md){md=d;mel=t.id}}}
+if(mel)return mel;
+const x=M.textos.find(x=>{const tm=x.tam||10;return p.x>=x.x-r&&p.x<=x.x+tm*.6*x.texto.length+r&&p.y>=x.y-tm-r&&p.y<=x.y+r});
+return x?x.id:null;
+}
+function alcaSob(p){for(const t of M.tracos)if(t.tipo==='curva'&&sel.has(t.id))for(const k of ['c1','c2'])if(dist(p,t[k])<=6/zoom)return {t,k};return null}
+// alça simétrica por padrão: a da curva vizinha no mesmo ponto espelha (Alt solta)
+function moverAlca(o,p,alt){
+const t=o.t;t[o.k]={x:p.x,y:p.y};if(alt)return;
+const pid=o.k==='c1'?t.a:t.b,P=M.pontos[pid],v=M.tracos.find(u=>u!==t&&u.tipo==='curva'&&(u.a===pid||u.b===pid));
+if(v)v[v.a===pid?'c1':'c2']={x:2*P.x-p.x,y:2*P.y-p.y};
+}
+
+// ferramentas: down/move/up recebem o ponto em mm; digitado recebe a medida já lida ("11,5;90" → [11.5,90])
+function seguirReta(B){
+const a=MD.ponto(M,op.A),b=MD.ponto(M,B);
+if(a===b)return;
+MD.reta(M,a,b);
+const fecha=dist(M.pontos[b],op.ini)<1e-4;
+op=fecha?null:{...op,A:{...M.pontos[b]}};
+alterou();
+}
+function criarRet(B){const r=MD.retangulo(M,op.A,B);op=null;if(r.erro){toast(r.erro);desenhar();return}alterou()}
+function criarCirc(r){if(!(r>0))return toast('Raio inválido.');M.tracos.push({id:MD.uid(M,'t'),tipo:'circulo',c:MD.ponto(M,op.C),r});op=null;alterou()}
+const T={
+sel:{dica:'Clique para selecionar (Shift soma). Arraste no vazio para selecionar por caixa, sobre um traço para mover, sobre um ponto para mudá-lo de lugar.',
+down(p,e){const a=alcaSob(p);op=a?{tipo:'alca',...a}:{tipo:'talvez',ini:p,ult:p,pid:pontoSob(p),id:achar(p),shift:e.shiftKey}},
+move(p,e){
+if(!op)return;
+if(op.tipo==='talvez'){
+if(dist(p,op.ini)*zoom<3)return;
+if(op.pid&&!(op.id&&sel.has(op.id)))op={tipo:'ponto',pid:op.pid,ult:op.ini};
+else if(op.id){if(!sel.has(op.id)){if(!op.shift)sel.clear();sel.add(op.id)}op={tipo:'mover',ult:op.ini}}
+else op={tipo:'caixa',ini:op.ini,fim:p,shift:op.shift};
+}
+const dx=p.x-(op.ult||p).x,dy=p.y-(op.ult||p).y;
+if(op.tipo==='alca')moverAlca(op,p,e.altKey);
+else if(op.tipo==='ponto'){const q=M.pontos[op.pid];q.x+=dx;q.y+=dy}
+else if(op.tipo==='mover')MD.transformar(M,[...sel],q=>G.mover(q,dx,dy));
+else if(op.tipo==='caixa')op.fim=p;
+op.ult=p;
+},
+up(p){
+if(!op)return;const o=op;op=null;
+if(o.tipo==='talvez'){if(o.id){if(!o.shift)sel.clear();if(o.shift&&sel.has(o.id))sel.delete(o.id);else sel.add(o.id)}else if(!o.shift)sel.clear();desenhar()}
+else if(o.tipo==='caixa'){if(!o.shift)sel.clear();MD.naCaixa(M,o.ini,o.fim).forEach(id=>sel.add(id));desenhar()}
+else alterou();
+}},
+ponto:{dica:'Clique para marcar um ponto.',up(p){const n=Object.keys(M.pontos).length;MD.ponto(M,grudar(p).p);if(Object.keys(M.pontos).length>n)alterou()}},
+reta:{dica:'Clique o início e as próximas pontas. Digite "comprimento cm; ângulo°" (ex.: 11,5;90) e Enter para medida exata. Esc ou botão direito encerra.',medida:'comprimento cm; ângulo°',
+up(p){const B=grudar(p).p;if(!op)op={tipo:'reta',A:{...B},ini:{...B}};else seguirReta(B)},
+digitado(v){const ang=v.length>1?v[1]:rato?MD.angulo(op.A,rato.p):0;seguirReta(MD.polar(op.A,v[0]*10,ang))}},
+ret:{dica:'Clique dois cantos opostos, ou um canto e digite "largura cm; altura cm" (ex.: 30;50).',medida:'largura cm; altura cm',
+up(p){const B=grudar(p).p;if(!op)op={tipo:'ret',A:{...B}};else criarRet(B)},
+// o lado para onde está o cursor dá o sentido
+digitado(v){const r=rato?rato.p:op.A,sx=Math.sign(r.x-op.A.x)||1,sy=Math.sign(r.y-op.A.y)||1;criarRet({x:op.A.x+sx*v[0]*10,y:op.A.y+sy*(v.length>1?v[1]:v[0])*10})}},
+circ:{dica:'Clique o centro e depois a borda, ou digite o raio em cm.',medida:'raio cm',
+up(p){const B=grudar(p).p;if(!op)op={tipo:'circ',C:{...B}};else criarCirc(dist(op.C,B))},
+digitado(v){criarCirc(v[0]*10)}},
+curva:{dica:'Clique as pontas; arraste ao clicar para puxar a alça (simétrica: a curva sai suave). Esc encerra.',
+down(p){
+const B=grudar(p).p;
+if(!op){op={tipo:'curva',A:{...B},ini:{...B},h:null,arr:true,t:null};return}
+const a=MD.ponto(M,op.A),b=MD.ponto(M,B);if(a===b)return;
+const PA=M.pontos[a],PB=M.pontos[b],t={id:MD.uid(M,'t'),tipo:'curva',a,b,c1:op.h||lerp(PA,PB,1/3),c2:lerp(PA,PB,2/3)};
+M.tracos.push(t);op={...op,A:{...PB},h:null,arr:true,t};
+},
+move(p){if(!op||!op.arr||dist(p,op.A)*zoom<3)return;op.h={x:p.x,y:p.y};if(op.t)op.t.c2={x:2*op.A.x-p.x,y:2*op.A.y-p.y}},
+up(){if(!op||!op.arr)return;op.arr=false;if(op.t){const fecha=dist(op.A,op.ini)<1e-4;op.t=null;if(fecha)op=null;alterou()}}},
+lapis:{dica:'Arraste para desenhar à mão livre.',
+down(p){op={tipo:'lapis',pts:[grudar(p).p]}},
+move(p){if(op&&dist(p,op.pts[op.pts.length-1])*zoom>=2)op.pts.push(p)},
+up(p){if(!op)return;const q=MD.simplificar([...op.pts,grudar(p).p],1);op=null;
+if(q.length>=2&&G.comprimento(q)>1){M.tracos.push({id:MD.uid(M,'t'),tipo:'livre',pts:q.map(r=>({x:r.x,y:r.y}))});alterou()}else desenhar()}},
+texto:{dica:'Clique onde o texto vai ficar.',
+up(p){const t=prompt('Texto:');if(t&&t.trim()){M.textos.push({id:MD.uid(M,'x'),x:p.x,y:p.y,texto:t.trim(),tam:10});alterou()}}}
+};
+
+function escolher(f){
+ferr=f;op=null;fecharMedida();
+document.querySelectorAll('#ferramentas [data-f]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===f));
+$('#dica').textContent=T[f].dica;if(M)desenhar();
+}
+function alternarIma(){imaLigado=!imaLigado;$('#btn-ima').setAttribute('aria-pressed',imaLigado);toast('Ímã '+(imaLigado?'ligado':'desligado'))}
+function edicao(n){
+const ids=[...sel];
+if(!ids.length)return toast('Selecione os traços primeiro.');
+if(n==='medir'){const t='Medida: '+MD.cm(MD.medir(M,ids))+' cm';$('#dica').textContent=t;toast(t);return}
+let r;
+if(n==='girar'){const g=(MD.medida(prompt('Girar quantos graus? (positivo = anti-horário)','90'))||[])[0];if(g==null)return;r=MD.girar(M,ids,g)}
+else if(n==='arredondar'){const v=(MD.medida(prompt('Raio do canto (cm):','1'))||[])[0];if(v==null)return;r=MD.arredondar(M,ids,v*10)}
+else r=MD[n](M,ids);
+if(r.erro)return toast(r.erro);
+sel.clear();r.ids.forEach(id=>sel.add(id));
+alterou();
+}
+
+// caixinha de medida exata: abre ao digitar com uma reta/retângulo/círculo começado
+const caixa=$('#medida');
+function abrirMedida(k,x,y){caixa.value=k;caixa.placeholder=T[ferr].medida;caixa.removeAttribute('aria-invalid');caixa.style.left=Math.min(x+12,innerWidth-200)+'px';caixa.style.top=Math.min(y+12,innerHeight-40)+'px';caixa.hidden=false;caixa.focus()}
+function fecharMedida(){caixa.hidden=true}
+caixa.addEventListener('keydown',e=>{
+if(e.key==='Escape'){fecharMedida();e.stopPropagation()}
+if(e.key!=='Enter')return;
+e.preventDefault();
+const v=MD.medida(caixa.value);
+if(!v||!(v[0]>0)||!op){caixa.setAttribute('aria-invalid','true');toast('Medida inválida. Ex.: '+(ferr==='reta'?'11,5;90':'30;50'));return}
+fecharMedida();T[ferr].digitado(v);
+});
+caixa.addEventListener('blur',fecharMedida);
+
+{const nav=$('#ferramentas'),bt=(txt,tit,fn)=>{const b=document.createElement('button');b.type='button';b.textContent=txt;b.title=tit;b.setAttribute('aria-label',tit);b.onclick=fn;nav.append(b);return b};
+for(const [f,ic,nome,k] of FERRS)bt(ic,nome+' ('+k+')',()=>escolher(f)).dataset.f=f;
+nav.append(document.createElement('hr'));
+const im=bt('⌖','Ímã (M)',alternarIma);im.id='btn-ima';im.setAttribute('aria-pressed','true');
+nav.append(document.createElement('hr'));
+for(const [n,ic,tit] of EDICOES)bt(ic,tit,()=>edicao(n));}
+escolher('sel');
+
+let ultCli={x:0,y:0};
+tela.addEventListener('pointerdown',e=>{
+if(!M)return;
+if(e.button===1||(e.button===0&&espaco)){pan={x:e.clientX,y:e.clientY,vx,vy};tela.setPointerCapture(e.pointerId);e.preventDefault();return}
+if(e.button===2){op=null;desenhar();return}
+if(e.button!==0)return;
+tela.setPointerCapture(e.pointerId);
+const p=mm(e);T[ferr].down&&T[ferr].down(p,e);desenhar();
+});
+tela.addEventListener('pointermove',e=>{
+if(!M)return;ultCli={x:e.clientX,y:e.clientY};
+if(pan){vx=pan.vx-(e.clientX-pan.x)/zoom;vy=pan.vy-(e.clientY-pan.y)/zoom;desenhar();return}
+const p=mm(e);
+rato=ferr==='sel'?null:grudar(p);
+T[ferr].move&&T[ferr].move(p,e);desenhar();
+});
+tela.addEventListener('pointerup',e=>{if(!M)return;if(pan){pan=null;return}if(e.button===0&&T[ferr].up)T[ferr].up(mm(e),e)});
+tela.addEventListener('pointerleave',()=>{if(rato){rato=null;desenhar()}});
+tela.addEventListener('contextmenu',e=>e.preventDefault());
+tela.addEventListener('wheel',e=>{if(!M)return;e.preventDefault();zoomEm(e.clientX,e.clientY,Math.pow(1.0015,-e.deltaY))},{passive:false});
+// mantém o ponto sob o cursor parado
+function zoomEm(cx,cy,f){const r=tela.getBoundingClientRect(),px=cx-r.left,py=cy-r.top,mx=vx+px/zoom,my=vy+py/zoom;zoom=Math.min(20,Math.max(.1,zoom*f));vx=mx-px/zoom;vy=my-py/zoom;desenhar()}
+function zoomMeio(f){const r=tela.getBoundingClientRect();zoomEm(r.left+r.width/2,r.top+r.height/2,f)}
+document.addEventListener('keydown',e=>{
+if(!M||e.ctrlKey||e.metaKey||e.altKey||e.target.closest('input,textarea,dialog,select'))return;
+const k=e.key;
+if(op&&T[ferr].digitado&&/^[0-9,.\-]$/.test(k)){e.preventDefault();abrirMedida(k,ultCli.x,ultCli.y);return}
+if(k==='Escape'){op=null;desenhar();return}
+if(k==='Delete'||k==='Backspace'){e.preventDefault();if(sel.size)edicao('apagar');return}
+if(k===' '){if(!e.target.closest('button,a')){espaco=true;e.preventDefault()}return}
+const l=k.toLowerCase();
+if(l==='m'){alternarIma();return}
+const f=FERRS.find(x=>x[3].toLowerCase()===l);if(f)escolher(f[0]);
+});
+document.addEventListener('keyup',e=>{if(e.key===' ')espaco=false});
 iniciar();
 </script>
 </body>
