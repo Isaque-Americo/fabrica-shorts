@@ -118,8 +118,16 @@ const h = M.historico();
 h.gravar({ n: 1 }); h.gravar({ n: 2 }); h.gravar({ n: 3 });
 const h1 = (h.desfazer(), h.desfazer()), h2 = h.refazer();
 const nVazio = M.normalizar({});
+// peça apontando para traço apagado não derruba o salvamento
+const quebrado = { ...ret, pecas: [...ret.pecas, pecaRet({ id: 'x', tracos: [{ id: 'sumiu', inv: false }] })] };
+const prodQuebrado = M.molParaProduto(quebrado);
+const semPonto = { ...ret, pontos: { a: P(0, 0) } };
 
 testes.push(
+  ['encadear traco inexistente', M.encadear(ret, ['r1', 'sumiu']), { ok: false, erro: 'Traço inexistente' }],
+  ['encadear vazio', M.encadear(ret, []).ok, false],
+  ['molParaProduto pula peca quebrada', prodQuebrado.pecas.length, 1],
+  ['molParaProduto ponto apagado nao lanca', M.molParaProduto(semPonto).pecas.length, 0],
   ['encadear fora de ordem ok', enc.ok, true],
   ['encadear 4 tracos', enc.tracos.length, 4],
   ['encadear area positiva', G.area(contornoEnc) > 0, true],

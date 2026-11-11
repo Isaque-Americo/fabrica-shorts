@@ -57,6 +57,7 @@
   }
 
   function encadear(m, ids) {
+    if (!ids || !ids.length || ids.some(id => !acha(m, id))) return { ok: false, erro: 'Traço inexistente' };
     if (ids.length === 1 && acha(m, ids[0]).tipo === 'circulo') return { ok: true, tracos: [{ id: ids[0], inv: false }] };
     const resto = ids.slice(1), cad = [{ id: ids[0], inv: false }];
     const ini = orientado(m, cad[0])[0];
@@ -111,7 +112,11 @@
     for (const peca of normalizar(m).pecas) {
       if (!peca.visivel || !peca.tracos.length) continue;
       const { a, b } = peca.fio, ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
-      const c = G.girar(corte(m, peca), { x: 0, y: 0 }, -ang), bx = G.bbox(c);
+      // peça quebrada (traço ou ponto apagado) fica fora, sem impedir o resto de salvar
+      let c = null;
+      try { if (peca.tracos.every(t => acha(m, t.id))) c = G.girar(corte(m, peca), { x: 0, y: 0 }, -ang); } catch (e) { c = null; }
+      if (!c || c.length < 3 || !c.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))) continue;
+      const bx = G.bbox(c);
       const pts = c.map(p => [Math.round(p.x - bx.x0), Math.round(p.y - bx.y0)]);
       pecas.push({ w: Math.max(...pts.map(p => p[0])), h: Math.max(...pts.map(p => p[1])), qtd: peca.cortar * (peca.par ? 2 : 1), pts });
     }
