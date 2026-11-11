@@ -751,7 +751,7 @@ return `<div class="bar">${campoBusca('Buscar por referência ou descrição')}<
 }
 function fProd(id){
 const p=id?prod(id):{};
-pltMol=null;
+pltMol=null;pltMolId=p.molId||'';
 const campoFoto=k=>{const n=p['img'+k],lbl=k==='F'?'Frente':'Costas';
 return `<div style="flex:1"><small style="display:block;margin-bottom:4px">${lbl}</small>${n?`<img class="fmed" src="${imgUrl(n)}" alt="${lbl}">`:'<div class="fmed semfoto"></div>'}<input type="file" name="foto${k}" accept="image/*" style="margin-top:6px"><label style="display:${n?'flex':'none'};gap:6px;align-items:center;margin:4px 0 0;font-size:13px"><input type="checkbox" name="del${k}" style="width:auto;margin:0">Remover</label></div>`};
 modal(id?'Editar produto':'Novo produto',`
@@ -777,7 +777,8 @@ modal(id?'Editar produto':'Novo produto',`
  <button type="button" class="ghost" onclick="estimarCons(this.form)">Estimar consumo pelo molde</button>
  <small id="consprev" style="display:block;margin-top:4px">Preenche os dois consumos acima a partir da largura útil do tecido. Estimativa por retângulo: o encaixe real costuma gastar menos.</small>
  <label style="margin:10px 0 0">Molde digitalizado (.plt)<input type="file" name="plt" accept=".plt,.hgl,.hpgl" onchange="lerPlt(this.form)"></label>
- <small>Arquivo de plotter em HP-GL, como os que saem do CAD ou da digitalização. O app separa os painéis, descarta piques e moldura, e calcula o consumo painel por painel.${p.mol?' <b>Este produto já tem molde: '+((p.mol.pecas||[]).length)+' painéis'+(p.mol.arq?' ('+esc(p.mol.arq)+')':'')+'.</b> Escolher outro arquivo substitui.':''}</small>
+ ${id?`<button type="button" class="ghost" onclick="window.open('molde.html?${p.molId?'id='+encodeURIComponent(p.molId):'produto='+encodeURIComponent(id)}','_blank')">Desenhar molde</button>`:''}
+ <small>Arquivo de plotter em HP-GL, como os que saem do CAD ou da digitalização. O app separa os painéis, descarta piques e moldura, e calcula o consumo painel por painel.${molOrigem(p)==='editor'?' <b>Molde desenhado no editor: '+esc((p.mol&&p.mol.arq||'').replace(/^Molde: /,''))+'.</b> Importar um PLT desliga o produto desse molde.':p.mol?' <b>Este produto já tem molde: '+((p.mol.pecas||[]).length)+' painéis'+(p.mol.arq?' ('+esc(p.mol.arq)+')':'')+'.</b> Escolher outro arquivo substitui.':''}</small>
  <div id="pltprev"></div>
  <label style="display:flex;align-items:center;gap:8px;margin:10px 0 4px"><input type="checkbox" id="fichaProp" style="width:auto;margin:0" ${p.ficha?'checked':''} onchange="toggleFichaProp(this)">Esta referência tem ficha própria</label>
  <small id="fichaPadMsg" style="display:${p.ficha?'none':'block'}">Os aviamentos, a mão de obra e o custo fixo vêm da ficha padrão (aba Matéria-prima). Marque acima para esta referência ter os seus.</small>
@@ -792,7 +793,10 @@ modal(id?'Editar produto':'Novo produto',`
 async(f,form)=>{
 const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.preco||0,precoG:+f.precoG||0,est:lerEst(form),tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0,molL:+f.molL||0,molC:+f.molC||0,molLG:+f.molLG||0,molCG:+f.molCG||0,perda:+f.perda||0};delete d.id;
 if(form.querySelector('#fichaProp').checked)d.ficha=lerFicha(form,f.pmo,f.pfixo);else delete d.ficha;
-if(pltMol)d.mol={arq:pltMol.arq,un:'mm',pecas:pltMol.pecas.map(q=>({w:q.w,h:q.h,qtd:q.qtd,pts:q.pts}))};
+if(pltMol){d.mol={arq:pltMol.arq,un:'mm',pecas:pltMol.pecas.map(q=>({w:q.w,h:q.h,qtd:q.qtd,pts:q.pts}))};delete d.molId}
+else if(id){ // o editor de molde pode ter mudado mol/molId depois que o formulário abriu
+const {data:r}=await sb.from('docs').select('data').eq('id',id).single();
+if(r&&r.data){if(r.data.mol)d.mol=r.data.mol;else delete d.mol;if(r.data.molId)d.molId=r.data.molId;else delete d.molId}}
 const upF=form.fotoF.files[0],upC=form.fotoC.files[0];
 if(f.delF&&!upF&&p.imgF){await sb.storage.from('produtos').remove([p.imgF]);d.imgF=''}
 if(f.delC&&!upC&&p.imgC){await sb.storage.from('produtos').remove([p.imgC]);d.imgC=''}
@@ -878,13 +882,15 @@ t+=c*n;
 }
 return t>0?t:null;
 }
-let pltMol=null;
+let pltMol=null,pltMolId='';
+const molOrigem=p=>p&&p.molId?'editor':p&&p.mol?'plt':null;
 const pltForm=()=>document.querySelector('dialog[open] form');
 async function lerPlt(fm){
 const prev=$('#pltprev'),f=fm.plt.files[0];
 pltMol=null;
 if(!prev)return;
 if(!f){prev.innerHTML='';return}
+if(pltMolId&&!confirm('Este produto usa um molde desenhado no editor. Importar um PLT desliga o produto desse molde. Continuar?')){fm.plt.value='';prev.innerHTML='';return}
 let txt='';
 try{txt=await f.text()}catch(e){prev.innerHTML='<p class="low">Não consegui ler esse arquivo.</p>';return}
 const cs=moldesDePlt(txt);
@@ -1763,6 +1769,9 @@ const t=[['aviamento 20/10un x2 + tecido 10x2m',a.mp,24],
 ['margem %',m.pct,52.5],
 ['comissao = a maior cadastrada',m.com,10],
 ['preco zero nao divide por zero',margem(10,0).pct,null],
+['molde do editor tem molId',+(molOrigem({molId:'m',mol:{}})==='editor'),1],
+['molde so PLT sem molId',+(molOrigem({mol:{}})==='plt'),1],
+['produto sem molde',+(molOrigem({})===null),1],
 ['produto sem foto vira placeholder',+foto({},'foto').includes('semfoto'),1],
 ['so frente nao oferece virar',+foto({imgF:'a.jpg'},'foto').includes('data-verso'),0],
 ['frente+costas oferece virar',+foto({imgF:'a.jpg',imgC:'b.jpg'},'foto').includes('data-verso'),1],
