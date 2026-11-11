@@ -112,9 +112,9 @@
     for (const peca of normalizar(m).pecas) {
       if (!peca.visivel || !peca.tracos.length) continue;
       const { a, b } = peca.fio, ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
-      // peça quebrada (traço ou ponto apagado) fica fora, sem impedir o resto de salvar
+      // peça quebrada (traço ou ponto apagado, contorno que não fecha mais) fica fora, sem impedir o resto de salvar
       let c = null;
-      try { if (peca.tracos.every(t => acha(m, t.id))) c = G.girar(corte(m, peca), { x: 0, y: 0 }, -ang); } catch (e) { c = null; }
+      try { if (encadear(m, peca.tracos.map(t => t.id)).ok) c = G.girar(corte(m, peca), { x: 0, y: 0 }, -ang); } catch (e) { c = null; }
       if (!c || c.length < 3 || !c.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))) continue;
       const bx = G.bbox(c);
       const pts = c.map(p => [Math.round(p.x - bx.x0), Math.round(p.y - bx.y0)]);

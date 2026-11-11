@@ -217,6 +217,11 @@ testes.push(
 const pm = structuredClone(dr), np1 = D.novaPeca(pm, [...rr, Object.keys(pm.pontos)[0]]), np2 = D.novaPeca(pm, rr);
 const pc1 = np1.peca, solta = D.novaPeca(structuredClone(dr), [rr[0], rr[1]]);
 const pmQ = structuredClone(pm); D.apagar(pmQ, [rr[0]]);
+// peça editada depois de extraída: reta atravessando a barra + cortar; arredondar um canto
+const pmUma = structuredClone(dr); D.novaPeca(pmUma, rr);
+const pmCortada = structuredClone(pmUma); D.reta(pmCortada, D.ponto(pmCortada, P(150, -50)), D.ponto(pmCortada, P(150, 50)));
+const cortou = D.cortar(pmCortada, [rr[0]]);
+const pmArred = structuredClone(pmUma), arredou = D.arredondar(pmArred, [rr[0], rr[1]], 50);
 testes.push(
   ['novaPeca ok ignora ponto', [np1.ok, pc1.tracos.length], [true, 4]],
   ['novaPeca padroes', [pc1.nome, pc1.cortar, pc1.par, pc1.margem, pc1.dobra, pc1.visivel, pc1.travada], ['PEÇA 1', 1, false, 10, null, true, false]],
@@ -230,6 +235,10 @@ testes.push(
   ['pique na bainha 3 cm', D.pique(pm, { ...pc1, margemTraco: { [rr[0]]: 30 } }, { tracoId: rr[0], t: 0.5 }), [P(150, -30), P(150, -25)]],
   ['pique traco invertido', D.pique(pm, { ...pc1, tracos: [{ id: rr[0], inv: true }] }, { tracoId: rr[0], t: 0.5 }), [P(150, 10), P(150, 5)]],
   ['naPeca acha traco e t', (h => [h.tracoId, h.t, h.d, h.L])(D.naPeca(pm, pc1, P(100, 2))), [rr[0], 1 / 3, 2, 300], 1e-6],
+  ['cortar e arredondar aplicados na peca', [!!cortou.ids, !!arredou.ids], [true, true]],
+  ['molParaProduto peca inteira vai', M.molParaProduto(pmUma).pecas.length, 1],
+  ['molParaProduto pula peca com aresta cortada', [D.geoPeca(pmCortada, pmCortada.pecas[0]), M.molParaProduto(pmCortada).pecas.length], [null, 0]],
+  ['molParaProduto pula peca com canto arredondado', [D.geoPeca(pmArred, pmArred.pecas[0]), M.molParaProduto(pmArred).pecas.length], [null, 0]],
   ['noTraco polilinha', D.noTraco([P(0, 0), P(100, 0), P(100, 100)], P(105, 50)), { t: 0.75, d: 5 }],
 );
 
