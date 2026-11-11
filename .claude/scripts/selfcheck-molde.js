@@ -88,6 +88,66 @@ const testes = [
   ['mover', G.mover([P(1, 2)], 3, 4)[0], P(4, 6)],
 ];
 
+// modelo: retângulo 100×200 com a barra (r1) embaixo
+if (!M) { console.error('FALHA molde/modelo.js ausente'); process.exit(2); }
+const ret = M.novo('teste');
+Object.assign(ret.pontos, { a: P(0, 0), b: P(100, 0), c: P(100, 200), d: P(0, 200) });
+ret.tracos.push({ id: 'r1', tipo: 'reta', a: 'a', b: 'b' }, { id: 'r2', tipo: 'reta', a: 'b', b: 'c' },
+  { id: 'r3', tipo: 'reta', a: 'd', b: 'c' }, { id: 'r4', tipo: 'reta', a: 'd', b: 'a' }); // r3 invertida
+const enc = M.encadear(ret, ['r3', 'r1', 'r4', 'r2']);
+const furo = M.encadear(ret, ['r1', 'r2', 'r3']);
+const pecaRet = (extra) => M.normalizar({ pecas: [{ id: 'p', tracos: enc.tracos, ...extra }] }).pecas[0];
+const contornoEnc = enc.tracos.map(t => (p => t.inv ? p.slice().reverse() : p)(M.tracoPts(ret, ret.tracos.find(x => x.id === t.id)))[0]);
+ret.pecas = [pecaRet({ par: true, fio: { a: P(0, 0), b: P(0, 100) } })];
+const prodRet = M.molParaProduto(ret);
+// quadrado com fio a 45°
+const qd = M.novo('qd');
+Object.assign(qd.pontos, { a: P(0, 0), b: P(100, 0), c: P(100, 100), d: P(0, 100) });
+qd.tracos.push({ id: 's1', tipo: 'reta', a: 'a', b: 'b' }, { id: 's2', tipo: 'reta', a: 'b', b: 'c' },
+  { id: 's3', tipo: 'reta', a: 'c', b: 'd' }, { id: 's4', tipo: 'reta', a: 'd', b: 'a' });
+qd.pecas = [M.normalizar({ pecas: [{ id: 'q', cortar: 1, par: true, tracos: M.encadear(qd, ['s1', 's2', 's3', 's4']).tracos, fio: { a: P(0, 0), b: P(100, 100) } }] }).pecas[0]];
+const prodQd = M.molParaProduto(qd), cxQd = G.bbox(G.girar(M.corte(qd, qd.pecas[0]), P(0, 0), -45));
+// dobra no lado esquerdo (r4) → peça aberta 200×200
+const pecaDobra = pecaRet({ dobra: { tracoId: 'r4' } });
+// pence de 20 de abertura e 50 de profundidade no meio da barra
+const pecaPence = pecaRet({ pences: [{ tracoId: 'r1', t: 0.5, abertura: 20, profundidade: 50 }] });
+const cosPence = M.costura(ret, pecaPence);
+const circ = M.novo('c');
+circ.pontos.o = P(0, 0); circ.tracos.push({ id: 'k', tipo: 'circulo', c: 'o', r: 50 });
+const h = M.historico();
+h.gravar({ n: 1 }); h.gravar({ n: 2 }); h.gravar({ n: 3 });
+const h1 = (h.desfazer(), h.desfazer()), h2 = h.refazer();
+const nVazio = M.normalizar({});
+
+testes.push(
+  ['encadear fora de ordem ok', enc.ok, true],
+  ['encadear 4 tracos', enc.tracos.length, 4],
+  ['encadear area positiva', G.area(contornoEnc) > 0, true],
+  ['encadear sem uma reta falha', furo.ok, false],
+  ['encadear erro nao fecha', /não fecha/.test(furo.erro), true],
+  ['encadear ponta solta', [P(0, 0), P(0, 200)].some(q => Math.hypot(q.x - furo.ponta.x, q.y - furo.ponta.y) < TOL), true],
+  ['encadear circulo sozinho', M.encadear(circ, ['k']).ok, true],
+  ['corte com bainha 30', (b => [b.w, b.h])(G.bbox(M.corte(ret, pecaRet({ margemTraco: { r1: 30 } })))), [120, 240]],
+  ['costura com dobra 200x200', (b => [b.w, b.h])(G.bbox(M.costura(ret, pecaDobra))), [200, 200]],
+  ['costura com dobra area', G.area(M.costura(ret, pecaDobra)), 40000],
+  ['pence ponta a 50 da barra', cosPence.some(q => Math.abs(q.x - 50) < TOL && Math.abs(q.y - 50) < TOL), true],
+  ['pence tira o V da area', G.area(cosPence), 20000 - 20 * 50 / 2],
+  ['molParaProduto chaves', Object.keys(prodRet).sort(), ['arq', 'pecas', 'un']],
+  ['molParaProduto peca chaves', Object.keys(prodRet.pecas[0]).sort(), ['h', 'pts', 'qtd', 'w']],
+  ['molParaProduto un mm', prodRet.un, 'mm'],
+  ['molParaProduto pts [x,y] inteiros', prodRet.pecas[0].pts.every(q => Array.isArray(q) && q.length === 2 && q.every(Number.isInteger)), true],
+  ['molParaProduto pts no canto', (p => [Math.min(...p.map(q => q[0])), Math.min(...p.map(q => q[1]))])(prodRet.pecas[0].pts), [0, 0]],
+  ['molParaProduto fio vertical vai para X', [prodRet.pecas[0].w, prodRet.pecas[0].h], [220, 120], 1],
+  ['molParaProduto qtd par', prodQd.pecas[0].qtd, 2],
+  ['molParaProduto fio 45 caixa', [prodQd.pecas[0].w, prodQd.pecas[0].h], [cxQd.w, cxQd.h], 1],
+  ['molParaProduto oculta fica fora', M.molParaProduto({ ...qd, pecas: [{ ...qd.pecas[0], visivel: false }] }).pecas.length, 0],
+  ['normalizar vazio', [nVazio.pontos, nVazio.tracos, nVazio.pecas, nVazio.base], [{}, [], [], 'M']],
+  ['normalizar margem padrao', M.normalizar({ pecas: [{ id: 'a' }] }).pecas[0].margem, 10],
+  ['novo', [M.novo('x').nome, M.novo('x').v, M.novo('x').base], ['x', 1, 'M']],
+  ['historico desfazer 2', h1, { n: 1 }],
+  ['historico refazer', h2, { n: 2 }],
+);
+
 const perto = (a, b, tol) => typeof a === 'number' ? Math.abs(a - b) <= tol
   : a && typeof a === 'object' ? Object.keys(b).length === Object.keys(a).length && Object.keys(b).every(k => perto(a[k], b[k], tol)) : a === b;
 
