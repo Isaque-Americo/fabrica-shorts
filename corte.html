@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ordens de corte</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="molde/encaixe.js"></script>
+<script src="molde/ordem.js"></script>
+<style>
+:root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{min-height:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button.pri,button.ghost,button.sm{font:inherit;border-radius:8px;cursor:pointer;padding:8px 14px;border:1px solid var(--ac)}
+button.pri{background:var(--ac);color:var(--acx)}
+button.ghost,button.sm{background:none;color:var(--ac)}
+button.sm{padding:4px 10px;font-size:13px}
+button.perigo{color:var(--bad);border-color:var(--bad)}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+input,select,textarea{font:inherit;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
+a{color:var(--ac)}
+dialog{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx);width:min(560px,94vw);padding:18px;max-height:92vh;overflow:auto}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h3{margin:0 0 12px}
+.row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+#aviso{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
+#aviso .c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:24px;max-width:420px}
+.topo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--bd)}
+.topo a{text-decoration:none;font-size:14px}
+.topo .esp{flex:1}
+#nome{font-weight:600;min-width:160px;max-width:360px;flex:1}
+#estado{font-size:13px;color:var(--mut);white-space:nowrap}
+#estado.ok{color:var(--ok)}#estado.erro{color:var(--bad);font-weight:600}
+main{max-width:1100px;margin:0 auto;padding:16px}
+.vazio{color:var(--mut);font-size:13px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px}
+table.lst{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--bd);border-radius:10px}
+table.lst th,table.lst td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left}
+table.lst th{color:var(--mut);font-weight:500;font-size:13px}
+table.lst td.n,table.lst th.n{text-align:right}
+.abas{display:flex;gap:4px;flex-wrap:wrap;align-items:flex-end;border-bottom:1px solid var(--bd);margin-bottom:10px}
+.abas [role=tab]{font:inherit;font-size:14px;font-weight:600;background:none;border:0;border-bottom:2px solid transparent;color:var(--mut);padding:6px 10px;cursor:pointer}
+.abas [role=tab][aria-selected="true"]{color:var(--tx);border-bottom-color:var(--ac)}
+.abas .acoes{margin-left:auto;display:flex;gap:4px;padding-bottom:4px;flex-wrap:wrap}
+#abas-tec [role=tab]{font-size:15px}
+.resumo{font-size:13px;color:var(--mut);margin:0 0 10px}
+.resumo .ruim{color:var(--bad);font-weight:600}
+.item{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.item header{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.item header strong{flex:1;min-width:160px}
+.item header label{font-size:13px;display:flex;gap:6px;align-items:center}
+.item header input{width:140px}
+.grade{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.tam{display:grid;grid-template-columns:28px auto 28px;align-items:center;justify-items:center;border:1px solid var(--bd);border-radius:8px;padding:4px;min-width:96px}
+.tam .t{grid-column:1/4;font-weight:600;font-size:13px}
+.tam button{font:inherit;width:28px;height:28px;padding:0;border:1px solid var(--bd);border-radius:6px;background:none;color:var(--tx);cursor:pointer}
+.tam output{min-width:28px;text-align:center;font-weight:600}
+.tam small{grid-column:1/4;color:var(--mut);font-size:12px}
+.pecas{border:1px solid var(--bd);border-radius:8px;padding:6px 10px;margin:0;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px}
+.pecas legend{font-size:13px;color:var(--mut);padding:0 4px}
+.add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
+.add select{min-width:220px}
+.resultado{border:1px dashed var(--bd);border-radius:10px;padding:12px;margin-top:12px}
+.campo{display:flex;flex-direction:column;gap:4px;margin:8px 0;font-size:14px}
+.duas{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+fieldset.grp{border:1px solid var(--bd);border-radius:8px;margin:12px 0 0;padding:6px 12px 10px}
+fieldset.grp legend{font-weight:600;font-size:14px;padding:0 4px}
+#pr-mat-info{font-size:13px;color:var(--mut);margin:4px 0 0}
+textarea{resize:vertical;min-height:60px}
+#toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:#fff;padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
+@media (max-width:560px){.duas{grid-template-columns:1fr}main{padding:12px}}
+</style>
+</head>
+<body>
+<div id="aviso"><div class="c" id="aviso-c">Carregando…</div></div>
+
+<div id="lista-v" hidden>
+  <header class="topo"><a href="index.html">← App</a></header>
+  <main>
+    <div class="row" style="justify-content:space-between;align-items:center;margin:0 0 12px">
+      <h2 style="margin:0;font:600 20px 'Poppins',sans-serif">Ordens de corte</h2>
+      <button class="pri" type="button" id="btn-nova">Nova ordem</button>
+    </div>
+    <table class="lst"><thead><tr><th>Nome</th><th>Data</th><th class="n">Metros</th></tr></thead><tbody id="lista"></tbody></table>
+  </main>
+</div>
+
+<div id="ordem-v" hidden>
+  <header id="topo" class="topo">
+    <a id="volta" href="corte.html">← Ordens</a>
+    <input id="nome" aria-label="Nome da ordem" placeholder="Nome da ordem" autocomplete="off">
+    <span id="estado" role="status" aria-live="polite">Salvo</span>
+    <span class="esp"></span>
+    <button class="sm" type="button" id="btn-props">Propriedades</button>
+  </header>
+  <main>
+    <div class="abas" id="abas-tec">
+      <div role="tablist" aria-label="Tecidos da ordem" id="tabs-tec" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+      <span class="acoes"><button class="sm" type="button" id="tec-novo">+ Tecido</button><button class="sm perigo" type="button" id="tec-apagar">Apagar tecido</button></span>
+    </div>
+    <p class="resumo" id="tec-resumo"></p>
+    <div class="abas" id="abas-enf">
+      <div role="tablist" aria-label="Enfestos deste tecido" id="tabs-enf" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+      <span class="acoes"><button class="sm" type="button" id="enf-novo">+ Enfesto</button><button class="sm" type="button" id="enf-ren">Renomear</button><button class="sm perigo" type="button" id="enf-apagar">Apagar enfesto</button></span>
+    </div>
+    <section id="enf-corpo" role="tabpanel" aria-labelledby=""></section>
+  </main>
+</div>
+
+<dialog id="dlg-props" aria-labelledby="dlg-props-t">
+  <h3 id="dlg-props-t">Propriedades da ordem</h3>
+  <label class="campo">Nome <input id="pr-nome" autocomplete="off"></label>
+  <label class="campo">Observação <textarea id="pr-obs"></textarea></label>
+  <fieldset class="grp" id="pr-tec">
+    <legend id="pr-tec-l">Tecido</legend>
+    <label class="campo">Matéria-prima <select id="pr-mat"></select></label>
+    <p id="pr-mat-info"></p>
+  </fieldset>
+  <fieldset class="grp" id="pr-enf">
+    <legend id="pr-enf-l">Enfesto</legend>
+    <div class="duas">
+      <label class="campo">Camadas <input id="pr-cam" type="number" min="1" step="1"></label>
+      <label class="campo">Altura máxima (camadas) <input id="pr-alt" type="number" min="0" step="1" placeholder="sem limite"></label>
+      <label class="campo">Comprimento máximo (m) <input id="pr-comp" inputmode="decimal" autocomplete="off" placeholder="sem limite"></label>
+      <label class="campo">Cabeceira (cm) <input id="pr-cab" inputmode="decimal" autocomplete="off"></label>
+      <label class="campo pr-ourela">Ourela esquerda (cm) <input id="pr-oe" inputmode="decimal" autocomplete="off"></label>
+      <label class="campo pr-ourela">Ourela direita (cm) <input id="pr-od" inputmode="decimal" autocomplete="off"></label>
+    </div>
+    <p class="vazio" id="pr-tub" hidden>Tecido tubular: sem ourela, a dobra fica na borda.</p>
+    <label class="campo">Sentido <select id="pr-sent"><option value="duplo">Duplo (camadas face a face)</option><option value="unico">Único (todas na mesma face)</option></select></label>
+  </fieldset>
+  <div class="row"><button class="pri" type="button" id="pr-ok">Fechar</button></div>
+</dialog>
+<div id="toast" role="status"></div>
+<script>
+const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
+const IS_DEV=location.hostname==='localhost'||location.hostname==='127.0.0.1';
+const Q=new URLSearchParams(location.search);
+// ?local=1 só em localhost: sem Supabase, tudo no localStorage (para testar a tela sem login)
+const LOCAL=IS_DEV&&Q.get('local')==='1';
+const sb=LOCAL?null:supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s);
+const MO=window.MoldeOrdem;
+const SZ=['P','M','G','GG','G1','G2','G3','G4'];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+const num=v=>{const n=parseFloat(String(v??'').replace(',','.'));return Number.isFinite(n)?n:0};
+const nf=(v,d=2)=>(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const campo=v=>v?String(+v.toFixed(3)).replace('.',','):''; // valor de input com vírgula; 0 fica vazio
+const brl=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const urlCom=(k,v)=>{const u=new URLSearchParams(LOCAL?'local=1':'');if(k)u.set(k,v);const s=String(u);return 'corte.html'+(s?'?'+s:'')};
+
+function ptErro(e){
+const m=String((e&&e.message)||e||'');
+if(/failed to fetch|networkerror|network request|load failed|sem conexão/i.test(m))return 'Sem conexão com o servidor.';
+if(/session|jwt|refresh token|sessão/i.test(m))return 'Sua sessão expirou. Entre novamente no app.';
+if(/row-level security|permission denied|not authorized|sem permissão/i.test(m))return 'Sem permissão para salvar.';
+return m||'Erro ao salvar.';
+}
+function toast(t){const d=$('#toast');d.textContent=t;d.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>d.style.display='none',3500)}
+
+// ---- armazenamento: Supabase (docs) ou local; o resto da página não sabe qual ----
+const B=LOCAL?(()=>{
+const K='corte-local:',ler=k=>{try{return JSON.parse(localStorage.getItem(K+k))}catch(e){return null}},gravarK=(k,v)=>localStorage.setItem(K+k,JSON.stringify(v));
+// rede derrubada (context.setOffline) ou window.simularOffline=true no console
+const rede=()=>{if(!navigator.onLine||window.simularOffline)throw new Error('Failed to fetch')};
+const ret=(w,h)=>[[0,0],[w,0],[w,h],[0,h]];
+const pc=(nome,w,h,o)=>({nome,w,h,qtd:1,pts:ret(w,h),rot:'180',...o});
+if(!ler('produtos'))gravarK('produtos',{
+'p-teste-1':{ref:'101',nome:'Short tactel masculino',tecidoId:'tec-tactel',mol:{arq:'Molde: Short 101',un:'mm',origem:'editor',
+  pecas:[pc('Frente',300,600,{qtd:2,par:true,espelhar:true}),pc('Costas',320,620,{qtd:2,par:true,espelhar:true}),pc('Forro bolso',200,250,{qtd:2,tecido:'tec-forro'})],
+  porTam:{P:[pc('Frente',280,580,{qtd:2,par:true,espelhar:true}),pc('Costas',300,600,{qtd:2,par:true,espelhar:true}),pc('Forro bolso',200,250,{qtd:2,tecido:'tec-forro'})],
+          M:[pc('Frente',300,600,{qtd:2,par:true,espelhar:true}),pc('Costas',320,620,{qtd:2,par:true,espelhar:true}),pc('Forro bolso',200,250,{qtd:2,tecido:'tec-forro'})],
+          G:[pc('Frente',320,620,{qtd:2,par:true,espelhar:true}),pc('Costas',340,640,{qtd:2,par:true,espelhar:true}),pc('Forro bolso',210,260,{qtd:2,tecido:'tec-forro'})]}}},
+'p-teste-2':{ref:'102',nome:'Bermuda moletom',tecidoId:'tec-forro',mol:{arq:'BERMUDA.PLT',un:'mm',pecas:[pc('',350,650,{qtd:2}),pc('',120,700,{qtd:1})]}}});
+if(!ler('materiais'))gravarK('materiais',{
+'tec-tactel':{tipo:'tecido',nome:'Tactel',cor:'Azul',larg:1.6,gram:120,forn:'Têxtil Sul',cobr:'mt',preco:12.5},
+'tec-forro':{tipo:'tecido',nome:'Malha tubular',larg:0.9,gram:180,forn:'Malharia Norte',cobr:'kg',preco:38,rend:3.2,tubular:true,encolhC:3,encolhL:2},
+'aviamento-1':{tipo:'aviamento',nome:'Elástico'}});
+if(!ler('ordens'))gravarK('ordens',{'o-exemplo':{nome:'Ordem de exemplo',obs:'',criadaEm:'2026-11-10T12:00:00.000Z',pedidos:[],
+  tecidos:[{id:'t1',materiaId:'tec-tactel'},{id:'t2',materiaId:'tec-forro'}],
+  enfestos:[{id:'e1',nome:'Enfesto 1',tecidoId:'t1',camadas:10,compMax:5000,itens:[{produtoId:'p-teste-1',cor:'Azul',pecas:null,grade:{P:1,M:2,G:1}}]},
+            {id:'e2',nome:'Forro',tecidoId:'t2',camadas:10,itens:[{produtoId:'p-teste-1',cor:'Azul',pecas:null,grade:{P:1,M:2,G:1}}]}],v:1}});
+const lista=k=>Object.entries(ler(k)||{}).map(([id,data])=>({id,data}));
+return {
+async ordens(){rede();return lista('ordens')},
+async ordem(id){rede();return (ler('ordens')||{})[id]||null},
+async criar(d){rede();const id='o'+Date.now(),t=ler('ordens')||{};t[id]=d;gravarK('ordens',t);return id},
+async gravar(id,d){rede();const t=ler('ordens')||{};t[id]=d;gravarK('ordens',t)},
+async produtos(){rede();return lista('produtos')},
+async materiais(){rede();return lista('materiais')}
+};
+})():(()=>{
+const ok=r=>{if(r.error)throw r.error;return r.data};
+async function sessaoOk(){const {data:{session}}=await sb.auth.getSession();if(!session)throw new Error('Sua sessão expirou.')}
+const doCol=async c=>{await sessaoOk();return ok(await sb.from('docs').select('id,data').eq('col',c).order('created_at'))};
+return {
+ordens:()=>doCol('ordens'),
+async ordem(id){await sessaoOk();const r=ok(await sb.from('docs').select('data').eq('id',id).eq('col','ordens').maybeSingle());return r?r.data:null},
+async criar(d){await sessaoOk();return ok(await sb.from('docs').insert({col:'ordens',data:d}).select('id').single()).id},
+// update que não acha a linha (RLS) volta vazio sem erro: tratar como falha para não perder a alteração
+async gravar(id,d){await sessaoOk();if(!ok(await sb.from('docs').update({data:d}).eq('id',id).eq('col','ordens').select('id')).length)throw new Error('Sem permissão para salvar.')},
+produtos:()=>doCol('produtos'),
+materiais:()=>doCol('materiais')
+};
+})();
+
+// ---- estado ----
+let O=null,ordId=null,estado='salvo',ver=0,salvando=false,timer=null,erroSalvar='';
+let PRODS=[],MATS=[],tecAtual=null,enfAtual=null;
+const RASC=()=>'ordem:'+ordId;
+const prod=id=>PRODS.find(p=>p.id===id),mat=id=>MATS.find(m=>m.id===id);
+const curTec=()=>O.tecidos.find(t=>t.id===tecAtual),curEnf=()=>O.enfestos.find(e=>e.id===enfAtual);
+const nomeProd=p=>p?[p.ref,p.nome].filter(Boolean).join(' · ')||'(sem nome)':'Produto não encontrado';
+const nomeMat=m=>m?[m.nome,m.cor].filter(Boolean).join(' · ')||'(sem nome)':'';
+const nomeTec=(t,i)=>(nomeMat(mat(t.materiaId))||'Tecido sem matéria-prima')+(i===0?' (principal)':'');
+
+function bloquear(msg,entrar){
+$('#lista-v').hidden=$('#ordem-v').hidden=true;$('#aviso').hidden=false;
+const c=$('#aviso-c');c.textContent=msg;
+if(entrar){const a=document.createElement('a');a.href='index.html';a.textContent='Entrar';a.style.cssText='display:block;margin-top:14px';c.append(a)}
+}
+function marcar(e){
+estado=e;const s=$('#estado');
+s.className=e==='salvo'?'ok':erroSalvar&&e==='nao-salvo'?'erro':'';
+s.textContent=e==='salvo'?'Salvo':e==='salvando'?'Salvando…':erroSalvar?'Não salvo — tentando de novo':'Não salvo';
+s.title=e==='nao-salvo'&&erroSalvar?erroSalvar:'';
+}
+function sujou(){ver++;erroSalvar='';marcar('nao-salvo');agendar()}
+function agendar(ms=1500){clearTimeout(timer);timer=setTimeout(salvar,ms)}
+async function salvar(){
+clearTimeout(timer);
+if(salvando){agendar();return}
+if(estado==='salvo')return;
+salvando=true;
+const v=ver,t=Date.now(),doc={...structuredClone(O),salvoEm:t};
+try{localStorage.setItem(RASC(),JSON.stringify({em:t,o:doc}))}catch(e){}
+marcar('salvando');
+try{
+await B.gravar(ordId,doc);
+if(ver===v){try{localStorage.removeItem(RASC())}catch(e){}marcar('salvo')}else{marcar('nao-salvo');agendar()}
+}catch(e){
+console.error(e);erroSalvar=ptErro(e);marcar('nao-salvo');agendar(10000);
+}finally{salvando=false}
+}
+
+// ---- lista ----
+const dataBR=iso=>{const d=new Date(iso);return isNaN(d)?'—':d.toLocaleDateString('pt-BR')};
+const nomePadrao=()=>'Ordem '+new Date().toLocaleDateString('pt-BR');
+async function abrirLista(){
+const ords=(await B.ordens()).map(r=>({id:r.id,o:MO.normalizar(r.data)})).sort((a,b)=>String(b.o.criadaEm).localeCompare(String(a.o.criadaEm)));
+$('#aviso').hidden=true;$('#lista-v').hidden=false;
+const tb=$('#lista');
+if(!ords.length){tb.innerHTML='<tr><td colspan="3" class="vazio">Nenhuma ordem ainda. Use “Nova ordem” ou o botão da aba Fabricar no app.</td></tr>';return}
+tb.innerHTML=ords.map(x=>`<tr><td><a href="${esc(urlCom('id',x.id))}">${esc(x.o.nome||'(sem nome)')}</a></td><td>${dataBR(x.o.criadaEm)}</td><td class="n" data-metros="${esc(x.id)}">…</td></tr>`).join('');
+// shortcut: metros recalculados com o encaixe a cada abertura da lista; guardar no doc se a lista ficar lenta
+for(const x of ords){
+await new Promise(r=>setTimeout(r));
+let m=null;try{m=MO.resultados(x.o,x.o.enfestos.map(e=>MO.calcularEnfesto(e,x.o,PRODS,MATS)),MATS).metros}catch(e){console.error(e)}
+const td=tb.querySelector(`[data-metros="${CSS.escape(x.id)}"]`);if(td)td.textContent=m?nf(m)+' m':'—';
+}
+}
+async function criarEIr(doc){const id=await B.criar(doc);location.href=urlCom('id',id)}
+
+// ---- ordem ----
+async function abrirOrdem(id,doc){
+ordId=id;
+O=MO.normalizar(doc);let pendente=false;
+let r=null;try{r=JSON.parse(localStorage.getItem(RASC()))}catch(e){}
+if(r&&r.em>(doc.salvoEm||0)){
+if(confirm('Há alterações desta ordem de '+new Date(r.em).toLocaleString('pt-BR')+' que não chegaram ao servidor. Recuperar?')){O=MO.normalizar(r.o);pendente=true}
+else try{localStorage.removeItem(RASC())}catch(e){}
+}
+if(!O.tecidos.length){O.tecidos.push({id:uid(),materiaId:''});pendente=true}
+$('#aviso').hidden=true;$('#ordem-v').hidden=false;
+$('#volta').href=urlCom();
+$('#nome').value=O.nome;
+marcar('salvo');if(pendente)sujou();
+render();
+}
+const uid=()=>Math.random().toString(36).slice(2,10);
+
+// tamanhos do produto: os de p.mol.porTam, senão a grade do app; mais os que já têm quantidade
+function tamsDe(p,it){
+const pt=p&&p.mol&&p.mol.porTam,base=pt&&Object.keys(pt).length?Object.keys(pt):SZ;
+return [...base,...Object.keys(it.grade).filter(t=>!base.includes(t)&&it.grade[t])];
+}
+// nomes das peças do molde que vão neste tecido (mesma regra do MoldeOrdem: peça sem tecido vai no principal)
+function pecasDe(p,aba){
+const m=p&&p.mol;if(!m||!aba)return [];
+const abas=O.tecidos.map(t=>t.materiaId),pr=abas.includes(p.tecidoId)?p.tecidoId:abas[0];
+const listas=m.porTam&&Object.keys(m.porTam).length?Object.values(m.porTam):[m.pecas||[]],s=new Set();
+for(const l of listas)(l||[]).forEach((q,k)=>{if(q&&(q.tecido||pr)===aba.materiaId)s.add(q.nome||String(k))});
+return [...s];
+}
+
+function tabs(el,itens,atual,attr){
+el.innerHTML=itens.map(([id,txt])=>`<button type="button" role="tab" id="tab-${esc(id)}" aria-selected="${id===atual}" tabindex="${id===atual?0:-1}" data-${attr}="${esc(id)}" data-foco="tab-${esc(id)}">${esc(txt)}</button>`).join('');
+}
+
+function render(){
+const foco=document.activeElement&&document.activeElement.dataset.foco;
+if(!O.tecidos.some(t=>t.id===tecAtual))tecAtual=O.tecidos[0].id;
+const enfs=O.enfestos.filter(e=>e.tecidoId===tecAtual);
+if(!enfs.some(e=>e.id===enfAtual))enfAtual=enfs[0]?enfs[0].id:null;
+document.title=(O.nome||'Ordem')+' · Ordens de corte';
+tabs($('#tabs-tec'),O.tecidos.map((t,i)=>[t.id,nomeTec(t,i)]),tecAtual,'tec');
+tabs($('#tabs-enf'),enfs.map(e=>[e.id,e.nome]),enfAtual,'enf');
+$('#tec-apagar').disabled=O.tecidos.length<2;
+$('#enf-ren').disabled=$('#enf-apagar').disabled=!enfAtual;
+const aba=curTec(),m=mat(aba.materiaId);
+$('#tec-resumo').textContent=m?infoMat(m):'Escolha a matéria-prima em Propriedades.';
+const c=$('#enf-corpo'),e=curEnf();
+c.setAttribute('aria-labelledby',e?'tab-'+e.id:'');
+if(!e){c.innerHTML='<p class="vazio">Nenhum enfesto neste tecido. Use “+ Enfesto”.</p>';return restaurar(foco)}
+const tub=!!(m&&m.tubular);
+const res=[`${e.camadas} camada(s)`,e.alturaMax?`altura máx. ${e.alturaMax}`:'',e.compMax?`comp. máx. ${nf(e.compMax/1000)} m`:'',
+  e.cabeceira?`cabeceira ${nf(e.cabeceira/10,1)} cm`:'',!tub&&(e.ourelaE||e.ourelaD)?`ourelas ${nf(e.ourelaE/10,1)} / ${nf(e.ourelaD/10,1)} cm`:'',
+  e.sentido==='unico'?'sentido único':'sentido duplo'].filter(Boolean).map(esc).join(' · ');
+const alto=e.alturaMax&&e.camadas>e.alturaMax?` · <span class="ruim">camadas acima da altura máxima</span>`:'';
+const usados=new Set(PRODS.filter(p=>e.itens.some(it=>it.produtoId===p.id)).map(p=>p.id));
+c.innerHTML=`<p class="resumo">${res}${alto} <button class="sm" type="button" data-acao="props" data-foco="props">Editar</button></p>`+
+(e.itens.length?e.itens.map((it,i)=>itemHtml(e,it,i,aba)).join(''):'<p class="vazio">Nenhum produto neste enfesto.</p>')+
+`<div class="add"><label for="add-prod" class="vazio">Adicionar produto</label><select id="add-prod" data-foco="add-prod">${PRODS.slice().sort((a,b)=>String(a.ref||'').localeCompare(String(b.ref||''))).map(p=>`<option value="${esc(p.id)}">${esc(nomeProd(p))}${p.mol?'':' (sem molde)'}${usados.has(p.id)?' ✓':''}</option>`).join('')}</select>
+<input id="add-cor" aria-label="Cor do produto a adicionar" placeholder="Cor" autocomplete="off" style="width:140px"><button class="sm" type="button" data-acao="add" data-foco="add">Adicionar</button></div>
+<section class="resultado" id="res-${esc(e.id)}" data-enf="${esc(e.id)}" aria-label="Resultados do enfesto"><p class="vazio">Risco e resultados deste enfesto: em breve.</p></section>`;
+restaurar(foco);
+}
+function restaurar(foco){if(foco){const el=document.querySelector(`[data-foco="${CSS.escape(foco)}"]`);if(el)el.focus()}}
+
+function itemHtml(e,it,i,aba){
+const p=prod(it.produtoId),pn=pecasDe(p,aba),k=`${i}-`;
+const grade=tamsDe(p,it).map(t=>{const q=it.grade[t]||0;return `<div class="tam" role="group" aria-label="Tamanho ${esc(t)}"><span class="t">${esc(t)}</span>
+<button type="button" data-acao="menos" data-i="${i}" data-t="${esc(t)}" data-foco="${k}m${esc(t)}" aria-label="Menos uma ${esc(t)} por camada"${q?'':' disabled'}>−</button>
+<output aria-label="${esc(t)} por camada">${q}</output>
+<button type="button" data-acao="mais" data-i="${i}" data-t="${esc(t)}" data-foco="${k}p${esc(t)}" aria-label="Mais uma ${esc(t)} por camada">+</button>
+<small>total ${q*e.camadas}</small></div>`}).join('');
+const pecas=pn.length?`<fieldset class="pecas"><legend>Peças que entram</legend>${pn.map(n=>`<label><input type="checkbox" data-acao="peca" data-i="${i}" data-n="${esc(n)}" data-foco="${k}c${esc(n)}"${!it.pecas||it.pecas.includes(n)?' checked':''}> ${esc(/^\d+$/.test(n)?'Peça '+(+n+1):n)}</label>`).join('')}</fieldset>`
+:`<p class="vazio">${p&&p.mol?'Nenhuma peça do molde vai neste tecido.':'Produto sem molde: nada a encaixar.'}</p>`;
+return `<article class="item" aria-label="${esc(nomeProd(p))}"><header><strong>${esc(nomeProd(p))}</strong>
+<label>Cor <input data-acao="cor" data-i="${i}" data-foco="${k}cor" value="${esc(it.cor)}" autocomplete="off"></label>
+<button class="sm perigo" type="button" data-acao="rm" data-i="${i}" data-foco="${k}rm">Remover</button></header>
+<div class="grade">${grade}</div>${pecas}</article>`;
+}
+
+function infoMat(m){
+const pr=MO.matCusto(m);
+return [m.larg?'largura '+nf(m.larg)+' m':'largura não informada',m.forn?'fornecedor '+m.forn:'',m.gram?nf(m.gram,0)+' g/m²':'',pr?brl(pr)+'/m':'',
+  m.tubular?'tubular':'aberto',m.sentidoUnico?'sentido único':'',(+m.encolhC||+m.encolhL)?`encolhimento ${nf(m.encolhC,1)}% × ${nf(m.encolhL,1)}%`:''].filter(Boolean).join(' · ');
+}
+
+// ---- ações (resolvem a ordem, a aba e o enfesto atuais na hora do evento) ----
+$('#tabs-tec').addEventListener('click',ev=>{const b=ev.target.closest('[data-tec]');if(b){tecAtual=b.dataset.tec;enfAtual=null;render()}});
+$('#tabs-enf').addEventListener('click',ev=>{const b=ev.target.closest('[data-enf]');if(b){enfAtual=b.dataset.enf;render()}});
+for(const id of ['#tabs-tec','#tabs-enf'])$(id).addEventListener('keydown',ev=>{
+const bs=[...ev.currentTarget.querySelectorAll('[role=tab]')],i=bs.indexOf(document.activeElement);if(i<0)return;
+const j=ev.key==='ArrowRight'?(i+1)%bs.length:ev.key==='ArrowLeft'?(i-1+bs.length)%bs.length:-1;
+if(j>=0){ev.preventDefault();bs[j].focus();bs[j].click()}
+});
+function novoEnfesto(tecidoId){
+const n=O.enfestos.filter(e=>e.tecidoId===tecidoId).length,base=O.enfestos.find(e=>e.tecidoId===tecidoId)||O.enfestos[0];
+const e=MO.normalizar({enfestos:[{nome:'Enfesto '+(n+1),tecidoId,camadas:base?base.camadas:1,compMax:base?base.compMax:0}]}).enfestos[0];
+O.enfestos.push(e);return e;
+}
+$('#tec-novo').onclick=()=>{const t={id:uid(),materiaId:''};O.tecidos.push(t);tecAtual=t.id;enfAtual=novoEnfesto(t.id).id;sujou();render();abrirProps()};
+$('#tec-apagar').onclick=()=>{
+const t=curTec(),i=O.tecidos.indexOf(t);if(!t||O.tecidos.length<2)return;
+const n=O.enfestos.filter(e=>e.tecidoId===t.id).length;
+if(!confirm(`Apagar o tecido “${nomeTec(t,i)}”`+(n?` e ${n} enfesto(s) dele`:'')+'?'))return;
+O.tecidos.splice(i,1);O.enfestos=O.enfestos.filter(e=>e.tecidoId!==t.id);sujou();render();
+};
+$('#enf-novo').onclick=()=>{enfAtual=novoEnfesto(tecAtual).id;sujou();render()};
+$('#enf-ren').onclick=()=>{const e=curEnf();if(!e)return;const n=prompt('Nome do enfesto',e.nome);if(n==null||!n.trim())return;curEnf().nome=n.trim();sujou();render()};
+$('#enf-apagar').onclick=()=>{const e=curEnf();if(!e||!confirm(`Apagar o enfesto “${e.nome}”?`))return;O.enfestos=O.enfestos.filter(x=>x.id!==e.id);sujou();render()};
+$('#nome').addEventListener('input',ev=>{O.nome=ev.target.value;document.title=(O.nome||'Ordem')+' · Ordens de corte';sujou()});
+const corpo=$('#enf-corpo');
+corpo.addEventListener('click',ev=>{
+const b=ev.target.closest('button[data-acao]');if(!b)return;
+const e=curEnf();if(!e)return;
+const a=b.dataset.acao,it=e.itens[+b.dataset.i];
+if(a==='props')return abrirProps();
+if(a==='add'){
+const pid=$('#add-prod').value,cor=$('#add-cor').value.trim();if(!pid)return;
+if(e.itens.some(x=>x.produtoId===pid&&x.cor===cor))return toast('Este produto e cor já estão no enfesto.');
+e.itens.push({produtoId:pid,cor,pecas:null,grade:{}});
+}else if(!it)return;
+else if(a==='mais'||a==='menos')MO.ajustarGrade(it,b.dataset.t,a==='mais'?1:-1);
+else if(a==='rm'){if(!confirm(`Remover ${nomeProd(prod(it.produtoId))}${it.cor?' ('+it.cor+')':''} do enfesto?`))return;e.itens.splice(+b.dataset.i,1)}
+sujou();render();
+});
+corpo.addEventListener('input',ev=>{
+const x=ev.target;if(x.dataset.acao!=='cor')return;
+const it=(curEnf()||{itens:[]}).itens[+x.dataset.i];if(!it)return;it.cor=x.value;sujou();
+});
+corpo.addEventListener('change',ev=>{
+const x=ev.target;if(x.dataset.acao!=='peca')return;
+const e=curEnf(),it=e&&e.itens[+x.dataset.i];if(!it)return;
+const todas=pecasDe(prod(it.produtoId),curTec()),marc=[...corpo.querySelectorAll(`input[data-acao="peca"][data-i="${x.dataset.i}"]`)].filter(c=>c.checked).map(c=>c.dataset.n);
+it.pecas=marc.length===todas.length?null:marc;sujou();render();
+});
+
+// ---- diálogo Propriedades: mexe na ordem, na aba de tecido e no enfesto atuais ----
+function abrirProps(){
+const d=$('#dlg-props'),t=curTec(),e=curEnf(),i=O.tecidos.indexOf(t);
+$('#pr-nome').value=O.nome;$('#pr-obs').value=O.obs;
+$('#pr-tec-l').textContent='Tecido'+(i===0?' principal':'');
+const tecs=MATS.filter(m=>m.tipo==='tecido').sort((a,b)=>nomeMat(a).localeCompare(nomeMat(b)));
+$('#pr-mat').innerHTML='<option value="">— escolha —</option>'+tecs.map(m=>`<option value="${esc(m.id)}"${m.id===t.materiaId?' selected':''}>${esc(nomeMat(m))}</option>`).join('')+
+(t.materiaId&&!mat(t.materiaId)?`<option value="${esc(t.materiaId)}" selected>(matéria-prima não encontrada)</option>`:'');
+$('#pr-enf').hidden=!e;
+if(e){
+$('#pr-enf-l').textContent=e.nome;
+$('#pr-cam').value=e.camadas;$('#pr-alt').value=e.alturaMax||'';$('#pr-comp').value=campo(e.compMax/1000);
+$('#pr-cab').value=campo(e.cabeceira/10);$('#pr-oe').value=campo(e.ourelaE/10);$('#pr-od').value=campo(e.ourelaD/10);$('#pr-sent').value=e.sentido;
+}
+propsMat();
+d.showModal();
+}
+function propsMat(){
+const m=mat(curTec().materiaId),tub=!!(m&&m.tubular);
+$('#pr-mat-info').textContent=m?infoMat(m):'';
+document.querySelectorAll('.pr-ourela').forEach(l=>{l.hidden=tub;l.querySelector('input').disabled=tub});
+$('#pr-tub').hidden=!tub;
+}
+$('#pr-nome').addEventListener('input',ev=>{O.nome=ev.target.value;$('#nome').value=O.nome;sujou()});
+$('#pr-obs').addEventListener('input',ev=>{O.obs=ev.target.value;sujou()});
+$('#pr-mat').addEventListener('change',ev=>{curTec().materiaId=ev.target.value;propsMat();sujou();render()});
+const CAMPOS={'#pr-cam':(e,v)=>e.camadas=Math.max(1,Math.round(num(v))),'#pr-alt':(e,v)=>e.alturaMax=Math.max(0,Math.round(num(v))),
+'#pr-comp':(e,v)=>e.compMax=Math.max(0,Math.round(num(v)*1000)),'#pr-cab':(e,v)=>e.cabeceira=Math.max(0,Math.round(num(v)*10)),
+'#pr-oe':(e,v)=>e.ourelaE=Math.max(0,Math.round(num(v)*10)),'#pr-od':(e,v)=>e.ourelaD=Math.max(0,Math.round(num(v)*10)),'#pr-sent':(e,v)=>e.sentido=v==='unico'?'unico':'duplo'};
+for(const [s,f] of Object.entries(CAMPOS))$(s).addEventListener(s==='#pr-sent'?'change':'input',ev=>{const e=curEnf();if(!e)return;f(e,ev.target.value);sujou()});
+$('#pr-ok').onclick=()=>$('#dlg-props').close();
+$('#dlg-props').addEventListener('close',()=>render());
+$('#btn-props').onclick=abrirProps;
+
+$('#btn-nova').onclick=async ev=>{
+ev.target.disabled=true;
+try{await criarEIr(MO.nova(nomePadrao()))}catch(e){console.error(e);toast('Não foi possível criar a ordem: '+ptErro(e));ev.target.disabled=false}
+};
+window.addEventListener('online',()=>{if(O&&estado!=='salvo')salvar()});
+window.addEventListener('beforeunload',e=>{if(O&&estado!=='salvo'){e.preventDefault();e.returnValue=''}});
+
+async function iniciar(){
+try{
+if(!LOCAL){
+const {data:{session}}=await sb.auth.getSession();
+const {data:{user}}=session?await sb.auth.getUser():{data:{}};
+if(!session||!user)return bloquear('Entre no app para ver as ordens de corte.',true);
+const {data:perfil}=await sb.from('user_profiles').select('role').eq('user_id',user.id).maybeSingle();
+if(!perfil||perfil.role!=='admin')return bloquear('Só administradores veem as ordens de corte.');
+}
+const [ps,ms]=await Promise.all([B.produtos(),B.materiais()]);
+PRODS=ps.map(r=>({...r.data,id:r.id}));MATS=ms.map(r=>({...r.data,id:r.id}));
+if(Q.get('deFabricar')==='1'){
+let s=null;try{s=JSON.parse(sessionStorage.getItem('ordemNova'))}catch(e){}
+if(!s||!Array.isArray(s.lista))return bloquear('Nada para criar: abra pela aba Fabricar do app.');
+// compMax vem da mesa da aba Fabricar, em metros; a ordem guarda mm
+const doc=MO.deFabricar(s.lista,{camadas:s.camadas,compMax:Math.round(num(s.compMax)*1000),produtos:PRODS});
+doc.nome=nomePadrao();
+const id=await B.criar(doc);
+try{sessionStorage.removeItem('ordemNova')}catch(e){}
+history.replaceState(null,'',urlCom('id',id));
+return abrirOrdem(id,doc);
+}
+const id=Q.get('id');
+if(!id)return abrirLista();
+const doc=await B.ordem(id);
+if(!doc)return bloquear('Ordem não encontrada.');
+await abrirOrdem(id,doc);
+}catch(e){console.error(e);bloquear('Não foi possível abrir as ordens de corte. '+ptErro(e))}
+}
+iniciar();
+</script>
+</body>
+</html>
