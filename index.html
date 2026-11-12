@@ -11,6 +11,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
 <script src="molde/encaixe.js"></script>
+<script src="molde/ordem.js"></script>
 <style>
 :root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;--sidebar:#212529;--sidebar-active:#007bff;
 color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -450,7 +451,7 @@ setTimeout(()=>aviso(obrigatoria?'Senha temporária trocada.':'Senha alterada.')
 const S={produtos:[],reps:[],pedidos:[],lojas:[],cadastros:[],materiais:[],config:[]};
 const SZ=['P','M','G','GG','G1','G2','G3','G4'];
 const ST=['Pendente','Faturado','Enviado','Entregue','Cancelado'];
-const TABS_ADMIN=[['painel','Painel'],['produtos','Produtos'],['materia','Matéria-prima'],['pedidos','Pedidos'],['fabricar','Fabricar'],['reps','Representantes'],['cadastros','Cadastros'],['estoque','Estoque']];
+const TABS_ADMIN=[['painel','Painel'],['produtos','Produtos'],['materia','Matéria-prima'],['pedidos','Pedidos'],['fabricar','Fabricar'],['corte','Ordens de corte'],['reps','Representantes'],['cadastros','Cadastros'],['estoque','Estoque']];
 const TABS_LOJISTA=[['catalogo','Catálogo'],['pedidos','Pedidos']];
 const TABS_REP=[['painel','Comissões'],['catalogo','Catálogo'],['pedidos','Pedidos']];
 function iconForTab(k){
@@ -460,6 +461,7 @@ case 'produtos':return 'inventory_2';
 case 'materia':return 'texture';
 case 'pedidos':return 'receipt_long';
 case 'fabricar':return 'precision_manufacturing';
+case 'corte':return 'content_cut';
 case 'reps':return 'groups';
 case 'cadastros':return 'person_add';
 case 'estoque':return 'store';
@@ -549,7 +551,7 @@ sb.auth.onAuthStateChange(async (e,s)=>{if(e==='PASSWORD_RECOVERY'&&s){history.r
 function render(){
 const tabs=appProfile?.role==='lojista'?TABS_LOJISTA:appProfile?.role==='representante'?TABS_REP:[...TABS_ADMIN,['administradores','Administradores']];
 if(!tabs.some(([k])=>k===tab))tab=tabs[0][0];
-$('#sidebar-nav').innerHTML=tabs.map(([k,l])=>`<a href="#" class="${k===tab?'active':''}" onclick="tab='${k}';render();return false;"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`).join('');
+$('#sidebar-nav').innerHTML=tabs.map(([k,l])=>k==='corte'?`<a href="corte.html"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`:`<a href="#" class="${k===tab?'active':''}" onclick="tab='${k}';render();return false;"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`).join('');
 $('#page-title').textContent=tabs.find(t=>t[0]===tab)?.[1]||'Painel';
 $('#page-subtitle').textContent='';
 const shell=document.getElementById('app-shell');
@@ -779,6 +781,7 @@ modal(id?'Editar produto':'Novo produto',`
  <small id="consprev" style="display:block;margin-top:4px">Preenche os dois consumos acima a partir da largura útil do tecido. Estimativa por retângulo: o encaixe real costuma gastar menos.</small>
  <label style="margin:10px 0 0">Molde digitalizado (.plt)<input type="file" name="plt" accept=".plt,.hgl,.hpgl" onchange="lerPlt(this.form)"></label>
  ${id?`<button type="button" class="ghost" onclick="window.open('molde.html?${p.molId?'id='+encodeURIComponent(p.molId):'produto='+encodeURIComponent(id)}','_blank')">Desenhar molde</button>`:''}
+ ${id&&p.mol&&p.mol.porTam?`<button type="button" class="ghost" onclick="consMolde('${esc(id)}')">Calcular consumo pelo molde</button><div id="molcons"></div>`:''}
  <small>Arquivo de plotter em HP-GL, como os que saem do CAD ou da digitalização. O app separa os painéis, descarta piques e moldura, e calcula o consumo painel por painel.${molOrigem(p)==='editor'?' <b>Molde desenhado no editor: '+esc((p.mol&&p.mol.arq||'').replace(/^Molde: /,''))+'.</b> Importar um PLT desliga o produto desse molde.':p.mol?' <b>Este produto já tem molde: '+((p.mol.pecas||[]).length)+' painéis'+(p.mol.arq?' ('+esc(p.mol.arq)+')':'')+'.</b> Escolher outro arquivo substitui.':''}</small>
  <div id="pltprev"></div>
  <label style="display:flex;align-items:center;gap:8px;margin:10px 0 4px"><input type="checkbox" id="fichaProp" style="width:auto;margin:0" ${p.ficha?'checked':''} onchange="toggleFichaProp(this)">Esta referência tem ficha própria</label>
@@ -930,6 +933,24 @@ if(c==null)return;
 fm.cons.value=c.toFixed(3);
 if(!(+fm.consG.value>0))fm.consG.value=c.toFixed(3);
 $('#consprev').textContent='Consumo calculado painel por painel a partir de '+pltMol.arq+'. Os campos de molde abaixo valem só para a estimativa manual.';
+}
+// risco de uma peça de cada tamanho com o molde do editor (molde/ordem.js), como sugestão
+let molSug=null;
+function consMolde(id){
+const fm=pltForm(),p=prod(id),box=$('#molcons');
+if(!fm||!p||!box)return;
+const t=mat(fm.tecidoId.value);
+molSug=t&&+t.larg>0?MoldeOrdem.consumoPeloMolde(p,t):null;
+box.innerHTML=molSug?`<p style="margin:6px 0">Risco com uma peça de cada tamanho em ${nf(+t.larg,2)} m de largura${t.tubular?' (tubular)':''}: <b>${molSug.cons!=null?nf(molSug.cons)+' m':'—'}</b> por peça (P–GG)${molSug.consG!=null?' · <b>'+nf(molSug.consG)+' m</b> (G1–G4)':''}.</p><button type="button" class="ghost" onclick="consMoldeAplicar()">Usar este consumo</button>`
+:`<p class="low">${!t?'Escolha o tecido antes de calcular.':!(+t.larg>0)?'O tecido "'+esc(t.nome)+'" está sem largura útil. Cadastre-a na aba Matéria-prima.':'Não deu para encaixar: o molde não tem peças nos tamanhos P a G4 ou alguma peça é mais larga que o tecido.'}</p>`;
+}
+function consMoldeAplicar(){
+const fm=pltForm();
+if(!fm||!molSug)return;
+if(molSug.cons!=null)fm.cons.value=molSug.cons.toFixed(3);
+if(molSug.consG!=null)fm.consG.value=molSug.consG.toFixed(3);
+else if(!(+fm.consG.value>0)&&molSug.cons!=null)fm.consG.value=molSug.cons.toFixed(3);
+$('#consprev').textContent='Consumo calculado pelo encaixe do molde do editor, uma peça de cada tamanho. Os campos de molde abaixo valem só para a estimativa manual.';
 }
 function custoFicha(p,g){
 const f=fichaDe(p),linhas=[];
@@ -1478,6 +1499,11 @@ const r=v==null?null:v*(1+Math.max(0,+perda||0)/100);
 encCache.set(k,r);
 return r;
 }
+// a mesa vai em metros; o corte.html converte para mm
+function criarOrdemCorte(){
+try{sessionStorage.setItem('ordemNova',JSON.stringify({lista:fabricarLista(),camadas:enfCam,compMax:enfMesa}))}catch(e){aviso('Não consegui passar os pedidos para a ordem de corte neste navegador.');return}
+location.href='corte.html?deFabricar=1';
+}
 function fabricar(){
 encCache=new Map();
 const P=fabricarPedidos();
@@ -1529,6 +1555,7 @@ const corpo=fabVista==='enfesto'?enfesto
 :fabVista==='lista'?(resumo?`<div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Total</th><th>De quais pedidos</th></tr>${resumo}</table></div>`:vazio)
 :(blocos||vazio)+(sem.length?`<p style="color:var(--mut)">Já cobertos pelo estoque: ${sem.map(x=>'#'+x.o.numero).join(', ')}.</p>`:'');
 return `<div class="cards"><div class="c"><small>Peças a fabricar</small><b>${total}</b></div><div class="c"><small>Pedidos com itens a fabricar</small><b>${com.length}</b></div></div>
+ ${todas.length?'<div class="bar end"><button class="pri" onclick="criarOrdemCorte()">Criar ordem de corte</button></div>':''}
  <div class="chips">${VISTAS.map(([k,l])=>`<button class="${k===fabVista?'on':''}" onclick="setFabVista('${k}')">${l}</button>`).join('')}</div>
  ${corpo}
  <p style="color:var(--mut)">Considera pedidos Pendente ou Faturado. O estoque (por cor e tamanho) é reservado primeiro para os pedidos mais antigos. Os pedidos não alteram o estoque: quando a produção ficar pronta, lance a entrada na aba Estoque.</p>`;

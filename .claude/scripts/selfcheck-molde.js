@@ -463,6 +463,18 @@ testes.push(
   ['calcularEnfesto posicoes dentro', !!cCab && posicoesOk(cCab.itens, cCab, 1550), true],
 );
 
+// consumo pelo molde (formulário do produto): uma peça de cada tamanho, risco ÷ peças de roupa
+const prodC = tams => ({ id: 'p1', ref: 'R1', tecidoId: 'tA', mol: { pecas: [pc()], porTam: Object.fromEntries(tams.map(t => [t, [pc()]])) } });
+const cpm = (p, t) => fn(() => O.consumoPeloMolde(p, t), 'sem');
+testes.push(
+  ['consumoPeloMolde P-GG 4 quadrados em 1,6 m: 0,2 m / 4', cpm(prodC(['P', 'M', 'G', 'GG']), tec()), { cons: 0.05, consG: null }, 1e-9],
+  ['consumoPeloMolde com G1-G4', cpm(prodC(['P', 'M', 'G', 'GG', 'G1', 'G2', 'G3', 'G4']), tec()), { cons: 0.05, consG: 0.05 }, 1e-9],
+  ['consumoPeloMolde pula tamanho ausente', cpm(prodC(['M', 'G']), tec()), { cons: 0.1, consG: null }, 1e-9],
+  ['consumoPeloMolde tubular rende 2: metade', cpm(prodC(['P', 'M', 'G', 'GG']), tec({ tubular: true })), { cons: 0.025, consG: null }, 1e-9],
+  ['consumoPeloMolde encolhimento aumenta', (r => !!r && r.cons > 0.05)(cpm(prodC(['P', 'M', 'G', 'GG']), tec({ encolhC: 10 }))), true],
+  ['consumoPeloMolde sem porTam, sem tecido ou sem largura: null', [cpm({ id: 'p1', mol: { pecas: [pc()] } }, tec()), cpm(prodC(['M']), null), cpm(prodC(['M']), tec({ larg: 0 }))], [null, null, null]],
+);
+
 // ajuste manual (molde/encaixe.js ocupacao/cabe/moverPeca/compPosicoes) sobre o cCab: 4 quadrados de 200 mm em 1550 mm
 const ajuste = (() => {
   if (!cCab || !E.ocupacao) return null;

@@ -175,7 +175,24 @@
     return r;
   }
 
-  const MoldeOrdem = { normalizar, nova, deFabricar, ajustarGrade, pecasEnfesto, calcularEnfesto, resultados, matCusto, meiaPeca };
+  // consumo sugerido no formulário do produto (m por peça): risco de uma peça de cada tamanho presente em porTam,
+  // com as regras do tecido (largura útil = larg sem ourela, encolhimento, sentido único, tubular) ÷ peças de roupa.
+  // {cons (P–GG), consG (G1–G4)}, cada um null se não houver tamanho; null se nenhum
+  function consumoPeloMolde(p, mat) {
+    const pt = p && p.mol && p.mol.porTam; if (!pt || !mat || !(num(mat.larg) > 0)) return null;
+    const tecidos = [{ ...mat, id: mat.id || 'm' }], ordem = { tecidos: [{ id: 't', materiaId: tecidos[0].id }] };
+    const por = tams => {
+      tams = tams.filter(t => pt[t] && pt[t].length); if (!tams.length) return null;
+      const n = mat.tubular ? 2 : 1; // tubular: cada posição rende 2, então pede 2 de cada para não arredondar para cima
+      const enf = normEnfesto({ tecidoId: 't', itens: [{ produtoId: 'p', pecas: null, grade: Object.fromEntries(tams.map(t => [t, n])) }] }, 0);
+      const c = calcularEnfesto(enf, ordem, [{ ...p, id: 'p' }], tecidos); // produto novo ainda não tem id
+      return c && c.comp > 0 ? c.comp / 1000 / (tams.length * n) : null;
+    };
+    const cons = por(['P', 'M', 'G', 'GG']), consG = por(['G1', 'G2', 'G3', 'G4']);
+    return cons == null && consG == null ? null : { cons, consG };
+  }
+
+  const MoldeOrdem = { normalizar, nova, deFabricar, ajustarGrade, pecasEnfesto, calcularEnfesto, resultados, matCusto, meiaPeca, consumoPeloMolde };
   g.MoldeOrdem = MoldeOrdem;
   if (typeof module !== 'undefined') module.exports = MoldeOrdem;
 })(typeof window !== 'undefined' ? window : globalThis);
