@@ -406,6 +406,9 @@ const aberto = pe([pc()], tec()), tub = pe([pc()], tec({ tubular: true })), cTub
 const dobraT = pe([pc({ w: 200, h: 300, pts: [[0, 0], [200, 0], [200, 300], [0, 300]], tubular: true })], tec({ tubular: true }));
 const parE = pc({ qtd: 2, par: true, espelhar: true });
 const parU = pe([parE], tec(), { sentido: 'unico' }), cParU = ce([parE], tec(), { sentido: 'unico' }), parD = pe([parE], tec());
+const parN = pc({ nome: 'Bolso', qtd: 2, par: true }), parSemE = pe([parN], tec(), { sentido: 'unico' }), cParSemE = ce([parN], tec(), { sentido: 'unico' });
+const pesoDe = t => { const o = { camadas: 3 }, c = ce([pc()], t, o); return [c, c && fn(() => O.resultados(O.normalizar(ordemO(o)), [c], [t]), null)]; };
+const [cPeso, rPeso] = pesoDe(tec()), [cPesoT, rPesoT] = pesoDe(tec({ tubular: true }));
 const su = pe([pc({ rot: 'livre' }), pc({ rot: '180' })], tec({ sentidoUnico: true }));
 const cSem = ce([pc()], tec({ larg: 0.2 }), {}, { grade: { M: 6 } }), cEnc = ce([pc()], tec({ larg: 0.2, encolhC: 10 }), {}, { grade: { M: 6 } });
 const doisTec = [pc({ nome: 'Frente' }), pc({ nome: 'Forro', tecido: 'tF' }), pc({ nome: 'Bolso' })];
@@ -428,7 +431,11 @@ testes.push(
   ['review5 aberto duplo: 4 posicoes', aberto.length, 4],
   ['review5 tubular: 2 posicoes, 4 pecas', [tub.length, tub.reduce((a, x) => a + x.rende, 0), cTub && cTub.posicoes.length, cTub && cTub.pecasTotal], [2, 4, 2, 4]],
   ['review5 unico par espelhar: normais = espelhadas', [parU.length, parU.filter(x => x.espelho).length, cParU && cParU.posicoes.filter(p => cParU.itens[p.i].espelho).length], [8, 4, 4]],
-  ['review5 duplo par: rende 2 por posicao', [parD.length, parD.reduce((a, x) => a + x.rende, 0)], [4, 8]],
+  ['review5 duplo par: 8 posicoes, todas normais', [parD.length, parD.every(x => !x.espelho && !x.espelhar && x.rende === 1), (parD.avisos || []).length], [8, true, 0]],
+  ['review5 unico par sem espelhar: 8 normais e 1 aviso', [parSemE.length, parSemE.filter(x => x.espelho).length, parSemE.avisos, cParSemE && (cParSemE.avisos || []).length],
+    [8, 0, [{ peca: 'Bolso', tam: 'M', motivo: 'par sem espelhar no sentido único' }], 1]],
+  ['peso das pecas = area x gram x pecas (aberto, 3 camadas)', rPeso && [cPeso.pecasTotal, rPeso.pesoPecas], [4, 0.04 * 0.16 * 4 * 3], 1e-9],
+  ['peso das pecas = area x gram x pecas (tubular, 3 camadas)', rPesoT && [cPesoT.pecasTotal, rPesoT.pesoPecas], [4, 0.04 * 0.16 * 4 * 3], 1e-9],
   ['review5 dobra tubular: meia peca na borda Y=0', dobraT.length && [dobraT.length, dobraT[0].borda0, dobraT[0].rende, dobraT[0].rasters.length, [dobraT[0].rasters[0].cw, dobraT[0].rasters[0].ch]], [4, true, 1, 1, [10, 8]]],
   ['review5 dobra: corte encosta em Y=0', !!dobraT.length && dobraT[0].pts.filter(q => q[1] === 0).length >= 2 && Math.min(...dobraT[0].pts.map(q => q[1])) === 0, true],
   ['sentidoUnico: todas as variantes rot 0', [su.length, su.every(x => x.rot === 'nenhuma' && x.rasters.length === 1)], [8, true]],

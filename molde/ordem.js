@@ -94,7 +94,7 @@
     const { aba, mat } = contexto(enf, ordem, tecidos); if (!aba) return [];
     const tub = !!(mat && mat.tubular), su = !!(mat && mat.sentidoUnico), unico = enf.sentido === 'unico';
     const escala = { x: 1 + num(mat && mat.encolhC) / 100, y: 1 + num(mat && mat.encolhL) / 100 };
-    const abas = (ordem.tecidos || []).map(t => t.materiaId), cache = new Map(), itens = [];
+    const abas = (ordem.tecidos || []).map(t => t.materiaId), cache = new Map(), itens = [], avisos = [];
     const item = (base, pts, o) => {
       const k = base.q; if (!cache.has(k)) cache.set(k, new Map());
       const ck = o.rot + '|' + o.espelhar + '|' + o.espelho + '|' + o.meia, cc = cache.get(k);
@@ -117,15 +117,17 @@
           const rot = su ? 'nenhuma' : q.rot, esp = !!q.espelhar;
           if (tub && q.tubular) { const m = meiaPeca(q.pts); repete(N, () => item(base, m, { rot: 'nenhuma', espelhar: false, meia: true, rende: 1 })); } // girar/espelhar tiraria a dobra de Y=0
           else if (tub) repete(Math.ceil(N / 2), () => item(base, q.pts, { rot, espelhar: esp, rende: 2 })); // dois panos por camada
-          else if (q.par && !unico) repete(gr * Math.ceil(qtd / 2), () => item(base, q.pts, { rot, espelhar: esp, rende: 2 })); // face a face: o par sai junto
+          else if (q.par && !unico) repete(N, () => item(base, q.pts, { rot, espelhar: false, rende: 1 })); // face a face: metade das camadas já sai espelhada
           else if (q.par) {
             const n = gr * Math.ceil(qtd / 2), espelhada = esp ? q.pts.map(([x, y]) => [x, -y]) : q.pts;
+            if (!esp) avisos.push({ peca: nome, tam, motivo: 'par sem espelhar no sentido único' });
             repete(n, () => item(base, q.pts, { rot, espelhar: false, rende: 1 }));
             repete(n, () => item(base, espelhada, { rot, espelhar: false, espelho: esp, rende: 1 }));
           } else repete(N, () => item(base, q.pts, { rot, espelhar: esp, rende: 1 }));
         });
       }
     }
+    itens.avisos = avisos; // [{peca, tam, motivo}] como propriedade: a lista continua indo direto para encaixar
     return itens;
   }
 
@@ -142,10 +144,11 @@
       for (const [t, q] of Object.entries(it.grade || {})) if (nn(q)) gr[t] = (gr[t] || 0) + nn(q);
     }
     return { comp, largUtil, posicoes: r.posicoes, itens, pecasTotal: itens.reduce((a, x) => a + x.rende, 0), areaPecas,
-      aproveitamento: comp > 0 && largUtil > 0 ? areaPecas / (comp * largUtil) : 0, grade };
+      aproveitamento: comp > 0 && largUtil > 0 ? areaPecas / (comp * largUtil) : 0, grade, avisos: itens.avisos };
   }
 
-  // calculos[k] = calcularEnfesto de ordem.enfestos[k] (null = fica fora). Pesos em kg; tubular conta os dois panos.
+  // calculos[k] = calcularEnfesto de ordem.enfestos[k] (null = fica fora). Pesos em kg; tubular conta os dois panos
+  // (peças cortadas = posições × camadas × (tubular ? 2 : 1); a meia peça da dobra abre numa peça inteira, rende 1).
   // pecas = peças de roupa (grade × camadas); consumoLinear = metros por peça de roupa
   function resultados(ordem, calculos, tecidos) {
     const r = { metros: 0, pesoTecido: 0, pesoPecas: 0, pesoDesperdicio: 0, consumoLinear: 0, custo: 0, pecas: 0, grade: {} };
