@@ -4,7 +4,7 @@
   const dist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
   const TOL = 0.5; // folga entre pontas de traços encadeados
 
-  const GRADES = { app: ['P', 'M', 'G', 'GG', 'G1', 'G2', 'G3', 'G4'], numerica: ['36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56'] };
+  const GRADES = { app: ['P', 'M', 'G', 'GG', 'G1', 'G2', 'G3', 'G4'], pgg: ['P', 'M', 'G', 'GG'], numerica: ['36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56'] };
   const novo = nome => normalizar({ nome });
 
   function uid(m, pre) {
@@ -167,12 +167,13 @@
         const n = structuredClone(peca), novoId = id => tid[id] || id;
         const chaves = o => Object.fromEntries(Object.entries(o || {}).map(([id, v]) => [novoId(id), v]));
         const comTraco = l => (l || []).map(x => ({ ...x, tracoId: novoId(x.tracoId) }));
-        Object.assign(n, { id: uid(m, 'pc'), nome: peca.nome + ' · ' + tam, tracos: peca.tracos.map(t => ({ ...t, id: novoId(t.id) })),
+        Object.assign(n, { id: uid(m, 'pc'), tam, nome: peca.nome + ' · ' + tam, tracos: peca.tracos.map(t => ({ ...t, id: novoId(t.id) })),
           fio: n.fio && { a: somar(n.fio.a, d), b: somar(n.fio.b, d) }, dobra: n.dobra && { ...n.dobra, tracoId: novoId(n.dobra.tracoId) },
           margemTraco: chaves(n.margemTraco), bainhas: chaves(n.bainhas), piques: comTraco(n.piques), pences: comTraco(n.pences) });
         m.pecas.push(n);
       }
     });
+    for (const peca of pecas) peca.tam = m.base; // molParaProduto põe em porTam[t] só as peças de tam t (e as sem tam)
     removerGradacao(m);
   }
 
@@ -188,27 +189,35 @@
     peca.margemTraco[tracoId] = largura * dobras;
   }
 
-  // peças de p.mol de um molde já no tamanho; fio no eixo X, que é o comprimento do risco no encaixe (index.html)
-  function pecasProduto(m) {
-    const pecas = [];
-    for (const peca of m.pecas) {
-      if (!peca.visivel || !peca.tracos.length) continue;
-      const { a, b } = peca.fio, ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
-      // peça quebrada (traço ou ponto apagado, contorno que não fecha mais) fica fora, sem impedir o resto de salvar
-      let c = null;
-      try { if (encadear(m, peca.tracos.map(t => t.id)).ok) c = G.girar(corte(m, peca), { x: 0, y: 0 }, -ang); } catch (e) { c = null; }
-      if (!c || c.length < 3 || !c.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))) continue;
-      const bx = G.bbox(c);
-      const pts = c.map(p => [Math.round(p.x - bx.x0), Math.round(p.y - bx.y0)]);
-      pecas.push({ w: Math.max(...pts.map(p => p[0])), h: Math.max(...pts.map(p => p[1])), qtd: peca.cortar * (peca.par ? 2 : 1), pts, rot: peca.rotacao, tecido: peca.tecido });
-    }
-    return pecas;
+  // peça de p.mol num molde já no tamanho (null se quebrada); fio no eixo X, que é o comprimento do risco no encaixe (index.html)
+  function pecaProduto(m, peca) {
+    if (!peca) return null;
+    const { a, b } = peca.fio, ang = Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+    // peça quebrada (traço ou ponto apagado, contorno que não fecha mais) fica fora, sem impedir o resto de salvar
+    let c = null;
+    try { if (encadear(m, peca.tracos.map(t => t.id)).ok) c = G.girar(corte(m, peca), { x: 0, y: 0 }, -ang); } catch (e) { c = null; }
+    if (!c || c.length < 3 || !c.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))) return null;
+    const bx = G.bbox(c);
+    const pts = c.map(p => [Math.round(p.x - bx.x0), Math.round(p.y - bx.y0)]);
+    return { w: Math.max(...pts.map(p => p[0])), h: Math.max(...pts.map(p => p[1])), qtd: peca.cortar * (peca.par ? 2 : 1), pts, rot: peca.rotacao, tecido: peca.tecido };
   }
-  // formato de p.mol; pecas = tamanho base, porTam = uma lista por tamanho
+  // formato de p.mol; pecas = tamanho base, porTam = uma lista por tamanho (só as peças sem tam ou com tam = o tamanho).
+  // peça boa no base que quebra num tamanho (ex.: traço lápis não acompanha a gradação) vai com a forma do base e entra em avisos
   function molParaProduto(m) {
-    const n = normalizar(m), porTam = {};
-    for (const tam of tamanhos(n)) porTam[tam] = pecasProduto(noTamanho(n, tam));
-    return { arq: 'Molde: ' + (m.nome || ''), un: 'mm', origem: 'editor', pecas: porTam[n.base] || [], porTam };
+    const n = normalizar(m), porTam = {}, avisos = [];
+    const vis = n.pecas.filter(p => p.visivel && p.tracos.length), nb = noTamanho(n, n.base);
+    const doBase = Object.fromEntries(vis.map(p => [p.id, pecaProduto(nb, p)]));
+    for (const tam of tamanhos(n)) {
+      const c = tam === n.base ? nb : noTamanho(n, tam);
+      porTam[tam] = [];
+      for (const p of vis) {
+        if (p.tam && p.tam !== tam) continue;
+        let r = tam === n.base ? doBase[p.id] : pecaProduto(c, c.pecas.find(x => x.id === p.id));
+        if (!r && doBase[p.id]) { r = doBase[p.id]; avisos.push({ peca: p.nome, tam }); }
+        if (r) porTam[tam].push(r);
+      }
+    }
+    return { arq: 'Molde: ' + (m.nome || ''), un: 'mm', origem: 'editor', pecas: porTam[n.base] || [], porTam, avisos };
   }
 
   function historico(limite = 100) {

@@ -99,7 +99,7 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 #foto-mini img{width:100%;height:100%;object-fit:cover;display:block}
 #fantasma{pointer-events:none}#tela .fan{fill:none;stroke-width:1.2px;opacity:.35;vector-effect:non-scaling-stroke}
 .campo{display:flex;flex-direction:column;gap:4px;margin:10px 0;font-size:14px}
-#g-aviso{color:var(--bad);font-weight:600;margin:0 0 8px}
+#g-aviso,#mol-avisos{color:var(--bad);font-weight:600;margin:0 0 8px}#mol-avisos{font-size:13px}
 #abas{display:flex;gap:4px;margin-bottom:10px;border-bottom:1px solid var(--bd)}
 #abas button{font:inherit;font-size:14px;font-weight:600;background:none;border:0;border-bottom:2px solid transparent;color:var(--mut);padding:6px 8px;cursor:pointer}
 #abas button[aria-selected="true"]{color:var(--tx);border-bottom-color:var(--ac)}
@@ -163,6 +163,7 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
     <g id="fantasma"></g><g id="diagrama"></g><g id="pecas"></g><g id="regua"></g>
   </svg>
   <aside id="painel" aria-label="Painel">
+    <p id="mol-avisos" role="status" hidden></p>
     <div id="abas" role="tablist" aria-label="Painel"><button type="button" role="tab" data-aba="moldes">Moldes</button><button type="button" role="tab" data-aba="grad">Gradação</button><button type="button" role="tab" data-aba="medidas">Medidas</button></div>
     <section id="aba-medidas" role="tabpanel" aria-label="Medidas" hidden>
       <p class="vazio" id="m-vazio"></p>
@@ -219,6 +220,7 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
   <h3 id="dlg-refs-t">Referências deste molde</h3>
   <small style="color:var(--mut)">Marque os produtos que usam este molde. Ao salvar, o molde vai para o cálculo de consumo de cada um.</small>
   <input id="ref-busca" type="search" placeholder="Buscar referência ou nome" aria-label="Buscar produto" style="margin-top:10px">
+  <p class="vazio" id="refs-dica" hidden></p>
   <div id="refs"><p class="vazio" style="padding:10px">Carregando…</p></div>
   <div class="row"><button class="pri" type="button" id="refs-ok">Fechar</button></div>
 </dialog>
@@ -227,8 +229,9 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
   <h3 id="dlg-grade-t">Novo molde</h3>
   <p id="g-aviso" hidden></p>
   <label class="campo" id="g-nome-l">Nome <input id="g-nome" autocomplete="off"></label>
-  <label class="campo">Grade <select id="g-grade"><option value="app">P–G4 do app</option><option value="numerica">36–56</option><option value="">Definir depois</option></select></label>
+  <label class="campo">Grade <select id="g-grade"><option value="app">P–G4 do app</option><option value="pgg">P–GG</option><option value="numerica">36–56</option><option value="">Definir depois</option></select></label>
   <label class="campo">Tamanho base <select id="g-base"></select></label>
+  <p class="vazio" id="g-dica" hidden></p>
   <label class="campo">Foto da ficha técnica (opcional) <input id="g-foto" type="file" accept="image/*"></label>
   <div class="row"><button class="ghost" type="submit" value="">Cancelar</button><button class="pri" type="submit" value="ok">OK</button></div>
   </form>
@@ -312,15 +315,14 @@ async produto(id){await sessaoOk();const r=ok(await sb.from('docs').select('data
 gravarProduto:atualizar,
 // tecidos da matéria-prima (a RLS só deixa o admin ler 'materiais')
 async tecidos(){await sessaoOk();return ok(await sb.from('docs').select('id,data').eq('col','materiais')).filter(r=>r.data&&r.data.tipo==='tecido').map(r=>({id:r.id,nome:[r.data.nome,r.data.cor].filter(Boolean).join(' · ')||'(sem nome)'}))},
-// mesmo caminho do subirFoto do index.html: bucket público 'produtos'
-async subirFoto(file,antigo){
+// mesmo caminho do subirFoto do index.html: bucket público 'produtos'. A foto antiga fica no storage: desfazer ou um salvar que falhou ainda apontam para ela
+async subirFoto(file){
 await sessaoOk();
 const c=await imgCanvas(file,1200),blob=await new Promise(r=>c.toBlob(r,'image/jpeg',.82));
 if(!blob)throw new Error('Não foi possível processar a imagem.');
 const nome=crypto.randomUUID()+'.jpg';
 const {error}=await sb.storage.from('produtos').upload(nome,blob,{contentType:'image/jpeg'});
 if(error)throw new Error('Falha ao enviar a foto: '+error.message);
-if(antigo&&!antigo.startsWith('data:'))await sb.storage.from('produtos').remove([antigo]);
 return nome;
 },
 fotoUrl:f=>f&&!f.startsWith('data:')?SB_URL+'/storage/v1/object/public/produtos/'+encodeURIComponent(f):''
@@ -366,7 +368,7 @@ $('#refs-n').textContent=M.produtoIds.length?'('+M.produtoIds.length+')':'';
 document.title=(M.nome||'Molde')+' · Editor de molde';
 const tams=MM.tamanhos(M);if(!tams.includes(tamVer))tamVer=M.base;
 V=tamVer===M.base?M:MM.noTamanho(M,tamVer);
-desenharTams(tams);desenharMed();
+desenharTams(tams);
 desenharDiagrama(w,h,tams);
 desenharPecas();
 }
@@ -374,7 +376,7 @@ desenharPecas();
 // alteração que vale como passo do histórico
 function alterou(){H.gravar(M);sujou()}
 // marca não salvo, redesenha e agenda salvar (sem passo no histórico)
-function sujou(){ver++;erroSalvar='';pontaErro=null;marcar('nao-salvo');desenhar();desenharPainel();agendar()}
+function sujou(){ver++;erroSalvar='';pontaErro=null;marcar('nao-salvo');desenhar();desenharPainel();desenharMed();agendar()}
 function agendar(ms=1500){clearTimeout(timer);timer=setTimeout(salvar,ms)}
 function aplicar(m){M=MM.normalizar(m);$('#nome').value=M.nome;sujou()}
 
@@ -398,6 +400,7 @@ console.error(e);erroSalvar=ptErro(e);marcar('nao-salvo');agendar(10000);
 // grava molId e mol nos produtos marcados; tira dos desmarcados desde o último salvamento
 async function ligarProdutos(doc){
 const mol=MM.molParaProduto(doc),temPecas=mol.pecas.length>0;
+mostrarAvisos(mol.avisos);
 const soltos=[];
 for(const pid of doc.produtoIds){
 const p=await B.produto(pid);
@@ -436,9 +439,19 @@ return confirm(p.molId
 :`${nome} já tem um molde importado${p.mol.arq?' ('+p.mol.arq+')':''}. Ele continua valendo até este molde ter peças; depois, será substituído por este. Continuar?`);
 }
 
+// os pedidos só têm P–G4 (SZ do index.html): tamanho fora disso nunca casa e o enfesto cai no base
+function dicaSZ(el,ligado,tams){el.textContent='Os pedidos usam P–G4; com esta grade o enfesto usa o tamanho base.';el.hidden=!(ligado&&tams.some(t=>!MM.GRADES.app.includes(t)))}
+// peças que quebram num tamanho e vão para o enfesto com a forma do base (molParaProduto.avisos)
+function mostrarAvisos(av){
+const el=$('#mol-avisos'),por={};
+for(const a of av||[])(por[a.peca||'(sem nome)']=por[a.peca||'(sem nome)']||[]).push(a.tam);
+const l=Object.entries(por).map(([p,t])=>p+' ('+t.join(', ')+')');
+el.textContent=l.length?'Contorno não fecha no tamanho; o enfesto usa a forma do base: '+l.join('; '):'';el.hidden=!l.length;
+}
+
 async function abrirRefs(){
-const dlg=$('#dlg-refs'),box=$('#refs');
-$('#ref-busca').value='';dlg.showModal();
+const dlg=$('#dlg-refs'),box=$('#refs'),dica=()=>dicaSZ($('#refs-dica'),M.produtoIds.length,MM.tamanhos(M));
+$('#ref-busca').value='';dica();dlg.showModal();
 try{
 const lista=await B.produtos();
 box.textContent='';
@@ -452,7 +465,7 @@ c.onchange=()=>{
 if(c.checked&&!podeLigar(p)){c.checked=false;return}
 if(!c.checked&&M.produtoIds.length===1&&!confirm('Sem produto ligado, este molde só abre pelo endereço desta página. Desligar mesmo assim?')){c.checked=true;return}
 M.produtoIds=c.checked?[...M.produtoIds,id]:M.produtoIds.filter(x=>x!==id);
-alterou();
+alterou();dica();
 };
 l.dataset.busca=s.textContent.toLowerCase();l.append(c,s);box.append(l);
 }
@@ -493,6 +506,7 @@ H=MM.historico();H.gravar(M);
 $('#aviso').hidden=true;$('#editor').hidden=false;$('#nome').value=M.nome;
 tamVer=M.base;
 marcar('salvo');if(pendente)sujou();else{desenhar();desenharPainel()}
+mostrarAvisos(MM.molParaProduto(M).avisos);
 B.tecidos().then(l=>{tecidos=l;preencherProps();desenhar()}).catch(e=>{console.error(e);toast('Lista de tecidos não carregou: '+ptErro(e))});
 // grade sem o base: molParaProduto sai sem peças e o salvar não grava o mol
 if(M.grade.length&&!M.grade.includes(M.base)){
@@ -517,14 +531,17 @@ const gradeDe=v=>v==='atual'?m.grade:v?MM.GRADES[v]:[];
 const encher=()=>{
 const l=gs.value?gradeDe(gs.value):[m.base||'M'],v=[bs.value,m.base,'M','40'].find(x=>l.includes(x))||l[0];
 bs.textContent='';for(const t of l){const o=document.createElement('option');o.value=o.textContent=t;bs.append(o)}bs.value=v;
+dicaSZ($('#g-dica'),novo||m.produtoIds.length,l);
 };
 bs.textContent='';encher();gs.onchange=encher;f.value='';
 d.returnValue='';d.showModal();
 await new Promise(r=>d.addEventListener('close',r,{once:true}));
 if(d.returnValue!=='ok')return null;
 const r={nome:novo?$('#g-nome').value.trim()||m.nome:null,grade:[...gradeDe(gs.value)],base:bs.value,foto:null};
-// shortcut: a foto antiga sai do storage na hora; desfazer a troca volta um caminho apagado. Guardar a antiga até salvar, se incomodar.
-if(f.files[0])try{r.foto=await B.subirFoto(f.files[0],m.foto)}catch(e){toast('Foto não enviada: '+ptErro(e))}
+// aplicarDlg apaga a gradação dos tamanhos que saem da grade
+const perde=Object.values(m.grad).filter(g=>Object.entries(g).some(([t,v])=>!r.grade.includes(t)&&(v.dx||v.dy))).length;
+if(perde&&!confirm(`${perde} ponto(s) perdem a regra de gradação dos tamanhos que saem da grade. Continuar?`))return null;
+if(f.files[0])try{r.foto=await B.subirFoto(f.files[0])}catch(e){toast('Foto não enviada: '+ptErro(e))}
 return r;
 }
 function aplicarDlg(m,r){
@@ -980,6 +997,7 @@ MM.aplicarBainha(pc,tid,{largura:mm10(v[0]),dobras:n,piques:$('#b-piq').checked}
 // ---- abas do painel (Moldes, Gradação, Medidas) ----
 function aba(n){
 document.querySelectorAll('#abas [data-aba]').forEach(b=>{const on=b.dataset.aba===n;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;$('#aba-'+b.dataset.aba).hidden=!on});
+if(n==='medidas')desenharMed();
 }
 document.querySelectorAll('#abas [data-aba]').forEach(b=>b.onclick=()=>aba(b.dataset.aba));
 aba('moldes');
@@ -1056,7 +1074,7 @@ MM.removerGradacao(M);alterou();
 
 // ---- medidas (Task 4). M.medidas[i] = {id,nome,tracos,valores:{tam:mm}}; esperado vs. medido no molde ----
 function desenharMed(){
-if(!M)return;
+if(!M||$('#aba-medidas').hidden)return; // tabela custa um noTamanho por medida e tamanho: só com a aba aberta
 const tams=MM.tamanhos(M),tb=$('#m-tab tbody'),th=$('#m-tab thead'),chave=M.medidas.map(m=>m.id).join(',')+'|'+tams.join(',');
 $('#m-vazio').textContent=M.medidas.length?'':'Nenhuma medida. Adicione e ligue aos traços (ex.: reta da cintura).';
 const atual=(m,t)=>{ // medido x esperado: texto + cor (✓ até 3 mm)

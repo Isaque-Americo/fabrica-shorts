@@ -140,7 +140,7 @@ testes.push(
   ['costura com dobra area', G.area(M.costura(ret, pecaDobra)), 40000],
   ['pence ponta a 50 da barra', cosPence.some(q => Math.abs(q.x - 50) < TOL && Math.abs(q.y - 50) < TOL), true],
   ['pence tira o V da area', G.area(cosPence), 20000 - 20 * 50 / 2],
-  ['molParaProduto chaves', Object.keys(prodRet).sort(), ['arq', 'origem', 'pecas', 'porTam', 'un']],
+  ['molParaProduto chaves', Object.keys(prodRet).sort(), ['arq', 'avisos', 'origem', 'pecas', 'porTam', 'un']],
   ['molParaProduto peca chaves', Object.keys(prodRet.pecas[0]).sort(), ['h', 'pts', 'qtd', 'rot', 'tecido', 'w']],
   ['molParaProduto un mm', prodRet.un, 'mm'],
   ['molParaProduto pts [x,y] inteiros', prodRet.pecas[0].pts.every(q => Array.isArray(q) && q.length === 2 && q.every(Number.isInteger)), true],
@@ -267,6 +267,14 @@ M.aplicarBainha(bp, 't3', { largura: 0, dobras: 2, piques: true });
 const rt = structuredClone(ret); rt.grade = ['P', 'M']; Object.assign(rt.pecas[0], { rotacao: 'nenhuma', tecido: 'mat9' });
 const prodRt = M.molParaProduto(rt);
 const nPeca = M.normalizar({ pecas: [{ id: 'a' }] });
+// final 1: depois de separar, cada tamanho só leva a sua peça
+const prodSp = M.molParaProduto(sp);
+// final 2: traço lápis não anda com a gradação; no G o contorno quebra e vai a peça do base com aviso
+const lp = M.normalizar({ grade: ['P', 'M', 'G'], base: 'M', pontos: { a: P(0, 0), b: P(100, 0), c: P(100, 100) },
+  tracos: [{ id: 'l1', tipo: 'reta', a: 'a', b: 'b' }, { id: 'l2', tipo: 'reta', a: 'b', b: 'c' }, { id: 'l3', tipo: 'livre', pts: [P(100, 100), P(0, 100), P(0, 0)] }] });
+lp.pecas = M.normalizar({ pecas: [{ id: 'lp', nome: 'Lapis', tracos: M.encadear(lp, ['l1', 'l2', 'l3']).tracos, fio: { a: P(0, 0), b: P(100, 0) } }] }).pecas;
+M.graduarPasso(lp, 'c', 10, 0);
+const prodLp = M.molParaProduto(lp);
 testes.push(
   ['review1 ret pecas iguais a etapa 1', semNovas(prodRet.pecas), [{ w: 220, h: 120, qtd: 2, pts: [[0, 120], [0, 0], [220, 0], [220, 120]] }]],
   ['review1 qd pecas iguais a etapa 1', semNovas(prodQd.pecas), [{ w: 170, h: 170, qtd: 2, pts: [[85, 0], [170, 85], [85, 170], [0, 85]] }]],
@@ -295,6 +303,13 @@ testes.push(
   ['aplicarBainha 15x2', bp30, [30, { largura: 15, dobras: 2, piques: true }]],
   ['aplicarBainha largura 0 remove', ['t3' in bp.margemTraco, 't3' in bp.bainhas], [false, false]],
   ['molParaProduto rot e tecido', Object.values(prodRt.porTam).flat().map(p => [p.rot, p.tecido]), [['nenhuma', 'mat9'], ['nenhuma', 'mat9']]],
+  ['final1 separar porTam G 1 peca com largura do G', [prodSp.porTam.G.length, prodSp.porTam.G[0].w, prodSp.pecas.length, prodSp.porTam.P.length], [1, prodGr.porTam.G[0].w, 1, 1]],
+  ['final1 separar G e a copia', prodSp.porTam.G[0].w - prodSp.pecas[0].w, 10, 1],
+  ['final1 separar tam nas pecas', sp.pecas.map(p => p.tam).sort(), ['G', 'M', 'P']],
+  ['final2 G quebrado usa a peca do base', [prodLp.porTam.G.length, prodLp.porTam.G[0].w], [1, prodLp.pecas[0].w]],
+  ['final2 avisos', prodLp.avisos, [{ peca: 'Lapis', tam: 'P' }, { peca: 'Lapis', tam: 'G' }]],
+  ['final2 sem quebra sem aviso', prodGr.avisos, []],
+  ['GRADES pgg', M.GRADES.pgg, ['P', 'M', 'G', 'GG']],
 );
 
 const perto = (a, b, tol) => typeof a === 'number' ? Math.abs(a - b) <= tol
