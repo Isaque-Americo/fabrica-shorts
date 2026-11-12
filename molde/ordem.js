@@ -85,6 +85,8 @@
     const aba = (ordem.tecidos || []).find(t => t.id === enf.tecidoId);
     return { aba, mat: aba && (tecidos || []).find(m => m.id === aba.materiaId) };
   };
+  // tecido principal do produto na ordem: o da aba com p.tecidoId, senão o da aba [0]
+  const principalDe = (p, ordem) => { const abas = (ordem.tecidos || []).map(t => t.materiaId); return abas.includes(p.tecidoId) ? p.tecidoId : abas[0]; };
 
   // itens para MoldeEncaixe.encaixar, um por posição no risco. Cada item leva o que o desenho precisa:
   // {pecaIdx (índice em porTam[tam]/pecas), rasters, borda0, a, produtoId, cor, tam, nome, pts (já meia/espelhada),
@@ -94,7 +96,7 @@
     const { aba, mat } = contexto(enf, ordem, tecidos); if (!aba) return [];
     const tub = !!(mat && mat.tubular), su = !!(mat && mat.sentidoUnico), unico = enf.sentido === 'unico';
     const escala = { x: 1 + num(mat && mat.encolhC) / 100, y: 1 + num(mat && mat.encolhL) / 100 };
-    const abas = (ordem.tecidos || []).map(t => t.materiaId), cache = new Map(), itens = [], avisos = [];
+    const cache = new Map(), itens = [], avisos = [];
     const item = (base, pts, o) => {
       const k = base.q; if (!cache.has(k)) cache.set(k, new Map());
       const ck = o.rot + '|' + o.espelhar + '|' + o.espelho + '|' + o.meia, cc = cache.get(k);
@@ -106,7 +108,7 @@
     const repete = (n, f) => { for (let i = 0; i < n; i++) itens.push(f()); };
     for (const it of enf.itens || []) {
       const p = (produtos || []).find(x => x.id === it.produtoId); if (!p) continue;
-      const principal = abas.includes(p.tecidoId) ? p.tecidoId : abas[0]; // peça sem tecido vai na aba do tecido do produto, senão na [0]
+      const principal = principalDe(p, ordem); // peça sem tecido vai na aba do principal
       for (const [tam, gq] of Object.entries(it.grade || {})) {
         const gr = nn(gq); if (!gr) continue;
         pecasTam(p, tam).forEach((q, k) => {
@@ -133,13 +135,14 @@
 
   // posições em mm a partir do início do encaixe (sem ourela E); comp inclui a cabeceira. null: sem peças, sem tecido ou peça mais larga que o tecido
   function calcularEnfesto(enf, ordem, produtos, tecidos) {
-    const { mat } = contexto(enf, ordem, tecidos); if (!mat) return null;
-    const largUtil = num(mat.larg) * 1000 - num(enf.ourelaE) - num(enf.ourelaD);
+    const { aba, mat } = contexto(enf, ordem, tecidos); if (!mat) return null;
+    const largUtil = num(mat.larg) * 1000 - (mat.tubular ? 0 : num(enf.ourelaE) + num(enf.ourelaD)); // tubular não tem ourela: a dobra fica na borda real
     const itens = pecasEnfesto(enf, ordem, produtos, tecidos), r = E.encaixar(itens, largUtil);
     if (!r) return null;
     const comp = r.comp + num(enf.cabeceira), areaPecas = itens.reduce((a, x) => a + x.area, 0), grade = {};
     for (const it of enf.itens || []) {
-      const p = (produtos || []).find(x => x.id === it.produtoId); if (!p) continue;
+      const p = (produtos || []).find(x => x.id === it.produtoId);
+      if (!p || principalDe(p, ordem) !== aba.materiaId) continue; // a roupa conta só no enfesto do tecido principal; forro etc. não repetem
       const gr = grade[p.ref || p.id] = grade[p.ref || p.id] || {};
       for (const [t, q] of Object.entries(it.grade || {})) if (nn(q)) gr[t] = (gr[t] || 0) + nn(q);
     }
@@ -149,9 +152,11 @@
 
   // calculos[k] = calcularEnfesto de ordem.enfestos[k] (null = fica fora). Pesos em kg; tubular conta os dois panos
   // (peças cortadas = posições × camadas × (tubular ? 2 : 1); a meia peça da dobra abre numa peça inteira, rende 1).
-  // pecas = peças de roupa (grade × camadas); consumoLinear = metros por peça de roupa
+  // pecas = peças de roupa (soma da grade, contada só no tecido principal de cada produto);
+  // consumoLinear = metros dos enfestos que contam roupa (tecido principal) ÷ peças de roupa
   function resultados(ordem, calculos, tecidos) {
     const r = { metros: 0, pesoTecido: 0, pesoPecas: 0, pesoDesperdicio: 0, consumoLinear: 0, custo: 0, pecas: 0, grade: {} };
+    let mPrincipal = 0;
     (ordem.enfestos || []).forEach((enf, k) => {
       const c = (calculos || [])[k]; if (!c) return;
       const { mat } = contexto(enf, ordem, tecidos), cam = Math.max(1, nn(enf.camadas)), m = c.comp / 1000 * cam;
@@ -159,13 +164,14 @@
       r.metros += m; r.custo += m * matCusto(mat);
       r.pesoTecido += m * num(mat && mat.larg) * kgm2;
       r.pesoPecas += num(c.areaPecas) / 1e6 * cam * kgm2;
+      if (Object.keys(c.grade || {}).length) mPrincipal += m;
       for (const [ref, gt] of Object.entries(c.grade || {})) for (const [t, q] of Object.entries(gt)) {
         const gr = r.grade[ref] = r.grade[ref] || {};
         gr[t] = (gr[t] || 0) + q * cam; r.pecas += q * cam;
       }
     });
     r.pesoDesperdicio = r.pesoTecido - r.pesoPecas;
-    r.consumoLinear = r.pecas ? r.metros / r.pecas : 0;
+    r.consumoLinear = r.pecas ? mPrincipal / r.pecas : 0;
     return r;
   }
 

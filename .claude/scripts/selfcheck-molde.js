@@ -409,6 +409,15 @@ const parU = pe([parE], tec(), { sentido: 'unico' }), cParU = ce([parE], tec(), 
 const parN = pc({ nome: 'Bolso', qtd: 2, par: true }), parSemE = pe([parN], tec(), { sentido: 'unico' }), cParSemE = ce([parN], tec(), { sentido: 'unico' });
 const pesoDe = t => { const o = { camadas: 3 }, c = ce([pc()], t, o); return [c, c && fn(() => O.resultados(O.normalizar(ordemO(o)), [c], [t]), null)]; };
 const [cPeso, rPeso] = pesoDe(tec()), [cPesoT, rPesoT] = pesoDe(tec({ tubular: true }));
+// produto com peça do principal e do forro, uma aba e um enfesto por tecido: a roupa conta uma vez só
+const duasAbas = fn(() => {
+  const it = { produtoId: 'p1', cor: 'Azul', pecas: null, grade: { M: 3 } }, tecs = [tec(), { id: 'tF', larg: 1.5, gram: 100 }];
+  const ord = O.normalizar({ tecidos: [{ id: 'a1', materiaId: 'tA' }, { id: 'a2', materiaId: 'tF' }],
+    enfestos: [{ id: 'e1', tecidoId: 'a1', camadas: 5, itens: [it] }, { id: 'e2', tecidoId: 'a2', camadas: 5, itens: [it] }] });
+  const cs = ord.enfestos.map(e => O.calcularEnfesto(e, ord, [prodO([pc({ nome: 'Frente' }), pc({ nome: 'Forro', tecido: 'tF' })])], tecs)), r = O.resultados(ord, cs, tecs);
+  return [cs[1].grade, cs[1].pecasTotal, r.pecas, r.grade, r.consumoLinear === cs[0].comp / 1000 * 5 / 15];
+}, null);
+const cTubOurela = ce([pc()], tec({ tubular: true }), { ourelaE: 20, ourelaD: 30 });
 const su = pe([pc({ rot: 'livre' }), pc({ rot: '180' })], tec({ sentidoUnico: true }));
 const cSem = ce([pc()], tec({ larg: 0.2 }), {}, { grade: { M: 6 } }), cEnc = ce([pc()], tec({ larg: 0.2, encolhC: 10 }), {}, { grade: { M: 6 } });
 const doisTec = [pc({ nome: 'Frente' }), pc({ nome: 'Forro', tecido: 'tF' }), pc({ nome: 'Bolso' })];
@@ -434,6 +443,8 @@ testes.push(
   ['review5 duplo par: 8 posicoes, todas normais', [parD.length, parD.every(x => !x.espelho && !x.espelhar && x.rende === 1), (parD.avisos || []).length], [8, true, 0]],
   ['review5 unico par sem espelhar: 8 normais e 1 aviso', [parSemE.length, parSemE.filter(x => x.espelho).length, parSemE.avisos, cParSemE && (cParSemE.avisos || []).length],
     [8, 0, [{ peca: 'Bolso', tam: 'M', motivo: 'par sem espelhar no sentido único' }], 1]],
+  ['duas abas: roupa so no tecido principal (15, nao 30)', duasAbas, [{}, 3, 15, { R1: { M: 15 } }, true]],
+  ['tubular ignora ourelas na largura util', cTubOurela && cTubOurela.largUtil, 1600],
   ['peso das pecas = area x gram x pecas (aberto, 3 camadas)', rPeso && [cPeso.pecasTotal, rPeso.pesoPecas], [4, 0.04 * 0.16 * 4 * 3], 1e-9],
   ['peso das pecas = area x gram x pecas (tubular, 3 camadas)', rPesoT && [cPesoT.pecasTotal, rPesoT.pesoPecas], [4, 0.04 * 0.16 * 4 * 3], 1e-9],
   ['review5 dobra tubular: meia peca na borda Y=0', dobraT.length && [dobraT.length, dobraT[0].borda0, dobraT[0].rende, dobraT[0].rasters.length, [dobraT[0].rasters[0].cw, dobraT[0].rasters[0].ch]], [4, true, 1, 1, [10, 8]]],
