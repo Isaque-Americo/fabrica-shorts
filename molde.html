@@ -991,25 +991,28 @@ return {txt,cls}};
 const pinta=(sp,r)=>{sp.textContent=r.txt;sp.className='med '+r.cls};
 // mesma estrutura: só atualiza valores (refazer as linhas tira o foco)
 if(tb.dataset.chave===chave){
-tb.querySelectorAll('input[data-tam]').forEach(i=>{const m=M.medidas.find(x=>x.id===i.dataset.id);if(i!==document.activeElement)i.value=m.valores[i.dataset.tam]==null?'':cm2(m.valores[i.dataset.tam])});
+tb.querySelectorAll('input.nm').forEach(i=>{const m=M.medidas.find(x=>x.id===i.dataset.id);if(i!==document.activeElement)i.value=m.nome;i.parentNode.querySelector('.rm').setAttribute('aria-label','Remover medida '+m.nome)});
+tb.querySelectorAll('input[data-tam]').forEach(i=>{const m=M.medidas.find(x=>x.id===i.dataset.id);i.setAttribute('aria-label',m.nome+', esperado em cm, tamanho '+i.dataset.tam);if(i!==document.activeElement)i.value=m.valores[i.dataset.tam]==null?'':cm2(m.valores[i.dataset.tam])});
 tb.querySelectorAll('.med').forEach(sp=>pinta(sp,atual(M.medidas.find(x=>x.id===sp.dataset.id),sp.dataset.tam)));
 return}
 tb.dataset.chave=chave;tb.textContent='';th.textContent='';
 if(M.medidas.length){const h=document.createElement('tr');for(const t of ['Medida',...tams]){const c=document.createElement('th');c.textContent=t;h.append(c)}th.append(h)}
 for(const m of M.medidas){
 const tr=document.createElement('tr'),c0=document.createElement('td'),nm=document.createElement('input');
-nm.className='nm';nm.value=m.nome;nm.autocomplete='off';nm.setAttribute('aria-label','Nome da medida');
-nm.onchange=()=>{m.nome=nm.value.trim()||m.nome;alterou()};
+nm.className='nm';nm.dataset.id=m.id;nm.value=m.nome;nm.autocomplete='off';nm.setAttribute('aria-label','Nome da medida');
+const ac=()=>M.medidas.find(x=>x.id===m.id); // M troca no desfazer: achar a medida na hora
+nm.onchange=()=>{const m=ac();if(!m)return;m.nome=nm.value.trim()||m.nome;alterou()};
 const lig=document.createElement('button');lig.type='button';lig.className='sm';lig.textContent='Ligar';lig.title='Ligar aos traços selecionados';
-lig.onclick=()=>{const ids=[...sel].filter(i=>M.tracos.some(x=>x.id===i));if(!ids.length)return toast('Selecione traços para ligar.');m.tracos=ids;alterou();toast('Ligada a '+ids.length+' traço(s).')};
-const rm=document.createElement('button');rm.type='button';rm.className='sm';rm.textContent='✕';rm.title='Remover medida';rm.setAttribute('aria-label','Remover medida '+m.nome);
-rm.onclick=()=>{M.medidas=M.medidas.filter(x=>x!==m);alterou()};
+lig.onclick=()=>{const m=ac();if(!m)return;const ids=[...sel].filter(i=>M.tracos.some(x=>x.id===i));if(!ids.length)return toast('Selecione traços para ligar.');m.tracos=ids;alterou();toast('Ligada a '+ids.length+' traço(s).')};
+const rm=document.createElement('button');rm.type='button';rm.className='sm rm';rm.textContent='✕';rm.title='Remover medida';rm.setAttribute('aria-label','Remover medida '+m.nome);
+rm.onclick=()=>{M.medidas=M.medidas.filter(x=>x.id!==m.id);alterou()};
 c0.append(nm,document.createElement('br'),lig,' ',rm);tr.append(c0);
 for(const t of tams){
 const td=document.createElement('td'),inp=document.createElement('input'),sp=document.createElement('span');
 inp.inputMode='decimal';inp.autocomplete='off';inp.dataset.id=m.id;inp.dataset.tam=t;inp.setAttribute('aria-label',m.nome+', esperado em cm, tamanho '+t);
 inp.value=m.valores[t]==null?'':cm2(m.valores[t]);
 inp.onchange=()=>{
+const m=ac();if(!m)return;
 if(!inp.value.trim())delete m.valores[t];
 else{const v=MD.medida(inp.value);if(!v||v.length>1||!(v[0]>=0)){toast('Medida inválida. Ex.: 78 ou 78,5');inp.value=m.valores[t]==null?'':cm2(m.valores[t]);return}m.valores[t]=mm10(v[0])}
 alterou()};
