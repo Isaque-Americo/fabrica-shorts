@@ -153,3 +153,7 @@ O dono pediu: implementar o que ainda não existe no app e deixar o que já exis
 - **Custo:** o consumo pelo encaixe real alimenta a sugestão de `cons`/`consG` da ficha técnica (botão "Usar este consumo"), e o custo da ordem usa `matCusto` do tecido.
 - **Processos na ficha técnica:** a ficha ganha uma lista opcional de processos (nome, minutos, custo por minuto), somada à mão de obra. Quem não preencher continua com a mão de obra única de hoje.
 - **Tamanhos:** a grade do app (`SZ` = P…G4) é a grade padrão; moldes com outra grade (36–56) funcionam no editor e na ordem, mas só P…G4 se ligam a pedidos.
+
+### Decisões do dono (2026-11-12)
+- Confirmados os 5 rulings do plano da etapa 3 (página separada, Plano de enfesto como estimativa, tubular, sentido do enfesto, jsPDF 2.5.1).
+- Páginas separadas: `molde.html` (molde), `corte.html` (ordens de corte) e `enfesto.html` (risco de um enfesto).

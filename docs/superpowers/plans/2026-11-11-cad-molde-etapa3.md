@@ -6,13 +6,13 @@
 
 **Architecture:** O encaixe sai do `index.html` para `molde/encaixe.js` (puro, agora devolvendo posições), usado pelo `index.html` e pela página nova `corte.html`. A regra da ordem fica em `molde/ordem.js` e as exportações em `molde/exporta.js`, ambos puros e testados em Node. `corte.html` é a interface (padrão do `molde.html`: acesso só admin, modo `?local=1`, armazenamento atrás de `B`).
 
-**Tech Stack:** HTML/JS sem build, SVG, Supabase JS 2.45.4, jsPDF 2.5.1 (`https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js`) só no `corte.html`, Node para self-check.
+**Tech Stack:** HTML/JS sem build, SVG, Supabase JS 2.45.4, jsPDF 2.5.1 (`https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js`) só no `enfesto.html`, Node para self-check.
 
 **Spec:** `docs/superpowers/specs/2026-11-11-cad-molde-enfesto-design.md` (seção "Etapa 3", itens 5–10, e "Compatibilidade")
 
 ## Global Constraints
 
-- Sem build. Única biblioteca nova: jsPDF 2.5.1 pelo CDN acima, só em `corte.html`.
+- Sem build. Única biblioteca nova: jsPDF 2.5.1 pelo CDN acima, só em `enfesto.html`.
 - mm internamente; cm/m na tela com vírgula decimal.
 - No encaixe: X = comprimento do risco, Y = largura do tecido; fio ao longo de X. Resolução da grade de encaixe 20 mm (`ENC_RES`) como hoje.
 - Só admin: `docs_admin_all` cobre `col='ordens'`; nada muda no banco. `corte.html` bloqueia não-admin como o `molde.html`.
@@ -24,7 +24,7 @@
 
 ## Rulings deste plano (substituem detalhes do spec)
 
-- **Página `corte.html` separada**, como o `molde.html`: o `index.html` já passa de 150 KB e o risco desenhado/impressões pesam. O `index.html` ganha a aba-link "Ordens de corte" e o botão "Criar ordem de corte" na aba Fabricar.
+- **Três páginas separadas (pedido do dono em 2026-11-12):** `molde.html` (já existe), `corte.html` (ordens de corte: lista, propriedades, abas de tecido/enfesto, grade, resultados e relatório) e `enfesto.html` (o risco de um enfesto: desenho, painel do enfesto, ajuste manual, minimapa e exportação do encaixe). `corte.html` abre `enfesto.html?ordem=<id>&enf=<id>`. O `index.html` ganha a aba-link "Ordens de corte" e o botão "Criar ordem de corte" na aba Fabricar.
 - **Plano de enfesto da aba Fabricar continua como está** (estimativa rápida com mesa/camadas do navegador); o botão "Criar ordem de corte" leva a mesa e as camadas dali como valores iniciais do enfesto.
 - **Tubular:** cada camada tem dois panos → cada peça encaixada rende 2 (qtd por camada da grade é dividida por 2, arredondando para cima). Peça com "dobra no tecido tubular" é encaixada como meia peça (a metade do lado da dobra) encostada na borda Y=0.
 - **Sentido do enfesto:** `duplo` (camadas face a face) → peça em par rende 2 por posição; `unico` → par vira duas posições (normal + espelhada se `espelhar`, senão duas normais). Tecido `sentidoUnico` força rotação `'nenhuma'`.
@@ -130,23 +130,23 @@
 - [ ] Step 6: Verificar em modo local (Playwright): nova ordem, 2 abas de tecido, 2 enfestos, ajustar grade, recarregar mantém.
 - [ ] Step 7: Commit `"Pagina de ordens de corte"`
 
-### Task 6: `corte.html` — risco, ajuste e resultados
+### Task 6: `enfesto.html` — risco e ajuste; resultados no `corte.html`
 
-**Files:** Modify `corte.html`.
+**Files:** Create `enfesto.html` (mesmo padrão de acesso/`B`/modo local do `corte.html`; lê a ordem e calcula o enfesto `enf`); Modify `corte.html` (botão "Abrir enfesto" por enfesto e o painel de resultados); Modify `.github/workflows/pages.yml` (copiar `enfesto.html`).
 
-- [ ] Step 1: Desenho do risco do enfesto (SVG, régua em cm): peças por cor de tamanho (mesmos tokens `--t0..--t7` do editor), nome/tamanho no centro, limites da largura útil, ourelas e cabeceira.
-- [ ] Step 2: Painel do enfesto: aproveitamento %, comprimento, total de tecido (comp × camadas), camadas, aviso se passar do comprimento máximo da mesa.
-- [ ] Step 3: Ajuste manual: arrastar peça (encaixe na grade de 20 mm, sem sobrepor), girar entre variantes permitidas; comprimento e aproveitamento recalculam; botão "Refazer encaixe automático"; nada é salvo.
-- [ ] Step 4: Painel de resultados da ordem (`resultados`): pesos, consumo linear, custo, total de peças, grade total por referência e tamanho.
+- [ ] Step 1 (`enfesto.html`): Desenho do risco do enfesto (SVG, régua em cm): peças por cor de tamanho (mesmos tokens `--t0..--t7` do editor), nome/tamanho no centro, limites da largura útil, ourelas e cabeceira.
+- [ ] Step 2 (`enfesto.html`): Painel do enfesto: aproveitamento %, comprimento, total de tecido (comp × camadas), camadas, aviso se passar do comprimento máximo da mesa.
+- [ ] Step 3 (`enfesto.html`): Ajuste manual: arrastar peça (encaixe na grade de 20 mm, sem sobrepor), girar entre variantes permitidas; comprimento e aproveitamento recalculam; botão "Refazer encaixe automático"; nada é salvo.
+- [ ] Step 4 (`corte.html`): Painel de resultados da ordem (`resultados`): pesos, consumo linear, custo, total de peças, grade total por referência e tamanho.
 - [ ] Step 5: Verificar em modo local; Commit `"Risco, ajuste manual e resultados da ordem"`
 
-### Task 7: `corte.html` — impressões
+### Task 7: Impressões (`enfesto.html` e `corte.html`)
 
-**Files:** Modify `corte.html`.
+**Files:** Modify `enfesto.html` (minimapa e exportação do encaixe); Modify `corte.html` (relatório).
 
-- [ ] Step 1: "Imprimir minimapa": risco reduzido numa A4 deitada com cabeçalho (ordem, enfesto, tecido, metros, camadas) via CSS de impressão.
-- [ ] Step 2: "Imprimir relatório": resultados + grades em A4.
-- [ ] Step 3: "Exportar encaixe": diálogo com formato (PDF na largura do tecido, PLT, DXF, A4 emendável), liga/desliga (nome do molde, textos, margem de costura, fio, bordas, limites do enfesto, cabeçalho), tamanho do papel e margens (A4); PDF via jsPDF a partir de `pdfPlano`; arquivos baixados com nome `ordem-enfesto.ext`.
+- [ ] Step 1 (`enfesto.html`): "Imprimir minimapa": risco reduzido numa A4 deitada com cabeçalho (ordem, enfesto, tecido, metros, camadas) via CSS de impressão.
+- [ ] Step 2 (`corte.html`): "Imprimir relatório": resultados + grades em A4.
+- [ ] Step 3 (`enfesto.html`): "Exportar encaixe": diálogo com formato (PDF na largura do tecido, PLT, DXF, A4 emendável), liga/desliga (nome do molde, textos, margem de costura, fio, bordas, limites do enfesto, cabeçalho), tamanho do papel e margens (A4); PDF via jsPDF a partir de `pdfPlano`; arquivos baixados com nome `ordem-enfesto.ext`.
 - [ ] Step 4: Verificar em modo local: baixar PLT e DXF e conferir a escala com o quadrado de calibração (ler o arquivo baixado); PDF A4 tem N páginas numeradas.
 - [ ] Step 5: Commit `"Impressoes da ordem de corte"`
 
