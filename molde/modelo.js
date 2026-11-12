@@ -199,7 +199,8 @@
     if (!c || c.length < 3 || !c.every(p => Number.isFinite(p.x) && Number.isFinite(p.y))) return null;
     const bx = G.bbox(c);
     const pts = c.map(p => [Math.round(p.x - bx.x0), Math.round(p.y - bx.y0)]);
-    return { w: Math.max(...pts.map(p => p[0])), h: Math.max(...pts.map(p => p[1])), qtd: peca.cortar * (peca.par ? 2 : 1), pts, rot: peca.rotacao, tecido: peca.tecido };
+    return { w: Math.max(...pts.map(p => p[0])), h: Math.max(...pts.map(p => p[1])), qtd: peca.cortar * (peca.par ? 2 : 1), pts, rot: peca.rotacao, tecido: peca.tecido,
+      nome: peca.nome, par: peca.par, espelhar: peca.espelhar, tubular: peca.tubular }; // par/espelhar/tubular: regras da ordem de corte (molde/ordem.js)
   }
   // formato de p.mol; pecas = tamanho base, porTam = uma lista por tamanho (só as peças sem tam ou com tam = o tamanho).
   // peça boa no base que quebra num tamanho (ex.: traço lápis não acompanha a gradação) vai com a forma do base e entra em avisos

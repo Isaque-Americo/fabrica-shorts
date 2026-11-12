@@ -1,0 +1,172 @@
+// Regra da ordem de corte (lógica pura): grade dos pedidos, peças de cada enfesto com as regras do tecido
+// (tubular, sentido, sentido único, encolhimento, espelhar), encaixe e resultados (pesos, custo, consumo, grade).
+// mm internamente; tecido.larg em m, gram em g/m². X = comprimento do risco, Y = largura do tecido.
+(function (g) {
+  const E = g.MoldeEncaixe || (typeof require !== 'undefined' ? require('./encaixe.js') : null);
+  const uid = () => Math.random().toString(36).slice(2, 10);
+  const num = v => Number.isFinite(+v) ? +v : 0;
+  const nn = v => Math.max(0, Math.round(num(v)));
+
+  // R$/m do tecido, igual a matCusto do index.html para tipo 'tecido'
+  const matCusto = m => !m ? 0 : m.cobr === 'mt' ? num(m.preco) : num(m.rend) > 0 ? num(m.preco) / num(m.rend) : 0;
+
+  function normEnfesto(e, i) {
+    e = e || {};
+    return {
+      id: e.id || uid(), nome: e.nome || 'Enfesto ' + (i + 1), tecidoId: e.tecidoId || '',
+      camadas: Math.max(1, nn(e.camadas)), alturaMax: nn(e.alturaMax), compMax: Math.max(0, num(e.compMax)),
+      cabeceira: Math.max(0, num(e.cabeceira)), ourelaE: Math.max(0, num(e.ourelaE)), ourelaD: Math.max(0, num(e.ourelaD)),
+      sentido: e.sentido === 'unico' ? 'unico' : 'duplo',
+      itens: (e.itens || []).map(it => ({
+        produtoId: (it && it.produtoId) || '', cor: (it && it.cor) || '',
+        pecas: it && Array.isArray(it.pecas) ? it.pecas.map(String) : null,
+        grade: Object.fromEntries(Object.entries((it && it.grade) || {}).map(([t, q]) => [t, nn(q)]))
+      }))
+    };
+  }
+
+  function normalizar(doc) {
+    const d = doc || {};
+    return {
+      ...d, nome: d.nome || '', obs: d.obs || '', criadaEm: d.criadaEm || '',
+      pedidos: Array.isArray(d.pedidos) ? d.pedidos.map(String) : [],
+      tecidos: (d.tecidos || []).map(t => ({ id: (t && t.id) || uid(), materiaId: (t && t.materiaId) || '' })),
+      enfestos: (d.enfestos || []).map(normEnfesto), v: 1
+    };
+  }
+
+  function nova(nome) {
+    const t = { id: uid(), materiaId: '' };
+    return normalizar({ nome: nome || '', criadaEm: new Date().toISOString(), tecidos: [t], enfestos: [{ tecidoId: t.id }] });
+  }
+
+  // lista = fabricarLista() do index.html; opts.produtos dá o tecido principal (p.tecidoId) de cada produto.
+  // grade por camada = ceil(f / camadas): com camadas 1 é o próprio f
+  function deFabricar(lista, opts) {
+    const o = opts || {}, camadas = Math.max(1, nn(o.camadas) || 1), prods = o.produtos || [];
+    const ordem = nova(''), tecidos = [], enfestos = [];
+    for (const l of lista || []) {
+      const f = nn(l.f); if (!f || !l.id) continue;
+      const p = prods.find(x => x.id === l.id), mat = (p && p.tecidoId) || '';
+      let enf = enfestos.find(e => e.mat === mat);
+      if (!enf) {
+        const t = { id: uid(), materiaId: mat }; tecidos.push(t);
+        enf = { mat, e: { tecidoId: t.id, camadas, compMax: o.compMax, itens: [] } }; enfestos.push(enf);
+      }
+      let it = enf.e.itens.find(x => x.produtoId === l.id && x.cor === (l.c || ''));
+      if (!it) enf.e.itens.push(it = { produtoId: l.id, cor: l.c || '', pecas: null, grade: {} });
+      it.grade[l.t] = (it.grade[l.t] || 0) + f; // f somado; divide por camadas no fim
+    }
+    for (const { e } of enfestos) for (const it of e.itens) for (const t in it.grade) it.grade[t] = Math.ceil(it.grade[t] / camadas);
+    return normalizar({ ...ordem, tecidos: tecidos.length ? tecidos : ordem.tecidos, enfestos: enfestos.length ? enfestos.map(x => x.e) : ordem.enfestos });
+  }
+
+  function ajustarGrade(item, tam, delta) {
+    item.grade = item.grade || {};
+    return (item.grade[tam] = Math.max(0, nn(item.grade[tam]) + Math.round(num(delta))));
+  }
+
+  const areaPol = pts => Math.abs(pts.reduce((a, [x, y], i) => { const [x2, y2] = pts[(i + 1) % pts.length]; return a + x * y2 - x2 * y; }, 0)) / 2;
+  // meia peça para a dobra do tubular: corta na linha do meio ao longo de X (y = h/2), fica com a metade de baixo
+  // e vira em Y para a linha do corte (a dobra) ficar em y = 0, encostada na borda Y=0 do tecido
+  function meiaPeca(pts) {
+    const ys = pts.map(p => p[1]), c = (Math.min(...ys) + Math.max(...ys)) / 2, out = [];
+    for (let i = 0; i < pts.length; i++) {
+      const a = pts[i], b = pts[(i + 1) % pts.length], ia = a[1] <= c, ib = b[1] <= c;
+      if (ia) out.push(a);
+      if (ia !== ib) out.push([a[0] + (b[0] - a[0]) * (c - a[1]) / (b[1] - a[1]), c]);
+    }
+    return out.map(([x, y]) => [x, c - y]);
+  }
+
+  // peças de um tamanho: porTam[tam], senão a base (produto antigo)
+  const pecasTam = (p, tam) => { const m = p && p.mol; if (!m) return []; return (m.porTam && m.porTam[tam] && m.porTam[tam].length ? m.porTam[tam] : m.pecas) || []; };
+  const contexto = (enf, ordem, tecidos) => {
+    const aba = (ordem.tecidos || []).find(t => t.id === enf.tecidoId);
+    return { aba, mat: aba && (tecidos || []).find(m => m.id === aba.materiaId) };
+  };
+
+  // itens para MoldeEncaixe.encaixar, um por posição no risco. Cada item leva o que o desenho precisa:
+  // {pecaIdx (índice em porTam[tam]/pecas), rasters, borda0, a, produtoId, cor, tam, nome, pts (já meia/espelhada),
+  //  rot, espelhar, escala, espelho, meia, rende (peças cortadas por posição e camada), area (mm², já com escala)}.
+  // rasters = variantes(pts, {rot, espelhar, escala}). Seleção `pecas`: pelo nome da peça; sem nome, pelo índice ('0', '1'…)
+  function pecasEnfesto(enf, ordem, produtos, tecidos) {
+    const { aba, mat } = contexto(enf, ordem, tecidos); if (!aba) return [];
+    const tub = !!(mat && mat.tubular), su = !!(mat && mat.sentidoUnico), unico = enf.sentido === 'unico';
+    const escala = { x: 1 + num(mat && mat.encolhC) / 100, y: 1 + num(mat && mat.encolhL) / 100 };
+    const abas = (ordem.tecidos || []).map(t => t.materiaId), cache = new Map(), itens = [];
+    const item = (base, pts, o) => {
+      const k = base.q; if (!cache.has(k)) cache.set(k, new Map());
+      const ck = o.rot + '|' + o.espelhar + '|' + o.espelho + '|' + o.meia, cc = cache.get(k);
+      if (!cc.has(ck)) cc.set(ck, { rasters: E.variantes(pts, { rot: o.rot, espelhar: o.espelhar, escala }), area: areaPol(pts) * escala.x * escala.y });
+      const { rasters, area } = cc.get(ck);
+      return { pecaIdx: base.k, rasters, borda0: !!o.meia, a: area, produtoId: base.p.id, cor: base.cor, tam: base.tam, nome: base.nome,
+        pts, rot: o.rot, espelhar: o.espelhar, escala, espelho: !!o.espelho, meia: !!o.meia, rende: o.rende, area };
+    };
+    const repete = (n, f) => { for (let i = 0; i < n; i++) itens.push(f()); };
+    for (const it of enf.itens || []) {
+      const p = (produtos || []).find(x => x.id === it.produtoId); if (!p) continue;
+      const principal = abas.includes(p.tecidoId) ? p.tecidoId : abas[0]; // peça sem tecido vai na aba do tecido do produto, senão na [0]
+      for (const [tam, gq] of Object.entries(it.grade || {})) {
+        const gr = nn(gq); if (!gr) continue;
+        pecasTam(p, tam).forEach((q, k) => {
+          if (!(q && q.pts && q.pts.length > 2) || (q.tecido || principal) !== aba.materiaId) return;
+          const nome = q.nome || String(k);
+          if (it.pecas && !it.pecas.includes(nome)) return;
+          const base = { q, k, p, cor: it.cor, tam, nome }, qtd = nn(q.qtd), N = gr * qtd;
+          const rot = su ? 'nenhuma' : q.rot, esp = !!q.espelhar;
+          if (tub && q.tubular) { const m = meiaPeca(q.pts); repete(N, () => item(base, m, { rot: 'nenhuma', espelhar: false, meia: true, rende: 1 })); } // girar/espelhar tiraria a dobra de Y=0
+          else if (tub) repete(Math.ceil(N / 2), () => item(base, q.pts, { rot, espelhar: esp, rende: 2 })); // dois panos por camada
+          else if (q.par && !unico) repete(gr * Math.ceil(qtd / 2), () => item(base, q.pts, { rot, espelhar: esp, rende: 2 })); // face a face: o par sai junto
+          else if (q.par) {
+            const n = gr * Math.ceil(qtd / 2), espelhada = esp ? q.pts.map(([x, y]) => [x, -y]) : q.pts;
+            repete(n, () => item(base, q.pts, { rot, espelhar: false, rende: 1 }));
+            repete(n, () => item(base, espelhada, { rot, espelhar: false, espelho: esp, rende: 1 }));
+          } else repete(N, () => item(base, q.pts, { rot, espelhar: esp, rende: 1 }));
+        });
+      }
+    }
+    return itens;
+  }
+
+  // posições em mm a partir do início do encaixe (sem ourela E); comp inclui a cabeceira. null: sem peças, sem tecido ou peça mais larga que o tecido
+  function calcularEnfesto(enf, ordem, produtos, tecidos) {
+    const { mat } = contexto(enf, ordem, tecidos); if (!mat) return null;
+    const largUtil = num(mat.larg) * 1000 - num(enf.ourelaE) - num(enf.ourelaD);
+    const itens = pecasEnfesto(enf, ordem, produtos, tecidos), r = E.encaixar(itens, largUtil);
+    if (!r) return null;
+    const comp = r.comp + num(enf.cabeceira), areaPecas = itens.reduce((a, x) => a + x.area, 0), grade = {};
+    for (const it of enf.itens || []) {
+      const p = (produtos || []).find(x => x.id === it.produtoId); if (!p) continue;
+      const gr = grade[p.ref || p.id] = grade[p.ref || p.id] || {};
+      for (const [t, q] of Object.entries(it.grade || {})) if (nn(q)) gr[t] = (gr[t] || 0) + nn(q);
+    }
+    return { comp, largUtil, posicoes: r.posicoes, itens, pecasTotal: itens.reduce((a, x) => a + x.rende, 0), areaPecas,
+      aproveitamento: comp > 0 && largUtil > 0 ? areaPecas / (comp * largUtil) : 0, grade };
+  }
+
+  // calculos[k] = calcularEnfesto de ordem.enfestos[k] (null = fica fora). Pesos em kg; tubular conta os dois panos.
+  // pecas = peças de roupa (grade × camadas); consumoLinear = metros por peça de roupa
+  function resultados(ordem, calculos, tecidos) {
+    const r = { metros: 0, pesoTecido: 0, pesoPecas: 0, pesoDesperdicio: 0, consumoLinear: 0, custo: 0, pecas: 0, grade: {} };
+    (ordem.enfestos || []).forEach((enf, k) => {
+      const c = (calculos || [])[k]; if (!c) return;
+      const { mat } = contexto(enf, ordem, tecidos), cam = Math.max(1, nn(enf.camadas)), m = c.comp / 1000 * cam;
+      const kgm2 = num(mat && mat.gram) / 1000 * (mat && mat.tubular ? 2 : 1);
+      r.metros += m; r.custo += m * matCusto(mat);
+      r.pesoTecido += m * num(mat && mat.larg) * kgm2;
+      r.pesoPecas += num(c.areaPecas) / 1e6 * cam * kgm2;
+      for (const [ref, gt] of Object.entries(c.grade || {})) for (const [t, q] of Object.entries(gt)) {
+        const gr = r.grade[ref] = r.grade[ref] || {};
+        gr[t] = (gr[t] || 0) + q * cam; r.pecas += q * cam;
+      }
+    });
+    r.pesoDesperdicio = r.pesoTecido - r.pesoPecas;
+    r.consumoLinear = r.pecas ? r.metros / r.pecas : 0;
+    return r;
+  }
+
+  const MoldeOrdem = { normalizar, nova, deFabricar, ajustarGrade, pecasEnfesto, calcularEnfesto, resultados, matCusto, meiaPeca };
+  g.MoldeOrdem = MoldeOrdem;
+  if (typeof module !== 'undefined') module.exports = MoldeOrdem;
+})(typeof window !== 'undefined' ? window : globalThis);

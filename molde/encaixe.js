@@ -73,7 +73,7 @@
       if (!rot.length) return null;
       lista.push({ i, rot, b0: todos0 || !!it.borda0, a: it.a != null ? +it.a || 0 : rot[0].r.cw * rot[0].r.ch * ENC_RES * ENC_RES });
     }
-    const maxCel = lista.reduce((a, x) => a + x.rot[0].r.cw, 0) + 4;
+    const maxCel = lista.reduce((a, x) => a + Math.max(...x.rot.map(v => v.r.cw)), 0) + 4; // a variante escolhida pode ser mais larga que rot[0]
     let melhor = null;
     for (const ord of [(a, b) => b.a - a.a, (a, b) => b.rot[0].r.ch - a.rot[0].r.ch || b.a - a.a])
       for (const custo of [c => c.oy * 1e4 + c.ox + c.r.cw, c => (c.ox + c.r.cw) * 1e4 + c.oy, c => c.i * 1e4 + c.oy]) {

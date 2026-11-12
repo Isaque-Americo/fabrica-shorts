@@ -141,7 +141,8 @@ testes.push(
   ['pence ponta a 50 da barra', cosPence.some(q => Math.abs(q.x - 50) < TOL && Math.abs(q.y - 50) < TOL), true],
   ['pence tira o V da area', G.area(cosPence), 20000 - 20 * 50 / 2],
   ['molParaProduto chaves', Object.keys(prodRet).sort(), ['arq', 'avisos', 'origem', 'pecas', 'porTam', 'un']],
-  ['molParaProduto peca chaves', Object.keys(prodRet.pecas[0]).sort(), ['h', 'pts', 'qtd', 'rot', 'tecido', 'w']],
+  ['molParaProduto peca chaves', Object.keys(prodRet.pecas[0]).sort(), ['espelhar', 'h', 'nome', 'par', 'pts', 'qtd', 'rot', 'tecido', 'tubular', 'w']],
+  ['molParaProduto par, espelhar, tubular e nome', (q => [q.nome, q.par, q.espelhar, q.tubular])(M.molParaProduto({ ...qd, pecas: [{ ...qd.pecas[0], nome: 'Bolso', espelhar: true, tubular: true }] }).pecas[0]), ['Bolso', true, true, true]],
   ['molParaProduto un mm', prodRet.un, 'mm'],
   ['molParaProduto pts [x,y] inteiros', prodRet.pecas[0].pts.every(q => Array.isArray(q) && q.length === 2 && q.every(Number.isInteger)), true],
   ['molParaProduto pts no canto', (p => [Math.min(...p.map(q => q[0])), Math.min(...p.map(q => q[1]))])(prodRet.pecas[0].pts), [0, 0]],
@@ -243,7 +244,7 @@ testes.push(
 );
 
 // etapa 2: grade, gradação e bainha
-const semNovas = pecas => pecas.map(({ rot, tecido, ...r }) => r);
+const semNovas = pecas => pecas.map(({ rot, tecido, nome, par, espelhar, tubular, ...r }) => r);
 const gp = M.normalizar({ grade: M.GRADES.app, base: 'M' });
 M.graduarPasso(gp, 'p1', 5, 0);
 const gs = M.normalizar({ grade: M.GRADES.app, base: 'M' });
@@ -372,6 +373,73 @@ testes.push(
   ['escala 1,1 x 1: comprimento maior ou igual', cTri({ escala: { x: 1.1, y: 1 } }) >= cTri({}), true],
   ['encaixar peca mais larga que o tecido: null', E.encaixar ? E.encaixar([{ pecaIdx: 0, rasters: va(antigos.L, { rot: 'nenhuma' }) }], 200) : 0, null],
   ['encaixar lista vazia: null', E.encaixar ? E.encaixar([], 1000) : 0, null],
+);
+
+// fallback do encaixar: a variante escolhida pode ser mais larga que rot[0] (caso achado por busca aleatória)
+const Rm = (cw, ch, s) => ({ cw, ch, m: Uint8Array.from([...s].map(Number)) });
+const itLargo = [{ pecaIdx: 0, rasters: [Rm(1, 2, '10')] }, { pecaIdx: 1, rasters: [Rm(1, 2, '10'), Rm(7, 1, '1111111')] }, { pecaIdx: 2, rasters: [Rm(1, 2, '01')] }];
+const rLargo = E.encaixar ? E.encaixar(itLargo, 40) : null;
+testes.push(['encaixar variante mais larga que rot[0]: posicoes dentro do comp', posicoesOk(itLargo, rLargo, 40), true]);
+
+// ordem de corte (molde/ordem.js)
+const O = fs.existsSync(path.join(raiz, 'ordem.js')) ? require(path.join(raiz, 'ordem.js')) : null;
+const fn = (f, d) => { try { return O ? f() : d; } catch (e) { return 'erro: ' + e.message; } };
+const sq200 = [[0, 0], [200, 0], [200, 200], [0, 200]];
+const pc = o => ({ w: 200, h: 200, qtd: 1, pts: sq200, rot: '180', tecido: '', ...o });
+const prodO = pecas => ({ id: 'p1', ref: 'R1', tecidoId: 'tA', mol: { pecas, porTam: { M: pecas } } });
+const tec = o => ({ id: 'tA', nome: 'Malha', larg: 1.6, gram: 160, cobr: 'mt', preco: 12, ...o });
+const ordemO = (o, item) => ({ tecidos: [{ id: 'a1', materiaId: 'tA' }, { id: 'a2', materiaId: 'tF' }],
+  enfestos: [{ id: 'e1', tecidoId: 'a1', camadas: 1, sentido: 'duplo', itens: [{ produtoId: 'p1', cor: 'Azul', pecas: null, grade: { M: 4 }, ...item }], ...o }] });
+const naOrdem = (f, pecas, t, o, item) => { const ord = O.normalizar(ordemO(o, item)); return f(ord.enfestos[0], ord, [prodO(pecas)], [t, { id: 'tF', larg: 1.5 }]); };
+const pe = (...a) => fn(() => naOrdem(O.pecasEnfesto, ...a), []);
+const ce = (...a) => fn(() => naOrdem(O.calcularEnfesto, ...a), null);
+const lista3 = [{ id: 'p1', ref: 'R1', nome: 'Short', c: 'Azul', t: 'P', f: 3 }, { id: 'p1', ref: 'R1', nome: 'Short', c: 'Azul', t: 'M', f: 5 },
+  { id: 'p2', ref: 'R2', nome: 'Bermuda', c: 'Preto', t: 'G', f: 2 }];
+const deF = fn(() => O.deFabricar(lista3, { produtos: [{ id: 'p1', tecidoId: 'tA' }, { id: 'p2', tecidoId: 'tB' }] }), null);
+const deF3 = fn(() => O.deFabricar(lista3, { camadas: 3, compMax: 4000 }), null);
+const itAj = { grade: { M: 2 } };
+const ajust = fn(() => [O.ajustarGrade(itAj, 'M', -5), itAj.grade.M], null);
+const ordR4 = { tecidos: [{ id: 'a1', materiaId: 'tA' }], enfestos: [{ id: 'e1', tecidoId: 'a1', camadas: 10 }] };
+const res4 = t => fn(() => O.resultados(O.normalizar(ordR4), [{ comp: 2000, areaPecas: 1.6e6, pecasTotal: 8, grade: { R1: { M: 4 } } }], [t]), null);
+const r4 = res4(tec()), r4kg = res4(tec({ cobr: 'kg', preco: 60, rend: 5 }));
+const aberto = pe([pc()], tec()), tub = pe([pc()], tec({ tubular: true })), cTub = ce([pc()], tec({ tubular: true }));
+const dobraT = pe([pc({ w: 200, h: 300, pts: [[0, 0], [200, 0], [200, 300], [0, 300]], tubular: true })], tec({ tubular: true }));
+const parE = pc({ qtd: 2, par: true, espelhar: true });
+const parU = pe([parE], tec(), { sentido: 'unico' }), cParU = ce([parE], tec(), { sentido: 'unico' }), parD = pe([parE], tec());
+const su = pe([pc({ rot: 'livre' }), pc({ rot: '180' })], tec({ sentidoUnico: true }));
+const cSem = ce([pc()], tec({ larg: 0.2 }), {}, { grade: { M: 6 } }), cEnc = ce([pc()], tec({ larg: 0.2, encolhC: 10 }), {}, { grade: { M: 6 } });
+const doisTec = [pc({ nome: 'Frente' }), pc({ nome: 'Forro', tecido: 'tF' }), pc({ nome: 'Bolso' })];
+const naPrincipal = pe(doisTec, tec()), noForro = pe(doisTec, tec(), { tecidoId: 'a2' }), soBolso = pe(doisTec, tec(), {}, { pecas: ['Bolso'] });
+const cCab = ce([pc()], tec(), { cabeceira: 40, ourelaE: 20, ourelaD: 30 });
+const nv = fn(() => O.nova('Ordem X'), null);
+testes.push(
+  ['ordem nova', nv && [nv.nome, nv.tecidos.length, nv.enfestos.length, nv.enfestos[0].tecidoId === nv.tecidos[0].id, nv.enfestos[0].camadas, nv.enfestos[0].sentido, nv.v], ['Ordem X', 1, 1, true, 1, 'duplo', 1]],
+  ['ordem normalizar vazio', fn(() => (n => [n.nome, n.pedidos, n.tecidos, n.enfestos, n.v])(O.normalizar({})), null), ['', [], [], [], 1]],
+  ['ordem normalizar grade negativa vira 0', fn(() => O.normalizar({ enfestos: [{ itens: [{ grade: { M: -3, G: '2' } }] }] }).enfestos[0].itens[0].grade, null), { M: 0, G: 2 }],
+  ['review3 deFabricar grade = f', deF && deF.enfestos.flatMap(e => e.itens.map(i => [i.produtoId, i.cor, i.grade])), [['p1', 'Azul', { P: 3, M: 5 }], ['p2', 'Preto', { G: 2 }]]],
+  ['review3 deFabricar um enfesto por tecido principal', deF && [deF.tecidos.map(t => t.materiaId), deF.enfestos.map(e => deF.tecidos.find(t => t.id === e.tecidoId).materiaId), deF.enfestos[0].camadas], [['tA', 'tB'], ['tA', 'tB'], 1]],
+  ['deFabricar camadas 3: grade por camada arredonda para cima', deF3 && [deF3.enfestos.length, deF3.enfestos[0].camadas, deF3.enfestos[0].compMax, deF3.enfestos[0].itens.map(i => i.grade)], [1, 3, 4000, [{ P: 1, M: 2 }, { G: 1 }]]],
+  ['review3 ajustarGrade -5 em 2 = 0', ajust, [0, 0]],
+  ['review4 pesoTecido 5,12 kg', r4 && r4.pesoTecido, 5.12, 1e-9],
+  ['review4 metros 20, custo 240', r4 && [r4.metros, r4.custo], [20, 240], 1e-9],
+  ['review4 custo por kg com rendimento', r4kg && r4kg.custo, 240, 1e-9],
+  ['review4 peso pecas e desperdicio', r4 && [r4.pesoPecas, r4.pesoDesperdicio], [2.56, 2.56], 1e-9],
+  ['review4 pecas, consumo e grade', r4 && [r4.pecas, r4.consumoLinear, r4.grade], [40, 0.5, { R1: { M: 40 } }], 1e-9],
+  ['review5 aberto duplo: 4 posicoes', aberto.length, 4],
+  ['review5 tubular: 2 posicoes, 4 pecas', [tub.length, tub.reduce((a, x) => a + x.rende, 0), cTub && cTub.posicoes.length, cTub && cTub.pecasTotal], [2, 4, 2, 4]],
+  ['review5 unico par espelhar: normais = espelhadas', [parU.length, parU.filter(x => x.espelho).length, cParU && cParU.posicoes.filter(p => cParU.itens[p.i].espelho).length], [8, 4, 4]],
+  ['review5 duplo par: rende 2 por posicao', [parD.length, parD.reduce((a, x) => a + x.rende, 0)], [4, 8]],
+  ['review5 dobra tubular: meia peca na borda Y=0', dobraT.length && [dobraT.length, dobraT[0].borda0, dobraT[0].rende, dobraT[0].rasters.length, [dobraT[0].rasters[0].cw, dobraT[0].rasters[0].ch]], [4, true, 1, 1, [10, 8]]],
+  ['review5 dobra: corte encosta em Y=0', !!dobraT.length && dobraT[0].pts.filter(q => q[1] === 0).length >= 2 && Math.min(...dobraT[0].pts.map(q => q[1])) === 0, true],
+  ['sentidoUnico: todas as variantes rot 0', [su.length, su.every(x => x.rot === 'nenhuma' && x.rasters.length === 1)], [8, true]],
+  ['encolhimento 10% C: comp >= 1,1x', !!(cSem && cEnc) && cEnc.comp >= 1.1 * cSem.comp - 20, true],
+  ['encolhimento escala no item', (pe([pc()], tec({ encolhC: 10, encolhL: 5 }))[0] || {}).escala, { x: 1.1, y: 1.05 }, 1e-9],
+  ['tecido da aba: principal sem o forro', naPrincipal.map(x => x.nome), ['Frente', 'Frente', 'Frente', 'Frente', 'Bolso', 'Bolso', 'Bolso', 'Bolso']],
+  ['tecido da aba: forro so o forro', [noForro.length, noForro.every(x => x.nome === 'Forro')], [4, true]],
+  ['selecao de pecas por nome', [soBolso.length, soBolso.every(x => x.nome === 'Bolso')], [4, true]],
+  ['calcularEnfesto largUtil, cabeceira e aproveitamento', cCab && [cCab.largUtil, cCab.comp, cCab.areaPecas, cCab.aproveitamento], [1550, 240, 160000, 160000 / (240 * 1550)], 1e-9],
+  ['calcularEnfesto grade por camada', cCab && cCab.grade, { R1: { M: 4 } }],
+  ['calcularEnfesto posicoes dentro', !!cCab && posicoesOk(cCab.itens, cCab, 1550), true],
 );
 
 const perto = (a, b, tol) => typeof a === 'number' ? Math.abs(a - b) <= tol
