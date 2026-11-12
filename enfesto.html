@@ -227,7 +227,7 @@ $('#sel').textContent=it?`Selecionada: ${nomePeca(it.nome)} ${it.tam}${it.cor?' 
 }
 function mover(j,ox,oy,v){
 const ok=E.moverPeca(OC,C.itens,P,j,ox,oy,v);
-$('#pecas').children[j].classList.toggle('bloq',!ok);
+$('#pecas').children[j].classList.toggle('bloq',!ok&&!!drag); // contorno vermelho só enquanto arrasta
 if(ok){posPeca(j);painel();$('#fundo .fim').setAttribute('x1',compAtual());$('#fundo .fim').setAttribute('x2',compAtual());$('#fundo .tecido').setAttribute('width',compAtual())}
 return ok;
 }
