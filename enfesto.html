@@ -8,6 +8,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="molde/encaixe.js"></script>
 <script src="molde/ordem.js"></script>
+<script src="molde/exporta.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;
 --t0:#c92a2a;--t1:#1c6dd0;--t2:#2b8a3e;--t3:#d9480f;--t4:#7048e8;--t5:#8d5b3a;--t6:#c2255c;--t7:#0b7285;color-scheme:light}
@@ -64,6 +66,31 @@ main{max-width:1400px;margin:0 auto;padding:16px}
 #risco.arrastando .pc{cursor:grabbing}
 #toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:#fff;padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
 @media (max-width:560px){main{padding:12px}}
+input,select{font:inherit;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
+dialog{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--tx);width:min(520px,94vw);padding:18px;max-height:92vh;overflow:auto}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog h3{margin:0 0 8px}
+dialog fieldset{border:1px solid var(--bd);border-radius:8px;margin:10px 0 0;padding:6px 12px 10px;display:flex;flex-direction:column;gap:4px}
+dialog legend{font-weight:600;font-size:14px;padding:0 4px}
+dialog label{font-size:14px}
+dialog small{display:block;margin:-2px 0 2px 24px;color:var(--mut);font-size:12px}
+.row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+#x-info{margin:10px 0 0}
+#mini{display:none}
+@media print{
+@page{size:A4 landscape;margin:10mm}
+:root:root:root{--bg:#fff;--card:#fff;--tx:#000;--mut:#555;--bd:#999;--t0:#c92a2a;--t1:#1c6dd0;--t2:#2b8a3e;--t3:#d9480f;--t4:#7048e8;--t5:#8d5b3a;--t6:#c2255c;--t7:#0b7285;color-scheme:light}
+body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+#enf-v,#aviso,#toast,dialog{display:none!important}
+#mini{display:block}
+#mini h2{font:600 14pt 'Poppins',sans-serif;margin:0 0 1mm}
+#mini p{margin:0 0 3mm;font-size:10pt}
+#mini svg{display:block;width:277mm;height:165mm}
+#mini .tecido{fill:none;stroke:#000;stroke-width:.8;vector-effect:non-scaling-stroke}
+#mini .cab{stroke:#000;stroke-dasharray:4 3;vector-effect:non-scaling-stroke}
+#mini polygon{fill:var(--c);fill-opacity:.25;stroke:var(--c);stroke-width:.8;vector-effect:non-scaling-stroke}
+#mini text{fill:#000;text-anchor:middle;dominant-baseline:middle}
+}
 </style>
 </head>
 <body>
@@ -73,6 +100,8 @@ main{max-width:1400px;margin:0 auto;padding:16px}
   <header class="topo">
     <a id="volta" href="corte.html">← Ordem</a>
     <h1 id="titulo">Enfesto</h1>
+    <button class="sm" type="button" id="b-mini" disabled>Imprimir minimapa</button>
+    <button class="sm" type="button" id="b-exp" disabled>Exportar encaixe</button>
   </header>
   <main>
     <dl class="painel" id="painel"></dl>
@@ -91,6 +120,37 @@ main{max-width:1400px;margin:0 auto;padding:16px}
     <div id="area"><svg id="risco" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Risco do enfesto"><g id="fundo"></g><g id="pecas"></g></svg></div>
   </main>
 </div>
+<section id="mini" aria-hidden="true"></section>
+<dialog id="dlg-exp" aria-labelledby="dlg-exp-t">
+  <h3 id="dlg-exp-t">Exportar encaixe</h3>
+  <p class="nota">Sai o risco como está na tela, com o ajuste manual, em escala 1:1.</p>
+  <fieldset>
+    <legend>Formato</legend>
+    <label><input type="radio" name="x-fmt" value="pdf" checked> PDF na largura do tecido</label>
+    <label><input type="radio" name="x-fmt" value="a4"> PDF em folhas A4 para emendar</label>
+    <label><input type="radio" name="x-fmt" value="plt"> PLT (plotter, HP-GL)</label>
+    <label><input type="radio" name="x-fmt" value="dxf"> DXF (CAD, R12)</label>
+  </fieldset>
+  <fieldset>
+    <legend>Mostrar</legend>
+    <label><input type="checkbox" id="x-nome" checked> Nome do molde</label>
+    <label><input type="checkbox" id="x-textos" checked> Textos (peça e tamanho)</label>
+    <label><input type="checkbox" id="x-margem" disabled aria-describedby="x-margem-d"> Margem de costura</label>
+    <small id="x-margem-d">O molde ainda não guarda a linha de costura.</small>
+    <label><input type="checkbox" id="x-fio" checked> Sentido do fio</label>
+    <label><input type="checkbox" id="x-bordas" class="so-pdf" checked> Bordas das peças</label>
+    <label><input type="checkbox" id="x-limites" class="so-pdf" checked> Limites do enfesto</label>
+    <label><input type="checkbox" id="x-cab" class="so-pdf" checked> Cabeçalho</label>
+    <small id="x-so-pdf" hidden>Bordas, limites e cabeçalho só no PDF; o PLT e o DXF sempre levam o contorno das peças.</small>
+  </fieldset>
+  <fieldset id="x-papel-f">
+    <legend>Papel</legend>
+    <label>Tamanho <select id="x-papel"><option value="a4">A4 (210 × 297 mm), em pé</option></select></label>
+    <label>Margens (mm) <input id="x-marg" type="number" min="5" max="30" step="1" value="10" style="width:80px"></label>
+  </fieldset>
+  <p id="x-info" class="nota" aria-live="polite"></p>
+  <div class="row"><button class="ghost" type="button" id="x-cancel">Cancelar</button><button class="pri" type="button" id="x-ok">Baixar</button></div>
+</dialog>
 <div id="toast" role="status"></div>
 <script>
 const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
@@ -145,7 +205,7 @@ if(entrar){const a=document.createElement('a');a.href='index.html';a.textContent
 // calcula uma vez (no carregar e no "refazer")
 function calcular(){
 C=MO.calcularEnfesto(ENF,O,PRODS,MATS);
-selJ=-1;
+selJ=-1;$('#b-mini').disabled=$('#b-exp').disabled=!C;
 if(!C){P=[];OC=null;$('#area').innerHTML='<p class="vazio">Não foi possível montar o risco: confira o tecido do enfesto, as peças e a grade, e se alguma peça é mais larga que o tecido.</p>';painel();return}
 P=C.posicoes.map(p=>({...p}));OC=E.ocupacao(C.itens,P,C.largUtil);
 desenharPecas();desenharFundo();painel();selecionar(-1);
@@ -265,6 +325,123 @@ if(k){ev.preventDefault();if(!mover(j,p.ox+k[0],p.oy+k[1],p.var))toast('Não dá
 else if(ev.key==='r'||ev.key==='R'){ev.preventDefault();variante('girar')}
 else if((ev.key==='e'||ev.key==='E')&&C.itens[p.i].espelhar){ev.preventDefault();variante('espelhar')}
 });
+
+// ---- minimapa e exportação: sempre as posições atuais (P, com o ajuste manual) ----
+const X=window.MoldeExporta;
+const formasAtuais=o=>X.formas({...C,posicoes:P},PRODS,{cabeceira:ENF.cabeceira,ourelaE:oe(),...o});
+const nomeTecido=()=>[MAT.nome,MAT.cor].filter(Boolean).join(' ');
+const resumoTxt=()=>[O.nome||'Ordem',ENF.nome,nomeTecido(),nf(compAtual()/1000)+' m',ENF.camadas+' camada(s)'].filter(Boolean).join(' · ');
+const slug=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+const nomeArq=(ext,suf)=>['ordem',slug(O.nome),'enfesto',slug(ENF.nome),suf].filter(Boolean).join('-')+'.'+ext;
+function baixar(dados,nome,tipo){
+const a=document.createElement('a'),u=URL.createObjectURL(dados instanceof Blob?dados:new Blob([dados],{type:tipo}));
+a.href=u;a.download=nome;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(u),5000);
+}
+
+// A4 deitada (277 × 190 mm úteis): risco reduzido inteiro, cor por tamanho
+function montarMini(){
+const m=$('#mini');if(!C||!MAT){m.innerHTML='';return}
+const L=larg(),comp=compAtual(),fs=formasAtuais({});
+const fz=2.5/Math.min(277/comp,165/L); // letra de ~2,5 mm no papel
+const pc=fs.map((f,j)=>{
+const it=C.itens[P[j].i];let x0=1/0,x1=-1/0,y0=1/0,y1=-1/0;
+for(const [x,y] of f.pts){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}
+return `<polygon style="--c:${corTam(it.tam)}" points="${f.pts.map(q=>q.join(',')).join(' ')}"/><text x="${(x0+x1)/2}" y="${(y0+y1)/2}">${esc([nomePeca(it.nome),it.tam].filter(Boolean).join(' '))}</text>`;
+}).join('');
+const dados=[['Ordem',O.nome||'—'],['Enfesto',ENF.nome],['Tecido',nomeTecido()+(MAT.tubular?' (tubular)':'')],
+['Metros',nf(comp/1000)+' m de risco · '+nf(comp/1000*ENF.camadas)+' m de tecido'],['Camadas',String(ENF.camadas)]];
+m.innerHTML=`<h2>Minimapa do enfesto</h2><p>${dados.map(([k,v])=>`<b>${esc(k)}:</b> ${esc(v)}`).join(' &nbsp;·&nbsp; ')}</p>`+
+`<svg xmlns="${NS}" viewBox="${-fz} ${-fz} ${comp+2*fz} ${L+2*fz}" font-size="${fz}"><rect class="tecido" x="0" y="0" width="${comp}" height="${L}"/>`+
+(ENF.cabeceira?`<line class="cab" x1="${ENF.cabeceira}" x2="${ENF.cabeceira}" y1="0" y2="${L}"/>`:'')+pc+'</svg>';
+}
+window.addEventListener('beforeprint',montarMini); // Ctrl+P também sai como minimapa
+$('#b-mini').onclick=()=>{montarMini();window.print()};
+
+// PDF: comandos neutros do MoldeExporta.pdfPlano desenhados com deslocamento (dx, dy) em mm
+function desenharPdf(doc,pl,dx,dy,comp){
+doc.setLineWidth(.3);
+for(const c of pl){
+if(c.tipo==='texto'){doc.setFontSize(c.tam||8);doc.text(String(c.s),c.x+dx,c.y+dy,c.tam<10&&c.x<comp?{align:'center',baseline:'middle'}:{})} // rótulo de peça centrado; cabeçalho e "10 cm" à esquerda
+else if(c.tipo==='retangulo')doc.rect(c.x+dx,c.y+dy,c.w,c.h);
+else{const p=c.pts.map(([x,y])=>[x+dx,y+dy]);if(c.tipo==='poligono')p.push(p[0]);for(let i=1;i<p.length;i++)doc.line(p[i-1][0],p[i-1][1],p[i][0],p[i][1])}
+}
+}
+const MAXW=5000,EMENDA=10; // jsPDF: página de até 14400 pt (5080 mm); partes vizinhas repetem 1 cm
+const partesLargura=w=>Math.max(1,Math.ceil((w-EMENDA)/(MAXW-EMENDA)));
+function pdfLargura(pl,comp){
+const n=partesLargura(pl.w),pw=n>1?MAXW:pl.w,fmt=[pw,pl.h],ori=pw>pl.h?'landscape':'portrait';
+const doc=new window.jspdf.jsPDF({unit:'mm',format:fmt,orientation:ori});
+for(let k=0;k<n;k++){
+if(k)doc.addPage(fmt,ori);
+desenharPdf(doc,pl,-k*(MAXW-EMENDA),0,comp);
+if(n>1){
+doc.setFontSize(9);doc.text(`Parte ${k+1} de ${n} · sobrepor 1 cm na emenda`,pw-4,5,{align:'right'});
+doc.setLineDashPattern([3,3],0);if(k<n-1)doc.line(pw-EMENDA,0,pw-EMENDA,pl.h);if(k)doc.line(EMENDA,0,EMENDA,pl.h);doc.setLineDashPattern([],0);
+}
+}
+return doc;
+}
+function pdfA4(pl,comp,marg){
+const fs=X.paginasA4(pl.w,pl.h,marg),ult=fs[fs.length-1],doc=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
+// 1ª folha: calibração e montagem. No plano o quadrado caía partido entre duas folhas, então o plano A4 vai sem ele
+doc.setFontSize(14);doc.text('Encaixe em folhas A4',20,25);
+doc.setFontSize(10);doc.text(doc.splitTextToSize(resumoTxt(),170),20,33);
+doc.setLineWidth(.5);doc.rect(20,50,100,100);doc.setFontSize(9);doc.text('10 cm',20,156);
+doc.text(doc.splitTextToSize(`Imprima em tamanho real (100%, sem "ajustar à página") e confira com uma régua: o quadrado acima deve medir 10 × 10 cm. Depois vêm ${fs.length} folha(s) do risco, ${ult.linha} linha(s) × ${ult.coluna} coluna(s). Recorte nas marcas de corte e monte pela linha e coluna escritas no pé de cada folha, sobrepondo a faixa tracejada de 1 cm da folha vizinha.`,170),20,166);
+fs.forEach((f,k)=>{
+doc.addPage('a4','portrait');
+doc.saveGraphicsState();doc.rect(marg,marg,f.w,f.h,null);doc.clip();doc.discardPath();
+desenharPdf(doc,pl,marg-f.x,marg-f.y,comp);
+doc.restoreGraphicsState();
+// marcas de corte nos cantos da área útil e faixa de emenda (1 cm repetido na folha vizinha)
+doc.setLineWidth(.2);
+const xa=marg,xb=marg+f.w,ya=marg,yb=marg+f.h,t=Math.min(4,marg-1);
+for(const x of [xa,xb])for(const y of [ya,yb]){doc.line(x,y-(y===ya?t:-t),x,y-(y===ya?1:-1));doc.line(x-(x===xa?t:-t),y,x-(x===xa?1:-1),y)}
+doc.setLineDashPattern([2,2],0);
+if(f.coluna<ult.coluna)doc.line(xb-EMENDA,ya,xb-EMENDA,yb);
+if(f.linha<ult.linha)doc.line(xa,yb-EMENDA,xb,yb-EMENDA);
+doc.setLineDashPattern([],0);
+doc.setFontSize(8);
+doc.text(`Folha ${k+1} de ${fs.length} · linha ${f.linha}, coluna ${f.coluna} · emendar sobrepondo a faixa tracejada`,xa,297-Math.min(3,marg/2));
+});
+return doc;
+}
+
+function opcoesExp(){
+const ck=id=>$('#'+id).checked,fmt=document.querySelector('input[name="x-fmt"]:checked').value;
+const marg=Math.min(30,Math.max(5,Math.round(+$('#x-marg').value||10)));
+return {fmt,marg,nome:ck('x-nome'),textos:ck('x-textos'),fio:ck('x-fio'),bordas:ck('x-bordas'),limites:ck('x-limites'),cab:ck('x-cab')};
+}
+const planoPdf=o=>X.pdfPlano(formasAtuais({nome:o.nome,textos:o.textos,fio:o.fio}),larg(),compAtual(),{bordas:o.bordas,limites:o.limites,cabecalho:o.cab?resumoTxt():'',calibracao:o.fmt!=='a4'});
+function infoExp(){
+const o=opcoesExp(),pdf=o.fmt==='pdf'||o.fmt==='a4';
+document.querySelectorAll('#dlg-exp .so-pdf').forEach(c=>c.disabled=!pdf);$('#x-so-pdf').hidden=pdf;
+$('#x-papel-f').hidden=o.fmt!=='a4';
+let t='';
+if(pdf){
+const pl=planoPdf(o);
+if(o.fmt==='a4'){const fs=X.paginasA4(pl.w,pl.h,o.marg),u=fs[fs.length-1];t=`${fs.length+1} folha(s) A4: a 1ª com o quadrado de calibração de 10 cm e como montar, depois ${fs.length} folha(s) do risco (${u.linha} linha(s) × ${u.coluna} coluna(s)), numeradas.`}
+else{const n=partesLargura(pl.w);t=`Página de ${nf(pl.w/1000)} × ${nf(pl.h/1000)} m com o quadrado de calibração de 10 cm.`+(n>1?` O risco passa de ${nf(MAXW/1000)} m (limite de página do PDF): sai em ${n} páginas seguidas para emendar, com 1 cm repetido em cada emenda.`:'')}
+}else t=`Arquivo em mm, origem no início do risco na ourela direita; largura total do tecido ${nf(larg()/10,1)} cm.`;
+$('#x-info').textContent=t;
+}
+$('#b-exp').onclick=()=>{infoExp();$('#dlg-exp').showModal()};
+$('#dlg-exp').addEventListener('change',infoExp);
+$('#x-cancel').onclick=()=>$('#dlg-exp').close();
+$('#x-ok').onclick=()=>{
+try{
+const o=opcoesExp();
+if(o.fmt==='plt'||o.fmt==='dxf'){
+const fs=formasAtuais({nome:o.nome,textos:o.textos,fio:o.fio});
+baixar(o.fmt==='plt'?X.plt(fs,larg(),compAtual()):X.dxf(fs,larg()),nomeArq(o.fmt),o.fmt==='plt'?'application/vnd.hp-hpgl':'application/dxf');
+}else{
+if(!window.jspdf)throw new Error('O gerador de PDF não carregou. Confira a internet e recarregue a página.');
+const pl=planoPdf(o),doc=o.fmt==='a4'?pdfA4(pl,compAtual(),o.marg):pdfLargura(pl,compAtual());
+baixar(doc.output('blob'),nomeArq('pdf',o.fmt==='a4'?'a4':''));
+}
+$('#dlg-exp').close();toast('Arquivo gerado.');
+}catch(e){console.error(e);$('#x-info').textContent='Não foi possível exportar: '+ptErro(e)} // toast ficaria atrás do diálogo modal
+};
 
 async function iniciar(){
 try{

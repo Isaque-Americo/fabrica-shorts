@@ -83,6 +83,22 @@ fieldset.grp legend{font-weight:600;font-size:14px;padding:0 4px}
 textarea{resize:vertical;min-height:60px}
 #toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:#fff;padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
 @media (max-width:560px){.duas{grid-template-columns:1fr}main{padding:12px}}
+#rel{display:none}
+@media print{
+@page{size:A4 portrait;margin:12mm}
+:root:root:root{--bg:#fff;--card:#fff;--tx:#000;--mut:#555;--bd:#bbb;color-scheme:light}
+body{background:#fff;font-size:10pt}
+#lista-v,#ordem-v,#aviso,#toast,dialog{display:none!important}
+#rel{display:block}
+#rel h1{font:600 16pt 'Poppins',sans-serif;margin:0}
+#rel h2{font:600 12pt 'Poppins',sans-serif;margin:6mm 0 2mm}
+#rel h3{font-size:10pt;margin:4mm 0 1mm}
+#rel h3 small{font-weight:400;color:var(--mut)}
+#rel table.lst{font-size:9pt}
+#rel table.lst th,#rel table.lst td{padding:3px 6px}
+#rel tr,#rel .painel div{break-inside:avoid}
+#rel .painel{grid-template-columns:repeat(4,1fr)}
+}
 </style>
 </head>
 <body>
@@ -106,6 +122,7 @@ textarea{resize:vertical;min-height:60px}
     <span id="estado" role="status" aria-live="polite">Salvo</span>
     <span class="esp"></span>
     <button class="sm" type="button" id="btn-props">Propriedades</button>
+    <button class="sm" type="button" id="btn-rel">Imprimir relatório</button>
   </header>
   <main>
     <div class="abas" id="abas-tec">
@@ -146,6 +163,7 @@ textarea{resize:vertical;min-height:60px}
   </fieldset>
   <div class="row"><button class="pri" type="button" id="pr-ok">Fechar</button></div>
 </dialog>
+<section id="rel" aria-hidden="true"></section>
 <div id="toast" role="status"></div>
 <script>
 const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
@@ -358,17 +376,41 @@ lin.innerHTML=c?`Risco ${nf(c.comp/1000)} m · ${nf(c.comp/1000*e.camadas)} m de
   (e.compMax&&c.comp>e.compMax?' · <span class="ruim">passa do comprimento máximo</span>':'')
   :'<span class="vazio">Sem risco: falta tecido, peças ou grade, ou alguma peça é mais larga que o tecido.</span>';
 }
+$('#res-ordem-c').innerHTML=htmlRes(cs);
+}
+// painel de resultados + grade total da ordem (tela e relatório)
+function htmlRes(cs){
 const r=MO.resultados(O,cs,MATS),fora=O.enfestos.filter((x,k)=>!cs[k]).map(x=>x.nome);
 const it=(t,v,s)=>`<div><dt>${esc(t)}</dt><dd>${esc(v)}${s?` <small>${esc(s)}</small>`:''}</dd></div>`;
-const tams=[...new Set(Object.values(r.grade).flatMap(Object.keys))].sort((a,b)=>(SZ.indexOf(a)+1||99)-(SZ.indexOf(b)+1||99)||a.localeCompare(b));
+const tams=[...new Set(Object.values(r.grade).flatMap(Object.keys))].sort(ordTam);
 const grade=tams.length?`<table class="lst" aria-label="Grade total por referência e tamanho"><thead><tr><th>Referência</th>${tams.map(t=>`<th class="n">${esc(t)}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>`+
   Object.entries(r.grade).map(([ref,g])=>{const nome=(PRODS.find(p=>(p.ref||p.id)===ref)||{}).nome;return `<tr><td>${esc(ref)}${nome?` <span class="vazio">${esc(nome)}</span>`:''}</td>${tams.map(t=>`<td class="n">${g[t]||0}</td>`).join('')}<td class="n">${Object.values(g).reduce((a,b)=>a+b,0)}</td></tr>`}).join('')+'</tbody></table>':'';
-$('#res-ordem-c').innerHTML=`<dl class="painel">${[
+return `<dl class="painel">${[
   it('Tecido',nf(r.metros)+' m'),it('Peso do tecido',nf(r.pesoTecido)+' kg'),it('Peso das peças',nf(r.pesoPecas)+' kg'),
   it('Desperdício',nf(r.pesoDesperdicio)+' kg',r.pesoTecido?nf(r.pesoDesperdicio/r.pesoTecido*100,1)+'%':''),
   it('Consumo linear',nf(r.consumoLinear,3)+' m/peça'),it('Custo do tecido',brl(r.custo)),it('Peças de roupa',String(r.pecas))].join('')}</dl>`+
   grade+(fora.length?`<p class="vazio">Fora do cálculo (sem risco): ${esc(fora.join(', '))}.</p>`:'');
 }
+// relatório A4 (só na impressão): resultados, enfestos e a grade de cada enfesto
+const ordTam=(a,b)=>(SZ.indexOf(a)+1||99)-(SZ.indexOf(b)+1||99)||a.localeCompare(b);
+function montarRel(){
+const el=$('#rel');if(!O){el.innerHTML='';return}
+const cs=O.enfestos.map(e=>{try{return MO.calcularEnfesto(e,O,PRODS,MATS)}catch(x){console.error(x);return null}});
+const tecDe=e=>{const t=O.tecidos.find(x=>x.id===e.tecidoId);return t?nomeMat(mat(t.materiaId))||'—':'—'};
+const linhas=O.enfestos.map((e,k)=>{const c=cs[k];return `<tr><td>${esc(e.nome)}</td><td>${esc(tecDe(e))}</td><td class="n">${e.camadas}</td><td class="n">${c?nf(c.comp/1000):'—'}</td><td class="n">${c?nf(c.comp/1000*e.camadas):'—'}</td><td class="n">${c?nf(c.aproveitamento*100,1)+'%':'sem risco'}</td><td class="n">${c?c.pecasTotal*e.camadas:'—'}</td></tr>`}).join('');
+const grades=O.enfestos.map(e=>{
+const ts=[...new Set(e.itens.flatMap(it=>Object.keys(it.grade).filter(t=>it.grade[t])))].sort(ordTam);
+if(!ts.length)return '';
+return `<h3>${esc(e.nome)} <small>${esc(tecDe(e))} · ${e.camadas} camada(s) · quantidade por camada (total cortado)</small></h3><table class="lst"><thead><tr><th>Produto</th><th>Cor</th>${ts.map(t=>`<th class="n">${esc(t)}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>`+
+e.itens.map(it=>{const s=ts.reduce((a,t)=>a+(it.grade[t]||0),0);return `<tr><td>${esc(nomeProd(prod(it.produtoId)))}</td><td>${esc(it.cor||'—')}</td>${ts.map(t=>{const q=it.grade[t]||0;return `<td class="n">${q?`${q} (${q*e.camadas})`:'—'}</td>`}).join('')}<td class="n">${s} (${s*e.camadas})</td></tr>`}).join('')+'</tbody></table>';
+}).join('');
+el.innerHTML=`<h1>${esc(O.nome||'Ordem de corte')}</h1><p class="vazio">Criada em ${dataBR(O.criadaEm)} · impresso em ${new Date().toLocaleString('pt-BR')}${estado==='salvo'?'':' · há alterações ainda não salvas'}</p>`+
+(O.obs?`<p>${esc(O.obs)}</p>`:'')+'<h2>Resultados da ordem</h2>'+htmlRes(cs)+
+`<h2>Enfestos</h2><table class="lst"><thead><tr><th>Enfesto</th><th>Tecido</th><th class="n">Camadas</th><th class="n">Risco (m)</th><th class="n">Tecido (m)</th><th class="n">Aproveitamento</th><th class="n">Peças</th></tr></thead><tbody>${linhas}</tbody></table>`+
+(grades?'<h2>Grades</h2>'+grades:'');
+}
+window.addEventListener('beforeprint',montarRel);
+$('#btn-rel').onclick=()=>{montarRel();window.print()};
 function restaurar(foco){if(foco){const el=document.querySelector(`[data-foco="${CSS.escape(foco)}"]`);if(el)el.focus()}}
 
 function itemHtml(e,it,i,aba){
