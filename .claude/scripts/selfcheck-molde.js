@@ -460,6 +460,57 @@ testes.push(
   ['calcularEnfesto posicoes dentro', !!cCab && posicoesOk(cCab.itens, cCab, 1550), true],
 );
 
+// exportação 1:1 (molde/exporta.js). Review 1: quadrado de 100 mm sai com 100 mm em PLT, DXF e PDF
+const X = fs.existsSync(path.join(raiz, 'exporta.js')) ? require(path.join(raiz, 'exporta.js')) : null;
+const fx = (f, d) => { try { return X ? f() : d; } catch (e) { return 'erro: ' + e.message; } };
+const q100 = [{ pts: [[0, 0], [100, 0], [100, 100], [0, 100]], texto: null, fio: null, costura: null, cor: '' }];
+const pltQ = fx(() => X.plt(q100, 100, 100), '');
+const pdQ = (pltQ.match(/P[UD][-\d,]+/g) || []).flatMap(s => s.slice(2).split(',').map(Number));
+const pdX = pdQ.filter((_, i) => i % 2 === 0), pdY = pdQ.filter((_, i) => i % 2);
+const dxfQ = fx(() => X.dxf(q100), '');
+const dxfL = dxfQ.split(/\r?\n/).map(s => s.trim());
+// valor do código c em cada VERTEX (pares código/valor a partir do VERTEX)
+const dxfV = c => dxfL.flatMap((s, i) => s === 'VERTEX' ? [+dxfL[dxfL.indexOf(c, i) + 1]] : []);
+const vx = dxfV('10'), vy = dxfV('20');
+const pags = fx(() => X.paginasA4(600, 1600), []);
+const cobre = (ps, comp, larg) => { for (let x = 0; x <= comp; x += 5) for (let y = 0; y <= larg; y += 5) if (!ps.some(p => x >= p.x && x <= p.x + p.w && y >= p.y && y <= p.y + p.h)) return false; return true; };
+const viz = (ps, a, b) => ps.find(p => p.linha === a.linha + b[0] && p.coluna === a.coluna + b[1]);
+const sobrepoe = ps => ps.every(p => { const d = viz(ps, p, [0, 1]), e = viz(ps, p, [1, 0]);
+  return (!d || p.x + p.w - d.x === 10) && (!e || p.y + p.h - e.y === 10); });
+const planoC = fx(() => X.pdfPlano(q100, 100, 100, { calibracao: true }), []);
+const planoS = fx(() => X.pdfPlano(q100, 100, 100, {}), []);
+const calib = pl => pl.some(c => c.tipo === 'retangulo' && c.w === 100 && c.h === 100 && c.calibracao);
+const planoL = fx(() => X.pdfPlano(q100, 100, 300, { limites: true, cabecalho: 'Ordem 1' }), []);
+// formas: o polígono transformado cai exatamente na caixa de células do raster (mesma transformação do encaixe)
+const Lp = [[0, 0], [400, 0], [400, 120], [150, 120], [150, 300], [0, 300]];
+const tecX = tec({ encolhC: 10, encolhL: 5 });
+const cX = ce([pc({ nome: 'Frente', w: 400, h: 300, pts: Lp, rot: 'livre', espelhar: true, qtd: 2 })], tecX, { cabeceira: 30, ourelaE: 15, ourelaD: 15 });
+const fX = fx(() => cX && X.formas(cX, [prodO([])], { cabeceira: 30, ourelaE: 15, nome: true, textos: true, fio: true }), []);
+const bb = pts => { const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]); return [Math.min(...xs), Math.min(...ys), Math.max(...xs), Math.max(...ys)]; };
+const naCaixa = !!cX && Array.isArray(fX) && fX.length === cX.posicoes.length && cX.posicoes.every((p, k) => {
+  const r = cX.itens[p.i].rasters[p.var], [x0, y0, x1, y1] = bb(fX[k].pts);
+  return Math.abs(x0 - p.ox - 30) < 1e-6 && Math.abs(y0 - p.oy - 15) < 1e-6 && x1 - x0 <= r.cw * 20 && x1 - x0 > (r.cw - 1) * 20 && y1 - y0 <= r.ch * 20 && y1 - y0 > (r.ch - 1) * 20;
+});
+const mesmoRaster = naCaixa && cX.posicoes.every((p, k) => {
+  const r = cX.itens[p.i].rasters[p.var], s = E.rasterPol(fX[k].pts.map(([x, y]) => [x - p.ox - 30, y - p.oy - 15]), 0);
+  return s.cw === r.cw && s.ch === r.ch && s.m.every((v, j) => v === r.m[j]);
+});
+const variasVar = !!cX && new Set(cX.posicoes.map(p => p.var)).size;
+testes.push(
+  ['review1 plt IN;SP1; e 40 unidades/mm', [pltQ.startsWith('IN;SP1;'), Math.max(...pdX) - Math.min(...pdX), Math.max(...pdY) - Math.min(...pdY)], [true, 4000, 4000]],
+  ['review1 plt inteiros e Y invertido (y=0 do risco vai para larg)', [pdQ.every(Number.isInteger), pdQ[1]], [true, 4000]],
+  ['review1 dxf vertices de 0 a 100', [Math.min(...vx), Math.max(...vx), Math.min(...vy), Math.max(...vy), vx.length], [0, 100, 0, 100, 4]],
+  ['dxf R12: INSUNITS 4, POLYLINE fechada, SEQEND, EOF', [/\$INSUNITS\s*\r?\n\s*70\s*\r?\n\s*4\b/.test(dxfQ), /AC1009/.test(dxfQ), dxfL.filter(s => s === 'POLYLINE').length, dxfL.filter(s => s === 'SEQEND').length, dxfL[dxfL.length - 1] === 'EOF' || dxfL[dxfL.length - 2] === 'EOF'], [true, true, 1, 1, true]],
+  ['review1 paginasA4(600,1600) cobre tudo', [pags.length > 0, cobre(pags, 600, 1600), pags.every(p => p.w === 190 && p.h === 277)], [true, true, true]],
+  ['review1 paginasA4 sobreposicao 10 mm entre vizinhas', [sobrepoe(pags), Math.max(...pags.map(p => p.linha)), Math.max(...pags.map(p => p.coluna))], [true, 6, 4]],
+  ['review1 pdfPlano quadrado de calibracao 100 mm', [calib(planoC), calib(planoS)], [true, false]],
+  ['pdfPlano poligono do quadrado com 100 mm', (planoS.find(c => c.tipo === 'poligono') || {}).pts && bb(planoS.find(c => c.tipo === 'poligono').pts).map((v, i, a) => i < 2 ? 0 : v - a[i - 2]), [0, 0, 100, 100]],
+  ['pdfPlano limites e cabecalho', [planoL.some(c => c.tipo === 'retangulo' && c.w === 300 && c.h === 100), planoL.some(c => c.tipo === 'texto' && c.s === 'Ordem 1')], [true, true]],
+  ['formas: bbox na caixa de celulas do raster (escala, giro, espelho, ourela, cabeceira)', [naCaixa, variasVar > 1], [true, true]],
+  ['formas: rasterizar a forma devolve o mesmo raster do encaixe', mesmoRaster, true],
+  ['formas: texto com nome do molde e da peca, fio ao longo de X', fX[0] && [fX[0].texto && fX[0].texto.s, fX[0].fio && fX[0].fio[0][1] === fX[0].fio[1][1], fX[0].cor, fX[0].costura], ['R1 · Frente M', true, 'Azul', null]],
+);
+
 const perto = (a, b, tol) => typeof a === 'number' ? Math.abs(a - b) <= tol
   : a && typeof a === 'object' ? Object.keys(b).length === Object.keys(a).length && Object.keys(b).every(k => perto(a[k], b[k], tol)) : a === b;
 

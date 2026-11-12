@@ -5,12 +5,18 @@
 (function (g) {
   const ENC_RES = 20;
 
-  // giro em quartos de volta: 0=0°, 1=90°, 2=180°, 3=270°
-  function rasterPol(pts, giro) {
+  // giro em quartos de volta: 0=0°, 1=90°, 2=180°, 3=270°; devolve os pontos girados com o canto mínimo em (0,0)
+  function pose(pts, giro) {
     let p = pts; for (let k = 0; k < (giro || 0); k++) p = p.map(([x, y]) => [-y, x]);
-    let x0 = 1 / 0, y0 = 1 / 0, x1 = -1 / 0, y1 = -1 / 0;
-    for (const q of p) { if (q[0] < x0) x0 = q[0]; if (q[0] > x1) x1 = q[0]; if (q[1] < y0) y0 = q[1]; if (q[1] > y1) y1 = q[1]; }
-    p = p.map(([x, y]) => [x - x0, y - y0]);
+    let x0 = 1 / 0, y0 = 1 / 0;
+    for (const q of p) { if (q[0] < x0) x0 = q[0]; if (q[1] < y0) y0 = q[1]; }
+    return p.map(([x, y]) => [x - x0, y - y0]);
+  }
+
+  function rasterPol(pts, giro) {
+    const p = pose(pts, giro);
+    let x0 = 0, y0 = 0, x1 = -1 / 0, y1 = -1 / 0;
+    for (const q of p) { if (q[0] > x1) x1 = q[0]; if (q[1] > y1) y1 = q[1]; }
     const cw = Math.max(1, Math.ceil((x1 - x0) / ENC_RES)), ch = Math.max(1, Math.ceil((y1 - y0) / ENC_RES)), m = new Uint8Array(cw * ch);
     const dentro = (px, py) => {
       let d = false;
@@ -26,14 +32,17 @@
 
   // variantes de giro permitidas pela peça: sem `rot` (produto antigo) vale '180';
   // `espelhar` acrescenta, depois das normais, as mesmas espelhadas em Y; `escala` entra antes de rasterizar
-  function variantes(pts, o) {
+  // poses = os polígonos de cada variante, na mesma ordem; o desenho do risco usa estes pontos + (ox, oy),
+  // assim desenho e encaixe não podem divergir
+  function poses(pts, o) {
     o = o || {};
     const sx = o.escala ? +o.escala.x || 1 : 1, sy = o.escala ? +o.escala.y || 1 : 1;
     const p = sx === 1 && sy === 1 ? pts : pts.map(([x, y]) => [Math.round(x * sx * 1e3) / 1e3, Math.round(y * sy * 1e3) / 1e3]); // arredonda: 200·1,1 não pode virar 12 células
     const giros = o.rot === 'nenhuma' ? [0] : o.rot === 'livre' ? [0, 1, 2, 3] : [0, 2];
     const formas = o.espelhar ? [p, p.map(([x, y]) => [x, -y])] : [p];
-    return formas.flatMap(f => giros.map(k => rasterPol(f, k)));
+    return formas.flatMap(f => giros.map(k => pose(f, k)));
   }
+  const variantes = (pts, o) => poses(pts, o).map(p => rasterPol(p, 0));
   const rasterRot = (pts, rot) => variantes(pts, { rot });
 
   // lista: [{rot:[{r,v}], b0}] já ordenada; devolve {maxX, pos:[{ox,oy,v}]} em células
@@ -109,7 +118,7 @@
     return r && r.comp / 1000;
   }
 
-  const MoldeEncaixe = { ENC_RES, rasterPol, rasterRot, variantes, encaixar, pecasDoRisco, encaixeMol };
+  const MoldeEncaixe = { ENC_RES, pose, poses, rasterPol, rasterRot, variantes, encaixar, pecasDoRisco, encaixeMol };
   g.MoldeEncaixe = MoldeEncaixe;
   if (typeof module !== 'undefined') module.exports = MoldeEncaixe;
 })(typeof window !== 'undefined' ? window : globalThis);
