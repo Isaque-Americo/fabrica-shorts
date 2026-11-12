@@ -231,7 +231,8 @@
     let n = m.pecas.length + 1;
     while (m.pecas.some(p => p.nome === 'PEÇA ' + n)) n++;
     const peca = { id: uid(m, 'pc'), nome: 'PEÇA ' + n, cortar: 1, par: false, tracos: r.tracos, dobra: null, fio: null,
-      margem: 10, margemTraco: {}, piques: [], pences: [], visivel: true, travada: false };
+      margem: 10, margemTraco: {}, piques: [], pences: [], visivel: true, travada: false,
+      rotacao: '180', espelhar: false, tubular: false, tecido: '', bainhas: {} }; // mesmos padrões do normalizar
     const b = G.bbox(MM.costura(m, peca)), x = b.x0 + b.w / 2;
     peca.fio = { a: { x, y: b.y0 + b.h * 0.2 }, b: { x, y: b.y0 + b.h * 0.8 } };
     m.pecas.push(peca);

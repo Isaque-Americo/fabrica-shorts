@@ -68,6 +68,7 @@ dialog h3{margin:0 0 12px}
 #tela .pc .cost{fill:var(--ac);fill-opacity:.06;stroke:var(--ac);stroke-width:1.5px;vector-effect:non-scaling-stroke}
 #tela .pc.sel .cost{fill-opacity:.14;stroke-width:2.5px}
 #tela .pc .corte{fill:none;stroke:var(--tx);stroke-width:1px;stroke-dasharray:6 4;vector-effect:non-scaling-stroke}
+#tela .pc .bh{fill:none;stroke:var(--tx);stroke-width:1px;stroke-dasharray:2 3;vector-effect:non-scaling-stroke}
 #tela .pc .fio,#tela .pc .piq{fill:none;stroke:var(--tx);stroke-width:1.2px;vector-effect:non-scaling-stroke}
 #tela .pc-tx{fill:var(--tx);font-family:'Inter',sans-serif}
 #tela .ponta-erro{fill:none;stroke:var(--bad);stroke-width:2.5px;vector-effect:non-scaling-stroke}
@@ -198,8 +199,13 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
       <label><span><input id="p-par" type="checkbox"> em par (espelhado)</span></label>
       <label>Margem (cm) <input id="p-margem" inputmode="decimal" autocomplete="off"></label>
       <label>Dobra <select id="p-dobra"></select></label>
+      <label>Rotação permitida <select id="p-rot"><option value="nenhuma">Nenhuma</option><option value="180">180°</option><option value="livre">Livre</option></select></label>
+      <label><span><input id="p-esp" type="checkbox"> Permitir espelhar</span></label>
+      <label><span><input id="p-tub" type="checkbox"> Dobra no tecido tubular</span></label>
+      <label>Tecido <select id="p-tec"></select></label>
       <div class="modos" role="group" aria-label="Marcar no contorno">
-        <button class="sm" type="button" data-modo="bainha" title="Margem só de um traço (ex.: bainha)">Margem do traço</button>
+        <button class="sm" type="button" data-modo="bainha" title="Bainha: largura, dobras e piques num traço do contorno">Bainha</button>
+        <button class="sm" type="button" data-modo="margem" title="Margem só de um traço">Margem do traço</button>
         <button class="sm" type="button" data-modo="pique">Piques</button>
         <button class="sm" type="button" data-modo="pence">Pence</button>
       </div>
@@ -225,6 +231,15 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
   <label class="campo">Tamanho base <select id="g-base"></select></label>
   <label class="campo">Foto da ficha técnica (opcional) <input id="g-foto" type="file" accept="image/*"></label>
   <div class="row"><button class="ghost" type="submit" value="">Cancelar</button><button class="pri" type="submit" value="ok">OK</button></div>
+  </form>
+</dialog>
+<dialog id="dlg-bainha" aria-labelledby="dlg-bainha-t">
+  <form method="dialog">
+  <h3 id="dlg-bainha-t">Bainha</h3>
+  <label class="campo">Largura de cada dobra (cm) <input id="b-larg" inputmode="decimal" autocomplete="off"></label>
+  <label class="campo">Dobras <input id="b-dob" type="number" min="1" step="1"></label>
+  <label><input id="b-piq" type="checkbox"> Piques nas dobras</label>
+  <div class="row"><button class="ghost" type="button" id="b-rm" onclick="this.closest('dialog').close('rm')">Tirar bainha</button><button class="ghost" type="button" onclick="this.closest('dialog').close('')">Cancelar</button><button class="pri" type="submit" value="ok">OK</button></div>
   </form>
 </dialog>
 <dialog id="dlg-foto" aria-label="Foto da ficha técnica" style="width:min(900px,94vw)">
@@ -279,6 +294,7 @@ async produto(id){rede();return ler('produtos')[id]||null},
 async gravarProduto(id,d){rede();const t=ler('produtos');t[id]=d;gravarK('produtos',t)},
 // foto: dataURL pequena (o localStorage é curto)
 async subirFoto(file){rede();return (await imgCanvas(file,600)).toDataURL('image/jpeg',.7)},
+async tecidos(){rede();return [{id:'tec-forro',nome:'Forro tactel'},{id:'tec-ribana',nome:'Ribana'}]},
 fotoUrl:f=>/^data:image\//.test(f)?f:''
 };
 })():(()=>{
@@ -294,6 +310,8 @@ gravar:atualizar,
 async produtos(){await sessaoOk();return ok(await sb.from('docs').select('id,data').eq('col','produtos').order('created_at'))},
 async produto(id){await sessaoOk();const r=ok(await sb.from('docs').select('data').eq('id',id).eq('col','produtos').maybeSingle());return r?r.data:null},
 gravarProduto:atualizar,
+// tecidos da matéria-prima (a RLS só deixa o admin ler 'materiais')
+async tecidos(){await sessaoOk();return ok(await sb.from('docs').select('id,data').eq('col','materiais')).filter(r=>r.data&&r.data.tipo==='tecido').map(r=>({id:r.id,nome:[r.data.nome,r.data.cor].filter(Boolean).join(' · ')||'(sem nome)'}))},
 // mesmo caminho do subirFoto do index.html: bucket público 'produtos'
 async subirFoto(file,antigo){
 await sessaoOk();
@@ -475,6 +493,7 @@ H=MM.historico();H.gravar(M);
 $('#aviso').hidden=true;$('#editor').hidden=false;$('#nome').value=M.nome;
 tamVer=M.base;
 marcar('salvo');if(pendente)sujou();else{desenhar();desenharPainel()}
+B.tecidos().then(l=>{tecidos=l;preencherProps();desenhar()}).catch(e=>{console.error(e);toast('Lista de tecidos não carregou: '+ptErro(e))});
 // grade sem o base: molParaProduto sai sem peças e o salvar não grava o mol
 if(M.grade.length&&!M.grade.includes(M.base)){
 const t=`A grade deste molde não tem o tamanho base (${M.base}). Escolha a grade e o tamanho base.`;
@@ -788,7 +807,7 @@ escolher('sel');
 // ---- peças (Task 6). Geometria em molde/desenho.js ----
 const pecaAtual=()=>M.pecas.find(p=>p.id===pecaSel)||null;
 const mm10=cm=>Math.round(cm*100)/10; // cm digitado → mm com 0,1 mm
-const MODOS={bainha:'Clique num traço do contorno e digite a margem dele em cm (vazio volta à margem da peça).',pique:'Clique no contorno para pôr um pique; clique num pique para tirar. Esc encerra.',pence:'Clique no contorno onde vai a pence e digite "abertura cm; profundidade cm"; clique numa pence para tirar.'};
+const MODOS={bainha:'Clique no traço da barra para pôr a bainha (largura, dobras, piques).',margem:'Clique num traço do contorno e digite a margem dele em cm (vazio volta à margem da peça).',pique:'Clique no contorno para pôr um pique; clique num pique para tirar. Esc encerra.',pence:'Clique no contorno onde vai a pence e digite "abertura cm; profundidade cm"; clique numa pence para tirar.'};
 function extrair(){
 if(foraBase())return toast('Edite no tamanho base');
 const r=MD.novaPeca(M,[...sel]);
@@ -798,6 +817,31 @@ sel.clear();pecaSel=r.peca.id;alterou();
 // ponta da seta do fio da peça selecionada sob o cursor
 function fioSob(p){const pc=pecaAtual();if(!pc||!pc.visivel||pc.travada||!MD.geoPeca(M,pc))return null;return ['a','b'].find(k=>dist(p,pc.fio[k])<=6/zoom)||null}
 function seta(a,b){const l=dist(a,b)||1,ux=(b.x-a.x)/l,uy=(b.y-a.y)/l,k=8/zoom;return `M${n2(b.x-ux*k-uy*k/2)} ${n2(b.y-uy*k+ux*k/2)}L${n2(b.x)} ${n2(b.y)}L${n2(b.x-ux*k+uy*k/2)} ${n2(b.y-uy*k-ux*k/2)}`}
+// tecidos = [{id,nome}] da matéria-prima; null enquanto não carregou
+let tecidos=null;
+const nomeTecido=id=>(tecidos&&tecidos.find(t=>t.id===id)||{}).nome||(tecidos?'Tecido removido':'Outro tecido');
+// bainha: dobras tracejadas a cada largura (para fora do traço) e, com piques, 5 mm do corte para dentro nas duas pontas de cada dobra
+function bainhaSvg(m,pc){
+let s='';const n=pc.tracos.length;
+for(const [id,b] of Object.entries(pc.bainhas||{})){
+const i=pc.tracos.findIndex(t=>t.id===id),t=m.tracos.find(x=>x.id===id),raw=t&&tracoSeguro(t,m);
+if(i<0||!raw||raw.length<2||!(b.largura>0))continue;
+const p=pc.tracos[i].inv?raw.slice().reverse():raw,L=p.length;
+// normal para fora = direita do sentido (anti-horário), como no offset do corte
+const off=d=>p.map((q,j)=>{const a=p[Math.max(0,j-1)],c=p[Math.min(L-1,j+1)],l=dist(a,c)||1;return {x:q.x+(c.y-a.y)/l*d,y:q.y-(c.x-a.x)/l*d}});
+for(let k=1;k<b.dobras;k++)s+=`<path class="bh" d="${caminho(off(k*b.largura))}"/>`;
+if(!b.piques)continue;
+const mg=j=>{const v=pc.margemTraco[pc.tracos[(j+n)%n].id];return v??pc.margem};
+for(let k=0;k<b.dobras;k++){
+const f=off(k*b.largura);
+for(const [e,o,d] of [[f[0],f[1],mg(i-1)],[f[L-1],f[L-2],mg(i+1)]]){
+const l=dist(o,e)||1,ux=(e.x-o.x)/l,uy=(e.y-o.y)/l;
+s+=`<path class="piq" d="${caminho([{x:e.x+ux*d,y:e.y+uy*d},{x:e.x+ux*(d-5),y:e.y+uy*(d-5)}])}"/>`;
+}
+}
+}
+return s;
+}
 function desenharPecas(){
 let s='';
 for(const pc of V.pecas){
@@ -806,8 +850,9 @@ const a=pc.id===pecaSel,b=G.bbox(g.cost),cx=n2(b.x0+b.w/2),cy=b.y0+b.h/2,f=pc.fi
 s+=`<g class="pc${a?' sel':''}"><path class="cost" d="${caminho(g.cost,1)}"/><path class="corte" d="${caminho(g.corte,1)}"/>`;
 s+=`<path class="fio" d="${caminho([f.a,f.b])}${seta(f.b,f.a)}${seta(f.a,f.b)}"/>`;
 for(const q of pc.piques){const l=MD.pique(V,pc,q);if(l)s+=`<path class="piq" d="${caminho(l)}"/>`}
+s+=bainhaSvg(V,pc);
 s+=`<text class="pc-tx" x="${cx}" y="${n2(cy)}" font-size="${fs}" text-anchor="middle">${esc(pc.nome)} · cortar ${n}${pc.par?(n>1?' pares':' par'):''}</text>`;
-s+=`<text class="pc-tx" x="${cx}" y="${n2(cy+fs*1.4)}" font-size="${fs}" text-anchor="middle">${esc(tamVer)}</text>`;
+s+=`<text class="pc-tx" x="${cx}" y="${n2(cy+fs*1.4)}" font-size="${fs}" text-anchor="middle">${esc(tamVer)}${pc.tecido?' · '+esc(nomeTecido(pc.tecido).toUpperCase()):''}</text>`;
 if(a&&!pc.travada&&!foraBase())for(const k of ['a','b'])s+=`<circle class="alca-p" cx="${n2(f[k].x)}" cy="${n2(f[k].y)}" r="${4/zoom}"/>`;
 s+='</g>';
 }
@@ -865,8 +910,20 @@ op('','Sem dobra');
 for(const {id} of pc.tracos){const t=M.tracos.find(x=>x.id===id);if(t&&t.tipo==='reta'&&!pc.pences.some(q=>q.tracoId===id))op(id,'Traço '+id+' ('+MD.cm(MD.medir(M,[id]))+' cm)')}
 d.value=pc.dobra?pc.dobra.tracoId:'';
 }
+por('#p-rot',pc.rotacao);por('#p-esp',pc.espelhar);por('#p-tub',pc.tubular);
+const tc=$('#p-tec');
+if(document.activeElement!==tc){
+tc.textContent='';
+const op=(v,t)=>{const o=document.createElement('option');o.value=v;o.textContent=t;tc.append(o)};
+op('','Principal do produto');
+for(const t of tecidos||[])op(t.id,t.nome);
+// id guardado que saiu da lista: continua guardado
+if(pc.tecido&&!(tecidos||[]).some(t=>t.id===pc.tecido))op(pc.tecido,nomeTecido(pc.tecido));
+tc.value=pc.tecido;
+}
 const mt=Object.entries(pc.margemTraco).map(([id,v])=>id+': '+MD.cm(+v||0)+' cm');
-$('#p-info').textContent=`${pc.piques.length} pique(s) · ${pc.pences.length} pence(s)`+(mt.length?' · margem do traço '+mt.join(', '):'');
+const bh=Object.entries(pc.bainhas).map(([id,b])=>id+': '+MD.cm(b.largura)+' cm × '+b.dobras+(b.piques?' c/ piques':''));
+$('#p-info').textContent=`${pc.piques.length} pique(s) · ${pc.pences.length} pence(s)`+(mt.length?' · margem do traço '+mt.join(', '):'')+(bh.length?' · bainha '+bh.join(', '):'');
 }
 // campos: aplica no 'change' (o painel é refeito a cada alteração)
 const campo=fn=>e=>{const pc=pecaAtual();if(!pc||pc.travada)return;if(fn(pc,e.target)===false){preencherProps();return}alterou()};
@@ -875,6 +932,10 @@ $('#p-cortar').addEventListener('change',campo((pc,i)=>{const n=Math.round(+i.va
 $('#p-par').addEventListener('change',campo((pc,i)=>{pc.par=i.checked}));
 $('#p-margem').addEventListener('change',campo((pc,i)=>{const v=MD.medida(i.value);if(!v||v.length>1||!(v[0]>=0)){toast('Margem inválida. Ex.: 1 ou 1,5');return false}pc.margem=mm10(v[0])}));
 $('#p-dobra').addEventListener('change',campo((pc,i)=>{pc.dobra=i.value?{tracoId:i.value}:null}));
+$('#p-rot').addEventListener('change',campo((pc,i)=>{pc.rotacao=i.value}));
+$('#p-esp').addEventListener('change',campo((pc,i)=>{pc.espelhar=i.checked}));
+$('#p-tub').addEventListener('change',campo((pc,i)=>{pc.tubular=i.checked}));
+$('#p-tec').addEventListener('change',campo((pc,i)=>{pc.tecido=i.value}));
 document.querySelectorAll('#props [data-modo]').forEach(b=>b.onclick=()=>{modoPeca=modoPeca===b.dataset.modo?null:b.dataset.modo;op=null;preencherProps();desenhar()});
 $('#btn-extrair').onclick=extrair;
 // clique na tela com um modo de peça ligado
@@ -891,13 +952,29 @@ abrirMedida('',e.clientX,e.clientY,'abertura cm; profundidade cm',v=>{
 if(!v||v.length!==2||!(v[0]>0)||!(v[1]>0)||v[0]*10>=h.L)return false;
 pc.pences.push({tracoId:h.tracoId,t,abertura:mm10(v[0]),profundidade:mm10(v[1])});alterou()});
 return}
-if(modoPeca==='bainha'){
-const at=pc.margemTraco[h.tracoId];
+if(modoPeca==='bainha')return abrirBainha(pc.id,h.tracoId);
+if(modoPeca==='margem'){
+const at=pc.margemTraco[h.tracoId],id=pc.id;
 abrirMedida(at==null?'':MD.cm(+at||0),e.clientX,e.clientY,'margem deste traço, cm',(v,txt)=>{
-if(!txt.trim())delete pc.margemTraco[h.tracoId];
-else if(!v||v.length>1||!(v[0]>=0))return false;
-else pc.margemTraco[h.tracoId]=mm10(v[0]);
+const pc=M.pecas.find(x=>x.id===id);if(!pc)return;
+if(txt.trim()&&(!v||v.length>1||!(v[0]>=0)))return false;
+// margem à mão no traço tira a bainha dele
+delete pc.bainhas[h.tracoId];
+if(!txt.trim())delete pc.margemTraco[h.tracoId];else pc.margemTraco[h.tracoId]=mm10(v[0]);
 alterou()})}
+}
+// caixa da bainha; a peça é achada pelo id ao confirmar (desfazer troca o M)
+async function abrirBainha(pid,tid){
+const d=$('#dlg-bainha'),pc0=M.pecas.find(x=>x.id===pid),b=pc0.bainhas[tid]||{largura:15,dobras:2,piques:true};
+$('#dlg-bainha-t').textContent='Bainha do traço '+tid;
+$('#b-larg').value=MD.cm(b.largura);$('#b-dob').value=b.dobras;$('#b-piq').checked=!!b.piques;$('#b-rm').hidden=!pc0.bainhas[tid];
+d.returnValue='';d.showModal();
+await new Promise(r=>d.addEventListener('close',r,{once:true}));
+const pc=M.pecas.find(x=>x.id===pid);if(!pc||pc.travada||!d.returnValue)return;
+if(d.returnValue==='rm'){MM.aplicarBainha(pc,tid,{largura:0});alterou();return}
+const v=MD.medida($('#b-larg').value),n=Math.round(+$('#b-dob').value);
+if(!v||v.length>1||!(v[0]>0)||!(n>=1)){toast('Bainha inválida: largura em cm (ex.: 1,5) e dobras a partir de 1.');return}
+MM.aplicarBainha(pc,tid,{largura:mm10(v[0]),dobras:n,piques:$('#b-piq').checked});alterou();
 }
 
 // ---- abas do painel (Moldes, Gradação, Medidas) ----
