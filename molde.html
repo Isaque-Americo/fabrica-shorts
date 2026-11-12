@@ -436,17 +436,22 @@ const d=$('#dlg-grade'),gs=$('#g-grade'),bs=$('#g-base'),f=$('#g-foto'),av=$('#g
 $('#dlg-grade-t').textContent=novo?'Novo molde':'Grade e foto';
 $('#g-nome-l').hidden=!novo;$('#g-nome').value=m.nome;
 av.textContent=aviso;av.hidden=!aviso;
-gs.value=novo?'app':Object.keys(MM.GRADES).find(k=>MM.GRADES[k].join()===m.grade.join())||'';
+// grade fora dos padrões (doc editado à mão): opção "Atual" mantém a grade como está
+gs.querySelector('[value="atual"]')?.remove();
+const chave=Object.keys(MM.GRADES).find(k=>MM.GRADES[k].join()===m.grade.join());
+if(!novo&&!chave&&m.grade.length){const o=document.createElement('option');o.value='atual';o.textContent='Atual ('+m.grade.join(', ')+')';gs.prepend(o)}
+gs.value=novo?'app':chave||(m.grade.length?'atual':'');
+const gradeDe=v=>v==='atual'?m.grade:v?MM.GRADES[v]:[];
 // base sempre dentro da grade; "definir depois" só tem o base
 const encher=()=>{
-const l=gs.value?MM.GRADES[gs.value]:[m.base||'M'],v=[bs.value,m.base,'M','40'].find(x=>l.includes(x))||l[0];
+const l=gs.value?gradeDe(gs.value):[m.base||'M'],v=[bs.value,m.base,'M','40'].find(x=>l.includes(x))||l[0];
 bs.textContent='';for(const t of l){const o=document.createElement('option');o.value=o.textContent=t;bs.append(o)}bs.value=v;
 };
 bs.textContent='';encher();gs.onchange=encher;f.value='';
 d.returnValue='';d.showModal();
 await new Promise(r=>d.addEventListener('close',r,{once:true}));
 if(d.returnValue!=='ok')return null;
-const r={nome:novo?$('#g-nome').value.trim()||m.nome:null,grade:gs.value?[...MM.GRADES[gs.value]]:[],base:bs.value,foto:null};
+const r={nome:novo?$('#g-nome').value.trim()||m.nome:null,grade:[...gradeDe(gs.value)],base:bs.value,foto:null};
 // shortcut: a foto antiga sai do storage na hora; desfazer a troca volta um caminho apagado. Guardar a antiga até salvar, se incomodar.
 if(f.files[0])try{r.foto=await B.subirFoto(f.files[0],m.foto)}catch(e){toast('Foto não enviada: '+ptErro(e))}
 return r;
