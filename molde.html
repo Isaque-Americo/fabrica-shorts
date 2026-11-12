@@ -107,6 +107,12 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 #grad legend{font-weight:600;font-size:14px;padding:0 4px}
 #grad label{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:13px}
 #grad label input,#grad label select{width:84px}
+#m-tab{border-collapse:collapse;font-size:13px;width:100%;margin-bottom:8px}
+#m-tab th{color:var(--mut);font-weight:500;text-align:left}
+#m-tab td{vertical-align:top;padding:2px 3px 6px 0}
+#m-tab input{width:62px;padding:3px 5px}
+#m-tab input.nm{width:100px}
+#m-tab .ok{color:var(--ok)}#m-tab .ruim{color:var(--bad)}#m-tab .med{display:block;font-size:12px}
 #g-tab{border-collapse:collapse;font-size:13px;width:100%}
 #g-tab th{color:var(--mut);font-weight:500;text-align:left}
 #g-tab input{width:62px;padding:3px 5px}
@@ -156,7 +162,13 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
     <g id="fantasma"></g><g id="diagrama"></g><g id="pecas"></g><g id="regua"></g>
   </svg>
   <aside id="painel" aria-label="Painel">
-    <div id="abas" role="tablist" aria-label="Painel"><button type="button" role="tab" data-aba="moldes">Moldes</button><button type="button" role="tab" data-aba="grad">Gradação</button></div>
+    <div id="abas" role="tablist" aria-label="Painel"><button type="button" role="tab" data-aba="moldes">Moldes</button><button type="button" role="tab" data-aba="grad">Gradação</button><button type="button" role="tab" data-aba="medidas">Medidas</button></div>
+    <section id="aba-medidas" role="tabpanel" aria-label="Medidas" hidden>
+      <p class="vazio" id="m-vazio"></p>
+      <table id="m-tab"><thead></thead><tbody></tbody></table>
+      <button class="sm" type="button" id="m-add">Adicionar medida</button>
+      <p class="vazio">Valor esperado em cm. Embaixo, o medido no molde: ✓ até 0,3 cm de diferença, ✗ acima.</p>
+    </section>
     <section id="aba-grad" role="tabpanel" aria-label="Gradação" hidden>
       <p class="vazio" id="g-vazio"></p>
       <fieldset id="grad">
@@ -336,7 +348,7 @@ $('#refs-n').textContent=M.produtoIds.length?'('+M.produtoIds.length+')':'';
 document.title=(M.nome||'Molde')+' · Editor de molde';
 const tams=MM.tamanhos(M);if(!tams.includes(tamVer))tamVer=M.base;
 V=tamVer===M.base?M:MM.noTamanho(M,tamVer);
-desenharTams(tams);
+desenharTams(tams);desenharMed();
 desenharDiagrama(w,h,tams);
 desenharPecas();
 }
@@ -888,7 +900,7 @@ else pc.margemTraco[h.tracoId]=mm10(v[0]);
 alterou()})}
 }
 
-// ---- abas do painel (Moldes, Gradação; Medidas entra na Task 4 com mais um data-aba) ----
+// ---- abas do painel (Moldes, Gradação, Medidas) ----
 function aba(n){
 document.querySelectorAll('#abas [data-aba]').forEach(b=>{const on=b.dataset.aba===n;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;$('#aba-'+b.dataset.aba).hidden=!on});
 }
@@ -964,6 +976,50 @@ if(foraBase()||!Object.keys(M.grad).length)return toast('Não há gradação.');
 if(!confirm('Remover a gradação de todos os pontos? Dá para desfazer.'))return;
 MM.removerGradacao(M);alterou();
 };
+
+// ---- medidas (Task 4). M.medidas[i] = {id,nome,tracos,valores:{tam:mm}}; esperado vs. medido no molde ----
+function desenharMed(){
+if(!M)return;
+const tams=MM.tamanhos(M),tb=$('#m-tab tbody'),th=$('#m-tab thead'),chave=M.medidas.map(m=>m.id).join(',')+'|'+tams.join(',');
+$('#m-vazio').textContent=M.medidas.length?'':'Nenhuma medida. Adicione e ligue aos traços (ex.: reta da cintura).';
+const atual=(m,t)=>{ // medido x esperado: texto + cor (✓ até 3 mm)
+const ids=m.tracos.filter(i=>M.tracos.some(x=>x.id===i)),e=m.valores[t];
+if(!ids.length)return {txt:'sem traço',cls:''};
+const v=MM.medir(M,ids,t);let txt='medido '+cm2(v)+' cm',cls='';
+if(e!=null){const ok=Math.abs(v-e)<=3+1e-6;txt=(ok?'✓ ':'✗ ')+txt;cls=ok?'ok':'ruim'}
+return {txt,cls}};
+const pinta=(sp,r)=>{sp.textContent=r.txt;sp.className='med '+r.cls};
+// mesma estrutura: só atualiza valores (refazer as linhas tira o foco)
+if(tb.dataset.chave===chave){
+tb.querySelectorAll('input[data-tam]').forEach(i=>{const m=M.medidas.find(x=>x.id===i.dataset.id);if(i!==document.activeElement)i.value=m.valores[i.dataset.tam]==null?'':cm2(m.valores[i.dataset.tam])});
+tb.querySelectorAll('.med').forEach(sp=>pinta(sp,atual(M.medidas.find(x=>x.id===sp.dataset.id),sp.dataset.tam)));
+return}
+tb.dataset.chave=chave;tb.textContent='';th.textContent='';
+if(M.medidas.length){const h=document.createElement('tr');for(const t of ['Medida',...tams]){const c=document.createElement('th');c.textContent=t;h.append(c)}th.append(h)}
+for(const m of M.medidas){
+const tr=document.createElement('tr'),c0=document.createElement('td'),nm=document.createElement('input');
+nm.className='nm';nm.value=m.nome;nm.autocomplete='off';nm.setAttribute('aria-label','Nome da medida');
+nm.onchange=()=>{m.nome=nm.value.trim()||m.nome;alterou()};
+const lig=document.createElement('button');lig.type='button';lig.className='sm';lig.textContent='Ligar';lig.title='Ligar aos traços selecionados';
+lig.onclick=()=>{const ids=[...sel].filter(i=>M.tracos.some(x=>x.id===i));if(!ids.length)return toast('Selecione traços para ligar.');m.tracos=ids;alterou();toast('Ligada a '+ids.length+' traço(s).')};
+const rm=document.createElement('button');rm.type='button';rm.className='sm';rm.textContent='✕';rm.title='Remover medida';rm.setAttribute('aria-label','Remover medida '+m.nome);
+rm.onclick=()=>{M.medidas=M.medidas.filter(x=>x!==m);alterou()};
+c0.append(nm,document.createElement('br'),lig,' ',rm);tr.append(c0);
+for(const t of tams){
+const td=document.createElement('td'),inp=document.createElement('input'),sp=document.createElement('span');
+inp.inputMode='decimal';inp.autocomplete='off';inp.dataset.id=m.id;inp.dataset.tam=t;inp.setAttribute('aria-label',m.nome+', esperado em cm, tamanho '+t);
+inp.value=m.valores[t]==null?'':cm2(m.valores[t]);
+inp.onchange=()=>{
+if(!inp.value.trim())delete m.valores[t];
+else{const v=MD.medida(inp.value);if(!v||v.length>1||!(v[0]>=0)){toast('Medida inválida. Ex.: 78 ou 78,5');inp.value=m.valores[t]==null?'':cm2(m.valores[t]);return}m.valores[t]=mm10(v[0])}
+alterou()};
+sp.dataset.id=m.id;sp.dataset.tam=t;pinta(sp,atual(m,t));
+td.append(inp,sp);tr.append(td);
+}
+tb.append(tr);
+}
+}
+$('#m-add').onclick=()=>{M.medidas.push({id:'md'+(1+Math.max(0,...M.medidas.map(m=>+m.id.slice(2)||0))),nome:'Medida '+(M.medidas.length+1),tracos:[],valores:{}});alterou()};
 
 let ultCli={x:0,y:0};
 tela.addEventListener('pointerdown',e=>{
