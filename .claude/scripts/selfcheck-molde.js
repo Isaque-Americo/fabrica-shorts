@@ -508,6 +508,17 @@ testes.push(
   ['pdfPlano limites e cabecalho', [planoL.some(c => c.tipo === 'retangulo' && c.w === 300 && c.h === 100), planoL.some(c => c.tipo === 'texto' && c.s === 'Ordem 1')], [true, true]],
   ['formas: bbox na caixa de celulas do raster (escala, giro, espelho, ourela, cabeceira)', [naCaixa, variasVar > 1], [true, true]],
   ['formas: rasterizar a forma devolve o mesmo raster do encaixe', mesmoRaster, true],
+  ['fix1 dxf(larg) na mesma origem do plt: y DXF = y PLT / 40', (() => {
+    const f = [{ pts: [[50, 200], [150, 200], [150, 300], [50, 300]], texto: null, fio: null, costura: null, cor: '' }];
+    const yP = (X.plt(f, 1000, 200).match(/P[UD][-\d,]+/g) || []).flatMap(s => s.slice(2).split(',').map(Number)).filter((_, i) => i % 2).map(v => v / 40);
+    const l = X.dxf(f, 1000).split(/\r?\n/).map(s => s.trim()), yD = l.flatMap((s, i) => s === 'VERTEX' ? [+l[l.indexOf('20', i) + 1]] : []);
+    return [yD, yP.slice(0, 5)];
+  })(), [[800, 800, 700, 700], [800, 800, 700, 700, 800]]],
+  ['fix1 larg menor que o risco (largUtil) e erro no plt e no dxf', [fx(() => X.plt(q100, 90, 100), 'ok'), fx(() => X.dxf(q100, 90), 'ok')].map(r => /^erro: larg menor/.test(r)), [true, true]],
+  ['fix1 rotulos em ASCII no LB e no TEXT', (() => {
+    const f = [{ ...q100[0], texto: { s: 'R1 · Calção Ânus M', x: 50, y: 50 } }];
+    return [X.plt(f, 100, 100).includes('LBR1 - Calcao Anus M\x03;'), X.dxf(f, 100).split(/\r?\n/).includes('R1 - Calcao Anus M')];
+  })(), [true, true]],
   ['formas: texto com nome do molde e da peca, fio ao longo de X', fX[0] && [fX[0].texto && fX[0].texto.s, fX[0].fio && fX[0].fio[0][1] === fX[0].fio[1][1], fX[0].cor, fX[0].costura], ['R1 · Frente M', true, 'Azul', null]],
 );
 

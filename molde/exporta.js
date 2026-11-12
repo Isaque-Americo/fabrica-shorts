@@ -41,33 +41,40 @@
     return t;
   }
 
+  // rótulo em ASCII para LB/TEXT (plotter e leitores R12 não entendem acento): NFD tira o acento, · vira -
+  const ascii = t => String(t).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/·/g, '-').replace(/[^\x20-\x7e]/g, ' ');
+  // Y do arquivo = L − y; peça além de L (larg errada, p.ex. largUtil sem a ourela) sairia com Y negativo: erro
+  const yInv = L => y => { if (L - y < -1e-6) throw new Error('larg menor que o risco: passe a largura total do tecido em mm'); return L - y; };
+
   // HP-GL: 40 unidades por mm, inteiras. Origem do plotter = canto do início do risco na ourela direita
-  // (x = 0, y = larg do risco), Y do plotter para cima: yPlt = (larg − y)·40, assim a peça não sai espelhada
+  // (x = 0, y = larg), Y do plotter para cima: yPlt = (larg − y)·40, assim a peça não sai espelhada.
+  // larg = largura TOTAL do tecido em mm (mat.larg·1000), não a largUtil: as formas já vêm com a ourela E somada
   function plt(fs, larg, comp) {
-    const u = v => Math.round(v * 40), L = num(larg), xy = ([x, y]) => u(x) + ',' + u(L - y);
+    const u = v => Math.round(v * 40), Y = yInv(num(larg)), xy = ([x, y]) => u(x) + ',' + u(Y(y));
     let s = 'IN;SP1;';
     for (const f of fs || []) {
       for (const t of tracos(f)) s += 'PU' + xy(t[0]) + ';PD' + t.slice(1).map(xy).join(',') + ';';
-      if (f.texto) s += 'PU' + xy([f.texto.x, f.texto.y]) + ';LB' + String(f.texto.s).replace(/[\x00-\x1f;]/g, ' ') + '\x03;';
+      if (f.texto) s += 'PU' + xy([f.texto.x, f.texto.y]) + ';LB' + ascii(f.texto.s).replace(/;/g, ' ') + '\x03;';
     }
     return s + 'PU0,0;SP0;';
   }
 
-  // DXF R12 (AC1009) em mm. DXF tem Y para cima: y' = yMax − y (yMax das formas) para a peça não sair espelhada
-  function dxf(fs) {
+  // DXF R12 (AC1009) em mm. DXF tem Y para cima: y' = larg − y, a mesma origem do plt (canto do início na ourela direita).
+  // larg = largura TOTAL do tecido em mm (mat.larg·1000); sem larg, cai no maior Y das formas
+  function dxf(fs, larg) {
     fs = fs || [];
-    const yMax = Math.max(0, ...fs.flatMap(f => f.pts.map(p => p[1])));
+    const Y = yInv(larg != null ? num(larg) : Math.max(0, ...fs.flatMap(f => f.pts.map(p => p[1]))));
     const out = ['0', 'SECTION', '2', 'HEADER', '9', '$ACADVER', '1', 'AC1009', '9', '$INSUNITS', '70', '4', '0', 'ENDSEC', '0', 'SECTION', '2', 'ENTITIES'];
     const poli = (pts, fechada) => {
       out.push('0', 'POLYLINE', '8', '0', '66', '1', '10', '0', '20', '0', '30', '0', '70', fechada ? '1' : '0');
-      for (const [x, y] of pts) out.push('0', 'VERTEX', '8', '0', '10', String(r3(x)), '20', String(r3(yMax - y)), '30', '0');
+      for (const [x, y] of pts) out.push('0', 'VERTEX', '8', '0', '10', String(r3(x)), '20', String(r3(Y(y))), '30', '0');
       out.push('0', 'SEQEND', '8', '0');
     };
     for (const f of fs) {
       poli(f.pts, true);
       if (f.costura) poli(f.costura, true);
       if (f.fio) tracos({ pts: f.pts, fio: f.fio }).slice(1).forEach(t => poli(t, false));
-      if (f.texto) out.push('0', 'TEXT', '8', '0', '10', String(f.texto.x), '20', String(r3(yMax - f.texto.y)), '30', '0', '40', '10', '1', String(f.texto.s).replace(/[\r\n]/g, ' '));
+      if (f.texto) out.push('0', 'TEXT', '8', '0', '10', String(f.texto.x), '20', String(r3(Y(f.texto.y))), '30', '0', '40', '10', '1', ascii(f.texto.s));
     }
     out.push('0', 'ENDSEC', '0', 'EOF');
     return out.join('\r\n') + '\r\n';
