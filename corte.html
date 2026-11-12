@@ -61,6 +61,7 @@ table.lst td.n,table.lst th.n{text-align:right}
 .tam button{font:inherit;width:28px;height:28px;padding:0;border:1px solid var(--bd);border-radius:6px;background:none;color:var(--tx);cursor:pointer}
 .tam output{min-width:28px;text-align:center;font-weight:600}
 .tam small{grid-column:1/4;color:var(--mut);font-size:12px}
+.tam small.dif{color:var(--bad);font-weight:600}
 .pecas{border:1px solid var(--bd);border-radius:8px;padding:6px 10px;margin:0;display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px}
 .pecas legend{font-size:13px;color:var(--mut);padding:0 4px}
 .add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
@@ -237,7 +238,7 @@ clearTimeout(timer);
 if(salvando){agendar();return}
 if(estado==='salvo')return;
 salvando=true;
-const v=ver,t=Date.now(),doc={...structuredClone(O),salvoEm:t};
+const v=ver,t=Date.now(),doc={...structuredClone(O),resumo:resumoDe(O),salvoEm:t};
 try{localStorage.setItem(RASC(),JSON.stringify({em:t,o:doc}))}catch(e){}
 marcar('salvando');
 try{
@@ -257,14 +258,16 @@ $('#aviso').hidden=true;$('#lista-v').hidden=false;
 const tb=$('#lista');
 if(!ords.length){tb.innerHTML='<tr><td colspan="3" class="vazio">Nenhuma ordem ainda. Use “Nova ordem” ou o botão da aba Fabricar no app.</td></tr>';return}
 tb.innerHTML=ords.map(x=>`<tr><td><a href="${esc(urlCom('id',x.id))}">${esc(x.o.nome||'(sem nome)')}</a></td><td>${dataBR(x.o.criadaEm)}</td><td class="n" data-metros="${esc(x.id)}">…</td></tr>`).join('');
-// shortcut: metros recalculados com o encaixe a cada abertura da lista; guardar no doc se a lista ficar lenta
+// resumo gravado a cada salvamento; ordem antiga sem resumo é calculada aqui
 for(const x of ords){
-await new Promise(r=>setTimeout(r));
-let m=null;try{m=MO.resultados(x.o,x.o.enfestos.map(e=>MO.calcularEnfesto(e,x.o,PRODS,MATS)),MATS).metros}catch(e){console.error(e)}
+let m=x.o.resumo&&x.o.resumo.metros;
+if(m==null){await new Promise(r=>setTimeout(r));m=resumoDe(x.o).metros}
 const td=tb.querySelector(`[data-metros="${CSS.escape(x.id)}"]`);if(td)td.textContent=m?nf(m)+' m':'—';
 }
 }
-async function criarEIr(doc){const id=await B.criar(doc);location.href=urlCom('id',id)}
+// metros e peças da ordem para a lista; null quando o encaixe falha
+function resumoDe(o){try{const r=MO.resultados(o,o.enfestos.map(e=>MO.calcularEnfesto(e,o,PRODS,MATS)),MATS);return {metros:r.metros,pecas:r.pecas}}catch(e){console.error(e);return {metros:null,pecas:null}}}
+async function criarEIr(doc){doc.resumo=resumoDe(doc);const id=await B.criar(doc);location.href=urlCom('id',id)}
 
 // ---- ordem ----
 async function abrirOrdem(id,doc){
@@ -284,10 +287,10 @@ render();
 }
 const uid=()=>Math.random().toString(36).slice(2,10);
 
-// tamanhos do produto: os de p.mol.porTam, senão a grade do app; mais os que já têm quantidade
+// tamanhos do produto: os de p.mol.porTam, senão a grade do app; mais os que já têm quantidade ou pedido
 function tamsDe(p,it){
 const pt=p&&p.mol&&p.mol.porTam,base=pt&&Object.keys(pt).length?Object.keys(pt):SZ;
-return [...base,...Object.keys(it.grade).filter(t=>!base.includes(t)&&it.grade[t])];
+return [...new Set([...base,...Object.keys(it.grade).filter(t=>it.grade[t]),...Object.keys(it.falta)])];
 }
 // nomes das peças do molde que vão neste tecido (mesma regra do MoldeOrdem: peça sem tecido vai no principal)
 function pecasDe(p,aba){
@@ -334,11 +337,11 @@ function restaurar(foco){if(foco){const el=document.querySelector(`[data-foco="$
 
 function itemHtml(e,it,i,aba){
 const p=prod(it.produtoId),pn=pecasDe(p,aba),k=`${i}-`;
-const grade=tamsDe(p,it).map(t=>{const q=it.grade[t]||0;return `<div class="tam" role="group" aria-label="Tamanho ${esc(t)}"><span class="t">${esc(t)}</span>
+const grade=tamsDe(p,it).map(t=>{const q=it.grade[t]||0,tot=q*e.camadas,ped=it.falta[t];return `<div class="tam" role="group" aria-label="Tamanho ${esc(t)}"><span class="t">${esc(t)}</span>
 <button type="button" data-acao="menos" data-i="${i}" data-t="${esc(t)}" data-foco="${k}m${esc(t)}" aria-label="Menos uma ${esc(t)} por camada"${q?'':' disabled'}>−</button>
 <output aria-label="${esc(t)} por camada">${q}</output>
 <button type="button" data-acao="mais" data-i="${i}" data-t="${esc(t)}" data-foco="${k}p${esc(t)}" aria-label="Mais uma ${esc(t)} por camada">+</button>
-<small>total ${q*e.camadas}</small></div>`}).join('');
+<small>total ${tot}</small>${ped!=null?`<small class="${tot===ped?'':'dif'}">pedido ${ped}${tot>ped?' · sobra '+(tot-ped):tot<ped?' · faltam '+(ped-tot):''}</small>`:''}</div>`}).join('');
 const pecas=pn.length?`<fieldset class="pecas"><legend>Peças que entram</legend>${pn.map(n=>`<label><input type="checkbox" data-acao="peca" data-i="${i}" data-n="${esc(n)}" data-foco="${k}c${esc(n)}"${!it.pecas||it.pecas.includes(n)?' checked':''}> ${esc(/^\d+$/.test(n)?'Peça '+(+n+1):n)}</label>`).join('')}</fieldset>`
 :`<p class="vazio">${p&&p.mol?'Nenhuma peça do molde vai neste tecido.':'Produto sem molde: nada a encaixar.'}</p>`;
 return `<article class="item" aria-label="${esc(nomeProd(p))}"><header><strong>${esc(nomeProd(p))}</strong>
@@ -460,9 +463,10 @@ let s=null;try{s=JSON.parse(sessionStorage.getItem('ordemNova'))}catch(e){}
 if(!s||!Array.isArray(s.lista))return bloquear('Nada para criar: abra pela aba Fabricar do app.');
 // compMax vem da mesa da aba Fabricar, em metros; a ordem guarda mm
 const doc=MO.deFabricar(s.lista,{camadas:s.camadas,compMax:Math.round(num(s.compMax)*1000),produtos:PRODS});
-doc.nome=nomePadrao();
-const id=await B.criar(doc);
-try{sessionStorage.removeItem('ordemNova')}catch(e){}
+doc.nome=nomePadrao();doc.resumo=resumoDe(doc);
+// tira antes de criar: recarregar durante um criar lento não duplica a ordem
+const bruto=sessionStorage.getItem('ordemNova');sessionStorage.removeItem('ordemNova');
+let id;try{id=await B.criar(doc)}catch(e){sessionStorage.setItem('ordemNova',bruto);throw e}
 history.replaceState(null,'',urlCom('id',id));
 return abrirOrdem(id,doc);
 }

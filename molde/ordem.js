@@ -20,7 +20,8 @@
       itens: (e.itens || []).map(it => ({
         produtoId: (it && it.produtoId) || '', cor: (it && it.cor) || '',
         pecas: it && Array.isArray(it.pecas) ? it.pecas.map(String) : null,
-        grade: Object.fromEntries(Object.entries((it && it.grade) || {}).map(([t, q]) => [t, nn(q)]))
+        grade: Object.fromEntries(Object.entries((it && it.grade) || {}).map(([t, q]) => [t, nn(q)])),
+        falta: Object.fromEntries(Object.entries((it && it.falta) || {}).map(([t, q]) => [t, nn(q)])) // pedido que veio do Fabricar
       }))
     };
   }
@@ -41,9 +42,9 @@
   }
 
   // lista = fabricarLista() do index.html; opts.produtos dá o tecido principal (p.tecidoId) de cada produto.
-  // grade por camada = ceil(f / camadas): com camadas 1 é o próprio f
+  // começa com camadas 1 e grade por camada = f (o usuário ajusta); as camadas do Fabricar ficam como alturaMax sugerida; falta = f pedido
   function deFabricar(lista, opts) {
-    const o = opts || {}, camadas = Math.max(1, nn(o.camadas) || 1), prods = o.produtos || [];
+    const o = opts || {}, prods = o.produtos || [];
     const ordem = nova(''), tecidos = [], enfestos = [];
     for (const l of lista || []) {
       const f = nn(l.f); if (!f || !l.id) continue;
@@ -51,13 +52,12 @@
       let enf = enfestos.find(e => e.mat === mat);
       if (!enf) {
         const t = { id: uid(), materiaId: mat }; tecidos.push(t);
-        enf = { mat, e: { tecidoId: t.id, camadas, compMax: o.compMax, itens: [] } }; enfestos.push(enf);
+        enf = { mat, e: { tecidoId: t.id, camadas: 1, alturaMax: o.camadas, compMax: o.compMax, itens: [] } }; enfestos.push(enf);
       }
       let it = enf.e.itens.find(x => x.produtoId === l.id && x.cor === (l.c || ''));
-      if (!it) enf.e.itens.push(it = { produtoId: l.id, cor: l.c || '', pecas: null, grade: {} });
-      it.grade[l.t] = (it.grade[l.t] || 0) + f; // f somado; divide por camadas no fim
+      if (!it) enf.e.itens.push(it = { produtoId: l.id, cor: l.c || '', pecas: null, grade: {}, falta: {} });
+      it.grade[l.t] = it.falta[l.t] = (it.grade[l.t] || 0) + f;
     }
-    for (const { e } of enfestos) for (const it of e.itens) for (const t in it.grade) it.grade[t] = Math.ceil(it.grade[t] / camadas);
     return normalizar({ ...ordem, tecidos: tecidos.length ? tecidos : ordem.tecidos, enfestos: enfestos.length ? enfestos.map(x => x.e) : ordem.enfestos });
   }
 

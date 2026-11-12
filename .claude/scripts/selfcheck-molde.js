@@ -397,6 +397,7 @@ const lista3 = [{ id: 'p1', ref: 'R1', nome: 'Short', c: 'Azul', t: 'P', f: 3 },
   { id: 'p2', ref: 'R2', nome: 'Bermuda', c: 'Preto', t: 'G', f: 2 }];
 const deF = fn(() => O.deFabricar(lista3, { produtos: [{ id: 'p1', tecidoId: 'tA' }, { id: 'p2', tecidoId: 'tB' }] }), null);
 const deF3 = fn(() => O.deFabricar(lista3, { camadas: 3, compMax: 4000 }), null);
+const deF30 = fn(() => O.deFabricar([{ id: 'p1', c: 'Azul', t: 'M', f: 5 }], { camadas: 30 }), null);
 const itAj = { grade: { M: 2 } };
 const ajust = fn(() => [O.ajustarGrade(itAj, 'M', -5), itAj.grade.M], null);
 const ordR4 = { tecidos: [{ id: 'a1', materiaId: 'tA' }], enfestos: [{ id: 'e1', tecidoId: 'a1', camadas: 10 }] };
@@ -430,7 +431,9 @@ testes.push(
   ['ordem normalizar grade negativa vira 0', fn(() => O.normalizar({ enfestos: [{ itens: [{ grade: { M: -3, G: '2' } }] }] }).enfestos[0].itens[0].grade, null), { M: 0, G: 2 }],
   ['review3 deFabricar grade = f', deF && deF.enfestos.flatMap(e => e.itens.map(i => [i.produtoId, i.cor, i.grade])), [['p1', 'Azul', { P: 3, M: 5 }], ['p2', 'Preto', { G: 2 }]]],
   ['review3 deFabricar um enfesto por tecido principal', deF && [deF.tecidos.map(t => t.materiaId), deF.enfestos.map(e => deF.tecidos.find(t => t.id === e.tecidoId).materiaId), deF.enfestos[0].camadas], [['tA', 'tB'], ['tA', 'tB'], 1]],
-  ['deFabricar camadas 3: grade por camada arredonda para cima', deF3 && [deF3.enfestos.length, deF3.enfestos[0].camadas, deF3.enfestos[0].compMax, deF3.enfestos[0].itens.map(i => i.grade)], [1, 3, 4000, [{ P: 1, M: 2 }, { G: 1 }]]],
+  ['deFabricar camadas 3: camadas 1, grade = f, camadas do Fabricar viram alturaMax', deF3 && [deF3.enfestos.length, deF3.enfestos[0].camadas, deF3.enfestos[0].alturaMax, deF3.enfestos[0].compMax, deF3.enfestos[0].itens.map(i => i.grade)], [1, 1, 3, 4000, [{ P: 3, M: 5 }, { G: 2 }]]],
+  ['deFabricar camadas 30 f=5: camadas 1, grade 5, falta 5 (sem cortar 30)', deF30 && [deF30.enfestos[0].camadas, deF30.enfestos[0].alturaMax, deF30.enfestos[0].itens[0].grade, deF30.enfestos[0].itens[0].falta], [1, 30, { M: 5 }, { M: 5 }]],
+  ['normalizar: falta padrão {} e coerção', fn(() => O.normalizar({ enfestos: [{ itens: [{ produtoId: 'p' }, { produtoId: 'q', falta: { P: '2' } }] }] }).enfestos[0].itens.map(i => i.falta), null), [{}, { P: 2 }]],
   ['review3 ajustarGrade -5 em 2 = 0', ajust, [0, 0]],
   ['review4 pesoTecido 5,12 kg', r4 && r4.pesoTecido, 5.12, 1e-9],
   ['review4 metros 20, custo 240', r4 && [r4.metros, r4.custo], [20, 240], 1e-9],
