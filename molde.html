@@ -44,7 +44,6 @@ dialog h3{margin:0 0 12px}
 #ferramentas{grid-area:ferr;display:flex;flex-direction:column;gap:4px;padding:8px;background:var(--card);border-right:1px solid var(--bd);min-width:52px}
 #tela{grid-area:tela;width:100%;height:100%;display:block;background:var(--bg);touch-action:none}
 #painel{grid-area:painel;background:var(--card);border-left:1px solid var(--bd);padding:12px;overflow:auto}
-#painel h2{margin:0 0 8px;font-size:16px;font-family:'Poppins',sans-serif;font-weight:600}
 .vazio{color:var(--mut);font-size:13px}
 #refs{max-height:50vh;overflow:auto;margin:8px 0;border:1px solid var(--bd);border-radius:8px}
 #refs label{display:flex;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--bd);cursor:pointer}
@@ -100,6 +99,21 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 #fantasma{pointer-events:none}#tela .fan{fill:none;stroke-width:1.2px;opacity:.35;vector-effect:non-scaling-stroke}
 .campo{display:flex;flex-direction:column;gap:4px;margin:10px 0;font-size:14px}
 #g-aviso{color:var(--bad);font-weight:600;margin:0 0 8px}
+#abas{display:flex;gap:4px;margin-bottom:10px;border-bottom:1px solid var(--bd)}
+#abas button{font:inherit;font-size:14px;font-weight:600;background:none;border:0;border-bottom:2px solid transparent;color:var(--mut);padding:6px 8px;cursor:pointer}
+#abas button[aria-selected="true"]{color:var(--tx);border-bottom-color:var(--ac)}
+#grad,#grad-tudo{border:1px solid var(--bd);border-radius:8px;margin:0 0 8px;padding:8px;min-width:0;display:flex;flex-direction:column;gap:6px}
+#grad legend{font-weight:600;font-size:14px;padding:0 4px}
+#grad label{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:13px}
+#grad label input,#grad label select{width:84px}
+#g-tab{border-collapse:collapse;font-size:13px;width:100%}
+#g-tab th{color:var(--mut);font-weight:500;text-align:left}
+#g-tab input{width:62px;padding:3px 5px}
+#g-tab .cor{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--c)}
+#grad:disabled,#grad-tudo:disabled{opacity:.5}
+#tela .gm{fill:none;stroke:var(--warn);stroke-width:1.5px;vector-effect:non-scaling-stroke}
+#tela .gm.atual{stroke:var(--ac);stroke-width:2.5px}
+#tela .gv{fill:none;stroke-width:1.5px;vector-effect:non-scaling-stroke}
 #medida{position:fixed;z-index:50;width:190px;box-shadow:0 4px 12px rgba(0,0,0,.2)}
 #medida[aria-invalid="true"]{border-color:var(--bad)}
 @media (max-width:760px){
@@ -140,7 +154,27 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
     <rect id="fundo" x="-5000" y="-5000" width="10000" height="10000" fill="url(#grade)"/>
     <g id="fantasma"></g><g id="diagrama"></g><g id="pecas"></g><g id="regua"></g>
   </svg>
-  <aside id="painel" aria-label="Moldes"><h2>Moldes</h2>
+  <aside id="painel" aria-label="Painel">
+    <div id="abas" role="tablist" aria-label="Painel"><button type="button" role="tab" data-aba="moldes">Moldes</button><button type="button" role="tab" data-aba="grad">Gradação</button></div>
+    <section id="aba-grad" role="tabpanel" aria-label="Gradação" hidden>
+      <p class="vazio" id="g-vazio"></p>
+      <fieldset id="grad">
+        <legend id="g-pt"></legend>
+        <table id="g-tab"><thead><tr><th></th><th>Tam.</th><th>X cm</th><th>Y cm</th></tr></thead><tbody></tbody></table>
+        <label>Passo X (cm) <input id="g-px" inputmode="decimal" autocomplete="off" value="0"></label>
+        <label>Passo Y (cm) <input id="g-py" inputmode="decimal" autocomplete="off" value="0"></label>
+        <label>Salto a partir de <select id="g-sde"></select></label>
+        <label>Salto X (cm) <input id="g-sx" inputmode="decimal" autocomplete="off" placeholder="opcional"></label>
+        <label>Salto Y (cm) <input id="g-sy" inputmode="decimal" autocomplete="off" placeholder="opcional"></label>
+        <button class="sm" type="button" id="g-aplicar">Aplicar passo</button>
+        <button class="sm" type="button" id="g-copiar" title="Shift+clique com a ferramenta Graduar marca os pontos de destino; traços selecionados também contam">Copiar regra para os selecionados</button>
+      </fieldset>
+      <fieldset id="grad-tudo">
+        <button class="sm" type="button" id="g-separar" title="Cria uma peça por tamanho e tira a gradação">Separar todos os tamanhos</button>
+        <button class="sm" type="button" id="g-remover">Remover gradação</button>
+      </fieldset>
+    </section>
+    <section id="aba-moldes" role="tabpanel" aria-label="Moldes">
     <button class="sm" type="button" id="btn-extrair" title="Cria uma peça com os traços selecionados (contorno fechado)">Extrair molde</button>
     <div id="lista-pecas"></div>
     <fieldset id="props" hidden>
@@ -158,6 +192,7 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
       <p class="vazio">Fio: arraste as pontas da seta na tela.</p>
       <p class="vazio" id="p-info"></p>
     </fieldset>
+    </section>
   </aside>
 </div>
 <dialog id="dlg-refs" aria-labelledby="dlg-refs-t">
@@ -271,6 +306,9 @@ let pecaSel=null,modoPeca=null,pontaErro=null;
 // tamVer = tamanho exibido (padrão M.base); fantasma = outros tamanhos por baixo; V = M no tamanho exibido (só para desenhar)
 let tamVer=null,fantasma=false,V=null,tamsChave='';
 const foraBase=()=>!!M&&tamVer!==M.base;
+// gradPt = ponto aberto no painel Gradação
+let gradPt=null;
+const temRegra=id=>!!M.grad[id]&&Object.values(M.grad[id]).some(d=>d.dx||d.dy);
 const dicaAgora=()=>foraBase()?'Edite no tamanho base':modoPeca?MODOS[modoPeca]:T[ferr].dica;
 const RASC=()=>'molde:'+molId;
 
@@ -487,6 +525,7 @@ if(foco)[...box.children].find(b=>b.textContent===foco)?.focus();
 $('#btn-fantasma').setAttribute('aria-pressed',fantasma);
 document.querySelectorAll('#ferramentas button,#btn-extrair,#props [data-modo]').forEach(b=>b.disabled=fora);
 if(fora){op=null;modoPeca=null}
+desenharGrad();
 const fm=$('#foto-mini');fm.hidden=!u;if(u)fm.firstElementChild.src=u;
 }
 
@@ -530,7 +569,7 @@ const G=window.MoldeGeo,MD=window.MoldeDesenho,tela=$('#tela');
 const dist=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y),lerp=(a,b,k)=>({x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k});
 const esc=s=>String(s).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';'),n2=v=>+v.toFixed(2);
 const caminho=(pts,z)=>'M'+pts.map(p=>n2(p.x)+' '+n2(p.y)).join('L')+(z?'Z':'');
-const FERRS=[['sel','↖','Selecionar','V'],['ponto','•','Ponto','P'],['reta','╱','Reta','L'],['ret','▭','Retângulo','R'],['circ','◯','Círculo','C'],['curva','∿','Curva','B'],['lapis','✎','Lápis','F'],['texto','T','Texto','T']];
+const FERRS=[['sel','↖','Selecionar','V'],['ponto','•','Ponto','P'],['reta','╱','Reta','L'],['ret','▭','Retângulo','R'],['circ','◯','Círculo','C'],['curva','∿','Curva','B'],['lapis','✎','Lápis','F'],['texto','T','Texto','T'],['grad','⇲','Graduar ponto','G']];
 const EDICOES=[['apagar','✕','Apagar (Delete)'],['cortar','✂','Cortar no cruzamento'],['estender','⇥','Estender até o próximo traço'],['arredondar','◠','Arredondar canto entre duas retas'],['girar','⟲','Girar'],['espelhar','⇋','Espelhar pela última reta selecionada'],['medir','↔','Medir os traços selecionados']];
 
 function tracoSeguro(t,m=M){try{const p=MM.tracoPts(m,t);return p&&p.every(Boolean)?p:null}catch(e){return null}}
@@ -554,6 +593,14 @@ if(d)fa+=`<path class="fan" style="stroke:var(--t${i%8})" d="${d}"/>`;
 $('#fantasma').innerHTML=fa;
 for(const t of V.tracos){const p=tracoSeguro(t,V);if(p)s+=`<path class="tr${sel.has(t.id)?' sel':''}" d="${caminho(p,t.tipo==='circulo')}"/>`}
 for(const [id,p] of Object.entries(V.pontos))s+=`<circle class="pt${u.has(id)?'':' solto'}${sel.has(id)?' sel':''}" cx="${n2(p.x)}" cy="${n2(p.y)}" r="${3/zoom}"/>`;
+// pontos com regra: anel; com o fantasma, vetor do base até o maior tamanho
+const ult=tams.length-1;
+for(const [id,g] of Object.entries(M.grad)){
+const q=V.pontos[id],b=M.pontos[id];if(!q||!temRegra(id))continue;
+if(fantasma&&ult>0){const d=g[tams[ult]]||{dx:0,dy:0};s+=`<path class="gv" style="stroke:var(--t${ult%8})" d="${caminho([b,{x:b.x+d.dx,y:b.y+d.dy}])}"/>`}
+s+=`<circle class="gm${id===gradPt?' atual':''}" cx="${n2(q.x)}" cy="${n2(q.y)}" r="${6/zoom}"/>`;
+}
+if(gradPt&&V.pontos[gradPt]&&!temRegra(gradPt))s+=`<circle class="gm atual" cx="${n2(V.pontos[gradPt].x)}" cy="${n2(V.pontos[gradPt].y)}" r="${6/zoom}"/>`;
 for(const x of M.textos)s+=`<text class="tx${sel.has(x.id)?' sel':''}" x="${n2(x.x)}" y="${n2(x.y)}" font-size="${+x.tam||10}">${esc(x.texto)}</text>`;
 for(const t of V.tracos)if(t.tipo==='curva'&&sel.has(t.id)&&V.pontos[t.a]&&V.pontos[t.b])for(const [k,e] of [['c1','a'],['c2','b']]){
 const c=t[k],q=V.pontos[t[e]];s+=`<line class="alca" x1="${n2(q.x)}" y1="${n2(q.y)}" x2="${n2(c.x)}" y2="${n2(c.y)}"/><circle class="alca-p" cx="${n2(c.x)}" cy="${n2(c.y)}" r="${4/zoom}"/>`}
@@ -667,11 +714,16 @@ move(p){if(op&&dist(p,op.pts[op.pts.length-1])*zoom>=2)op.pts.push(p)},
 up(p){if(!op)return;const q=MD.simplificar([...op.pts,grudar(p).p],1);op=null;
 if(q.length>=2&&G.comprimento(q)>1){M.tracos.push({id:MD.uid(M,'t'),tipo:'livre',pts:q.map(r=>({x:r.x,y:r.y}))});alterou()}else desenhar()}},
 texto:{dica:'Clique onde o texto vai ficar.',
-up(p){const t=prompt('Texto:');if(t&&t.trim()){M.textos.push({id:MD.uid(M,'x'),x:p.x,y:p.y,texto:t.trim(),tam:10});alterou()}}}
+up(p){const t=prompt('Texto:');if(t&&t.trim()){M.textos.push({id:MD.uid(M,'x'),x:p.x,y:p.y,texto:t.trim(),tam:10});alterou()}}},
+grad:{dica:'Clique num ponto para ver e editar a gradação dele. Shift+clique marca pontos para "Copiar regra".',
+up(p,e){
+const id=pontoSob(p);if(!id)return toast('Clique sobre um ponto.');
+if(e.shiftKey){if(sel.has(id))sel.delete(id);else sel.add(id)}else{gradPt=id;aba('grad')}
+desenhar();desenharGrad()}}
 };
 
 function escolher(f){
-ferr=f;op=null;modoPeca=null;fecharMedida();if(M)preencherProps();
+ferr=f;op=null;modoPeca=null;fecharMedida();if(M)preencherProps();if(f==='grad')aba('grad');
 document.querySelectorAll('#ferramentas [data-f]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===f));
 $('#dica').textContent=M?dicaAgora():T[f].dica;if(M)desenhar();
 }
@@ -768,7 +820,7 @@ bt('⧉','Duplicar',()=>{const c=structuredClone(pc);c.id=MD.uid(M,'pc');c.nome=
 bt('✕','Apagar',()=>{if(pc.travada)return toast('Peça travada: destrave para apagar.');if(confirm(`Apagar a peça "${pc.nome}"?`)){M.pecas=M.pecas.filter(x=>x!==pc);alterou()}}));
 box.append(li);
 }
-preencherProps();
+preencherProps();desenharGrad();
 }
 function renomear(pc,nm){
 const i=document.createElement('input');i.className='pc-ren';i.value=pc.nome;i.setAttribute('aria-label','Nome da peça');
@@ -834,6 +886,83 @@ else pc.margemTraco[h.tracoId]=mm10(v[0]);
 alterou()})}
 }
 
+// ---- abas do painel (Moldes, Gradação; Medidas entra na Task 4 com mais um data-aba) ----
+function aba(n){
+document.querySelectorAll('#abas [data-aba]').forEach(b=>{const on=b.dataset.aba===n;b.setAttribute('aria-selected',on);b.tabIndex=on?0:-1;$('#aba-'+b.dataset.aba).hidden=!on});
+}
+document.querySelectorAll('#abas [data-aba]').forEach(b=>b.onclick=()=>aba(b.dataset.aba));
+aba('moldes');
+
+// ---- gradação (Task 3). Regras em M.grad[ponto][tam] = {dx,dy} mm, relativas ao base ----
+const cm2=v=>String(+(v/10).toFixed(2)).replace('.',','); // mostra 0,25 cm sem arredondar para 0,3
+const lerCm=id=>{const t=$(id).value.trim();if(!t)return 0;const v=MD.medida(t);return v&&v.length===1?mm10(v[0]):null};
+// destino do "Copiar regra": pontos marcados + pontas dos traços selecionados
+function pontosSel(){
+const s=new Set();
+for(const id of sel){if(M.pontos[id])s.add(id);const t=M.tracos.find(x=>x.id===id);if(t)for(const k of ['a','b','c'])if(t[k])s.add(t[k])}
+s.delete(gradPt);return [...s];
+}
+function desenharGrad(){
+if(!M)return;
+if(gradPt&&!M.pontos[gradPt])gradPt=null;
+const tams=MM.tamanhos(M),semGrade=tams.length<2,fora=foraBase();
+$('#g-vazio').textContent=semGrade?'Defina a grade em "Grade e foto" para graduar.':fora?'Edite no tamanho base.':!gradPt?'Escolha Graduar ponto (G) e clique num ponto do diagrama.':'';
+$('#grad').disabled=semGrade||fora||!gradPt;$('#grad-tudo').disabled=semGrade||fora;
+$('#grad').hidden=!gradPt;
+$('#g-pt').textContent=gradPt?'Ponto '+gradPt:'';
+// o salto só vale depois do base
+const sd=$('#g-sde'),sv=sd.value,dep=tams.slice(tams.indexOf(M.base)+1);
+if(document.activeElement!==sd){sd.textContent='';for(const t of ['',...dep]){const o=document.createElement('option');o.value=t;o.textContent=t||'sem salto';sd.append(o)}sd.value=dep.includes(sv)?sv:dep.includes('G1')?'G1':''}
+const tb=$('#g-tab tbody'),g=M.grad[gradPt]||{},val=(t,k)=>cm2(t===M.base?0:(g[t]||{})[k]||0),chave=[gradPt,M.base,...tams].join('|');
+// mesma tabela: só troca os valores (refazer as linhas tira o foco do Tab)
+if(gradPt&&tb.dataset.chave===chave){tb.querySelectorAll('input').forEach(i=>{if(i!==document.activeElement)i.value=val(i.dataset.tam,i.dataset.k)});return}
+tb.dataset.chave=chave;tb.textContent='';if(!gradPt)return;
+tams.forEach((t,i)=>{
+const tr=document.createElement('tr'),c=document.createElement('span'),nm=document.createElement('td'),td0=document.createElement('td');
+c.className='cor';c.style.setProperty('--c',`var(--t${i%8})`);td0.append(c);nm.textContent=t+(t===M.base?' (base)':'');tr.append(td0,nm);
+for(const k of ['dx','dy']){
+const td=document.createElement('td'),inp=document.createElement('input');
+inp.inputMode='decimal';inp.autocomplete='off';inp.dataset.tam=t;inp.dataset.k=k;inp.setAttribute('aria-label',(k==='dx'?'X':'Y')+' cm, tamanho '+t);
+inp.value=val(t,k);inp.disabled=t===M.base;
+inp.onchange=()=>{
+const v=MD.medida(inp.value);if(!v||v.length>1){toast('Medida inválida. Ex.: 1 ou -0,5');inp.value=cm2(((M.grad[gradPt]||{})[t]||{})[k]||0);return}
+const r=M.grad[gradPt]||(M.grad[gradPt]={});
+for(const u of tams)r[u]=r[u]||{dx:0,dy:0};
+r[t]={...r[t],[k]:mm10(v[0])};alterou();
+};
+td.append(inp);tr.append(td);
+}
+tb.append(tr);
+});
+}
+$('#g-aplicar').onclick=()=>{
+if(!gradPt||foraBase())return;
+const dx=lerCm('#g-px'),dy=lerCm('#g-py'),sx=lerCm('#g-sx'),sy=lerCm('#g-sy'),de=$('#g-sde').value;
+if([dx,dy,sx,sy].includes(null))return toast('Medida inválida. Ex.: 1 ou -0,5');
+// salto só quando tem tamanho e algum valor
+const salto=de&&($('#g-sx').value.trim()||$('#g-sy').value.trim())?{dx:sx,dy:sy,de}:null;
+MM.graduarPasso(M,gradPt,dx,dy,{salto});alterou();
+};
+$('#g-copiar').onclick=()=>{
+if(!gradPt||foraBase())return;
+const para=pontosSel();if(!para.length)return toast('Marque os pontos de destino (Shift+clique com Graduar) ou selecione traços.');
+MM.copiarRegra(M,gradPt,para);alterou();toast('Regra copiada para '+para.length+' ponto(s).');
+};
+$('#g-separar').onclick=()=>{
+if(foraBase()||MM.tamanhos(M).length<2)return;
+const n=M.pecas.filter(p=>p.visivel!==false).length;
+if(!n)return toast('Nenhuma peça visível para separar.');
+if(!confirm(`Criar uma cópia de ${n} peça(s) para cada tamanho fora do base e tirar a gradação? Dá para desfazer.`))return;
+const vis=M.pecas.filter(p=>p.visivel!==false);
+MM.separarTamanhos(M,50);for(const p of vis)p.nome+=' · '+M.base; // as cópias saem "nome · P"; o base ganha o seu
+alterou();toast('Tamanhos separados.');
+};
+$('#g-remover').onclick=()=>{
+if(foraBase()||!Object.keys(M.grad).length)return toast('Não há gradação.');
+if(!confirm('Remover a gradação de todos os pontos? Dá para desfazer.'))return;
+MM.removerGradacao(M);alterou();
+};
+
 let ultCli={x:0,y:0};
 tela.addEventListener('pointerdown',e=>{
 if(!M)return;
@@ -850,7 +979,7 @@ if(!M)return;ultCli={x:e.clientX,y:e.clientY};
 if(pan){vx=pan.vx-(e.clientX-pan.x)/zoom;vy=pan.vy-(e.clientY-pan.y)/zoom;desenhar();return}
 const p=mm(e);
 if(foraBase())return;
-rato=ferr==='sel'?null:grudar(p);
+rato=ferr==='sel'||ferr==='grad'?null:grudar(p);
 T[ferr].move&&T[ferr].move(p,e);desenhar();
 });
 tela.addEventListener('pointerup',e=>{if(!M)return;if(pan){pan=null;return}if(e.button!==0||foraBase())return;if(modoPeca)cliquePeca(mm(e),e);else if(T[ferr].up)T[ferr].up(mm(e),e)});
