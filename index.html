@@ -1458,8 +1458,9 @@ return out;
 // testando algumas estratégias e ficando com o risco mais curto. Heurística gulosa sozinha erra:
 // girar um painel pode encostá-lo na ourela e estragar o resto do risco.
 const ENC_RES=20;
+// giro em quartos de volta: 0=0°, 1=90°, 2=180°, 3=270°
 function rasterPol(pts,giro){
-let p=giro?pts.map(([x,y])=>[-x,-y]):pts;
+let p=pts;for(let g=0;g<(giro||0);g++)p=p.map(([x,y])=>[-y,x]);
 let x0=1/0,y0=1/0,x1=-1/0,y1=-1/0;
 for(const q of p){if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<y0)y0=q[1];if(q[1]>y1)y1=q[1]}
 p=p.map(([x,y])=>[x-x0,y-y0]);
@@ -1485,17 +1486,27 @@ maxX=Math.max(maxX,b.ox+b.r.cw);
 }
 return maxX;
 }
-// comprimento do risco, em metros, para `copias` peças completas no tecido de `largMm` de largura útil
-function encaixeMol(pecas,largMm,copias){
+// variantes de giro permitidas pela peça: sem `rot` (produto antigo) vale '180'
+function rasterRot(pts,rot){
+return (rot==='nenhuma'?[0]:rot==='livre'?[0,1,2,3]:[0,2]).map(g=>rasterPol(pts,g));
+}
+// peças do risco: a de cada tamanho (porTam, senão a base), só do tecido principal
+function pecasDoRisco(p,tams){
+const m=p&&p.mol;if(!m)return [];
+return (tams||[]).flatMap(t=>(m.porTam&&m.porTam[t]&&m.porTam[t].length?m.porTam[t]:m.pecas)||[]).filter(q=>!q.tecido);
+}
+// comprimento do risco, em metros, para a lista de peças (já com os tamanhos do risco) no tecido de `largMm` de largura útil
+function encaixeMol(pecas,largMm){
 const largCel=Math.floor(largMm/ENC_RES);
-if(!(largCel>0)||!(copias>0))return null;
-const lista=[];
+if(!(largCel>0))return null;
+const lista=[],ras=new Map();
 for(const q of pecas||[]){
 if(!(q.pts&&q.pts.length>2))return null;
-const rot=[rasterPol(q.pts,0),rasterPol(q.pts,1)].filter(r=>r.ch<=largCel);
+if(!ras.has(q))ras.set(q,rasterRot(q.pts,q.rot).filter(r=>r.ch<=largCel));
+const rot=ras.get(q);
 if(!rot.length)return null;
 const n=Math.max(0,Math.round(+q.qtd||0));
-for(let c=0;c<copias*n;c++)lista.push({a:(+q.w||0)*(+q.h||0),rot});
+for(let c=0;c<n;c++)lista.push({a:(+q.w||0)*(+q.h||0),rot});
 }
 if(!lista.length)return null;
 const maxCel=lista.reduce((a,x)=>a+x.rot[0].cw,0)+4;
@@ -1507,14 +1518,13 @@ if(melhor==null||n<melhor)melhor=n;
 }
 return melhor==null?null:melhor*ENC_RES/1000;
 }
-// shortcut: todos os tamanhos do risco usam os painéis do molde importado, sem gradação;
-// trocar quando houver um molde por tamanho. Por isso o ganho é conservador nos riscos com muitos tamanhos.
 let encCache=new Map();
-function encaixeRisco(p,larg,copias,perda){
-if(!p||!p.mol||!(p.mol.pecas||[]).length||!(larg>0))return null;
-const k=p.id+'|'+copias+'|'+larg;
+function encaixeRisco(p,larg,tams,perda){
+const pecas=pecasDoRisco(p,tams);
+if(!pecas.length||!(larg>0))return null;
+const k=p.id+'|'+tams.join(',')+'|'+larg;
 if(encCache.has(k))return encCache.get(k);
-const v=encaixeMol(p.mol.pecas,larg*1000,copias);
+const v=encaixeMol(pecas,larg*1000);
 const r=v==null?null:v*(1+Math.max(0,+perda||0)/100);
 encCache.set(k,r);
 return r;
@@ -1549,7 +1559,7 @@ if(!p||!(consDe(p,false)>0)){semCons.push('Ref. '+e.ref+' · '+e.c);return ''}
 const pl=planoEnfesto(e.q,t=>consDe(p,SZ.indexOf(t)>=4),enfCam,enfMesa);
 const tec=mat(p.tecidoId),largT=tec&&+tec.larg>0?+tec.larg:0;
 // com molde importado, o comprimento do risco deixa de ser soma de retângulos e passa a ser medido
-pl.forEach(x=>{const r=encaixeRisco(p,largT,x.tams.length,p.perda);if(r!=null){x.real=r;x.metros=r*x.cam}});
+pl.forEach(x=>{const r=encaixeRisco(p,largT,x.tams,p.perda);if(r!=null){x.real=r;x.metros=r*x.cam}});
 const mtEst=pl.reduce((a,x)=>a+x.risco*x.cam,0);
 const mt=pl.reduce((a,x)=>a+x.metros,0),pc=pl.reduce((a,x)=>a+x.pecas,0),cu=matCusto(tec);
 const enc=pl.some(x=>x.real!=null),eco=mtEst-mt;
@@ -1822,10 +1832,25 @@ return [['quadrado de 10 cm vira 5 x 5 celulas',r.cw*10+r.ch,55],
 ['1 peca em 20 cm de largura: risco de 10 cm',encaixeMol(um,200,1),0.1],
 ['2 pecas cabem lado a lado e o risco nao cresce',encaixeMol(dois,200,1),0.1],
 ['4 pecas: duas fileiras, risco dobra',encaixeMol(quatro,200,1),0.2],
-['copias do risco multiplicam as pecas',encaixeMol(um,200,2),0.1],
+['copias do risco multiplicam as pecas',encaixeMol(um.concat(um),200),0.1],
 ['peca mais larga que o tecido nao encaixa',encaixeMol(um,60,1),null],
-['sem molde importado nao ha encaixe real',encaixeRisco({id:'x'},1.6,1,0),null],
-['encaixe real nunca fica abaixo da area sobre a largura',+(encaixeMol(quatro,200,1)*1000*200>=4e4-1e-9),1]]})()];
+['sem molde importado nao ha encaixe real',encaixeRisco({id:'x'},1.6,['M'],0),null],
+['encaixe real nunca fica abaixo da area sobre a largura',+(encaixeMol(quatro,200,1)*1000*200>=4e4-1e-9),1]]})(),
+...(()=>{
+// enfesto por tamanho: cada tamanho do risco usa a sua peca; peca de outro tecido fica fora
+const A={w:1,h:1,qtd:1,pts:[]},B={...A},C={...A},X={...A},F={...A,tecido:'mat9'};
+const pt={id:'t',mol:{pecas:[X],porTam:{P:[A],M:[B,F],G:[C]}}},pa={id:'a',mol:{pecas:[X]}};
+const d1=pecasDoRisco(pt,['P','M','G']),d2=pecasDoRisco(pa,['P','M']);
+const re=[[0,0],[200,0],[200,100],[0,100]],v=rasterRot(re,'livre');
+return [['cada tamanho do risco usa a sua peca',+(d1.length===3&&d1[0]===A&&d1[1]===B&&d1[2]===C),1],
+['produto antigo repete a peca base em cada tamanho',+(d2.length===2&&d2[0]===X&&d2[1]===X),1],
+['peca de outro tecido fica fora do risco principal',+pecasDoRisco(pt,['M']).includes(F),0],
+['rotacao nenhuma: 1 variante',rasterRot(re,'nenhuma').length,1],
+['rotacao 180: 2 variantes',rasterRot(re,'180').length,2],
+['rotacao ausente vale 180',rasterRot(re).length,2],
+['rotacao livre: 4 variantes',v.length,4],
+['90 graus troca os eixos',v[1].cw*100+v[1].ch,510],
+['sem peca do tecido principal nao ha encaixe',encaixeRisco({id:'y',mol:{pecas:[F]}},1.6,['M'],0),null]]})()];
 Object.assign(S,O);
 const bad=t.filter(([,g,e])=>e===null?g!==null:!(Math.abs(g-e)<1e-9));
 console[bad.length?'error':'log'](bad.length?'FALHA no custo/margem: '+bad.map(([n,g,e])=>n+' deu '+g+', esperado '+e).join(' | '):'✓ custo/margem: '+t.length+' asserções OK');
