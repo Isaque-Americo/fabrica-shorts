@@ -788,6 +788,7 @@ modal(id?'Editar produto':'Novo produto',`
   <button type="button" class="ghost" onclick="$('#fitens').insertAdjacentHTML('beforeend',fichaLinha({}))">+ Item</button>
   <div class="g2" style="margin-top:10px"><label>Mão de obra (R$ por peça)<input name="pmo" type="number" step="0.01" min="0" value="${fichaDe(p).mo??''}"></label>
   <label>Custo fixo (R$ por peça)<input name="pfixo" type="number" step="0.01" min="0" value="${fichaDe(p).fixo??''}"></label></div>
+  ${procsHtml(fichaDe(p))}
   <small>Começa com uma cópia da ficha padrão. Ajuste o que difere nesta referência.</small></div></fieldset>
  <label>Estoque por cor e tamanho (peças que você tem hoje)</label><div id="gp">${grade(coresDe(p),(c,s)=>estQ(p,c,s))}</div>
  <div class="r2"><input id="novacor" placeholder="Outra cor (ex.: Bege)"><button type="button" class="ghost" onclick="addCor()">+ Cor</button></div>`,
@@ -935,14 +936,14 @@ const f=fichaDe(p),linhas=[];
 (f.itens||[]).forEach(i=>{const m=mat(i.matId);if(!m)return;const cu=matCusto(m);linhas.push({nome:m.nome,cor:m.cor||'',q:+i.qtd||0,un:matUn(m),cu,ct:cu*(+i.qtd||0)})});
 const t=mat(p.tecidoId);
 if(t){const q=consDe(p,g);const cu=matCusto(t);linhas.push({nome:'Tecido: '+t.nome,cor:t.cor||'Cor do produto',q,un:'MT',cu,ct:cu*q,tec:true})}
-const mp=linhas.reduce((a,x)=>a+x.ct,0),mo=+f.mo||0,fixo=+f.fixo||0,extra=+p.extra||0;
+const mp=linhas.reduce((a,x)=>a+x.ct,0),mo=(+f.mo||0)+(f.processos||[]).reduce((a,q)=>a+(+q.min||0)*(+q.custoMin||0),0),fixo=+f.fixo||0,extra=+p.extra||0;
 return {linhas,mp,mo,fixo,extra,total:mp+mo+fixo+extra};
 }
 const custoP=(p,g)=>p.tecidoId?custoFicha(p,g).total:(+p.custo||0);
 function materia(){
 const ms=S.materiais.slice().sort((a,b)=>(a.tipo===b.tipo?0:a.tipo==='tecido'?-1:1)||(a.nome||'').localeCompare(b.nome||''));
   const r=ms.map(m=>{
-const tec=m.tipo==='tecido',det=[m.cor,m.comp,+m.gram?m.gram+' g/m²':'',+m.larg?nf(m.larg,2)+' m de largura':''].filter(Boolean).join(' · ');
+const tec=m.tipo==='tecido',det=[m.cor,m.comp,+m.gram?m.gram+' g/m²':'',+m.larg?nf(m.larg,2)+' m de largura':'',tec&&m.tubular?'tubular':'',tec&&m.sentidoUnico?'sentido único':''].filter(Boolean).join(' · ');
 return `<tr><td>${esc(m.nome)}${det?`<small>${esc(det)}</small>`:''}</td>
  <td>${tec?'Tecido':'Aviamento'}</td>
  <td>${esc(m.forn)||'<small>sem fornecedor</small>'}</td>
@@ -975,17 +976,25 @@ modal(id?'Editar matéria-prima':'Nova matéria-prima',`
   <label class="tc">Largura útil (m)<input name="larg" type="number" step="0.01" min="0" value="${m.larg??''}" placeholder="Ex.: 1,60" title="Largura aproveitável do rolo; usada para estimar o consumo e planejar o enfesto"></label>
   <label class="tc">Cobrança do fornecedor<select name="cobr" onchange="matTipo(this.form)"><option value="kg"${m.cobr!=='mt'?' selected':''}>Por kg</option><option value="mt"${m.cobr==='mt'?' selected':''}>Por metro</option></select></label>
   <label>Fornecedor<input name="forn" value="${esc(m.forn)}"></label></div>
+  <div class="g2"><label class="tc" style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="tubular" style="width:auto;margin:0"${m.tubular?' checked':''}>Tecido tubular</label>
+  <label class="tc" style="display:flex;align-items:center;gap:8px"><input type="checkbox" name="sentidoUnico" style="width:auto;margin:0"${m.sentidoUnico?' checked':''}>Sentido único (pelo, estampa)</label>
+  <label class="tc">Encolhimento comprimento %<input name="encolhC" type="number" step="0.1" value="${m.encolhC??''}"></label>
+  <label class="tc">Encolhimento largura %<input name="encolhL" type="number" step="0.1" value="${m.encolhL??''}"></label></div>
   <div class="g2"><label><span class="tc tck">Preço do tecido (R$ por kg)</span><span class="tc tcm">Preço do tecido (R$ por metro)</span><span class="av">Preço pago (R$)</span><input name="preco" type="number" step="0.0001" min="0" value="${m.preco??''}" oninput="matPrev(this.form)"></label>
   <label class="tc tck">Rendimento (metros por kg)<input name="rend" type="number" step="0.01" min="0" value="${m.rend??''}" oninput="matPrev(this.form)"></label>
  <label class="av">Quantidade que vem nesse preço<input name="qtdC" type="number" step="0.001" min="0" value="${m.qtdC??1}" oninput="matPrev(this.form)" title="Ex.: cone de linha com 4000 m, milheiro de ilhós = 1000"></label></div>
  <div id="matprev" class="alert" style="background:#eef6ee;border-color:#cfe3cf;color:#234"></div>`,
-  async f=>{const d={...m};delete d.id;Object.assign(d,{nome:f.nome.trim(),cor:(f.cor||'').trim(),tipo:f.tipo,un:f.tipo==='tecido'?'MT':f.un,forn:(f.forn||'').trim(),comp:f.tipo==='tecido'?(f.comp||'').trim():'',gram:f.tipo==='tecido'?+f.gram||0:0,larg:f.tipo==='tecido'?+f.larg||0:0,cobr:f.tipo==='tecido'?f.cobr:'',preco:+f.preco||0,rend:+f.rend||0,qtdC:+f.qtdC||1});id?await db.doc('materiais/'+id).set(d):await db.collection('materiais').add(d)});
+  async f=>{const d={...m};delete d.id;Object.assign(d,{nome:f.nome.trim(),cor:(f.cor||'').trim(),tipo:f.tipo,un:f.tipo==='tecido'?'MT':f.un,forn:(f.forn||'').trim(),comp:f.tipo==='tecido'?(f.comp||'').trim():'',gram:f.tipo==='tecido'?+f.gram||0:0,larg:f.tipo==='tecido'?+f.larg||0:0,cobr:f.tipo==='tecido'?f.cobr:'',tubular:f.tipo==='tecido'&&!!f.tubular,sentidoUnico:f.tipo==='tecido'&&!!f.sentidoUnico,encolhC:f.tipo==='tecido'?+f.encolhC||0:0,encolhL:f.tipo==='tecido'?+f.encolhL||0:0,preco:+f.preco||0,rend:+f.rend||0,qtdC:+f.qtdC||1});id?await db.doc('materiais/'+id).set(d):await db.collection('materiais').add(d)});
 matTipo($('#dlg form'));
 }
 function matTipo(fm){const t=fm.tipo.value==='tecido';fm.querySelectorAll('.tc').forEach(e=>e.style.display=t?'':'none');fm.querySelectorAll('.av').forEach(e=>e.style.display=t?'none':'');const k=fm.cobr.value==='kg';fm.querySelectorAll('.tck').forEach(e=>e.style.display=t&&k?'':'none');fm.querySelectorAll('.tcm').forEach(e=>e.style.display=t&&!k?'':'none');matPrev(fm)}
 function matPrev(fm){const m={tipo:fm.tipo.value,cobr:fm.cobr.value,un:fm.un.value,preco:fm.preco.value,rend:fm.rend.value,qtdC:fm.qtdC.value};$('#matprev').textContent='Custo de uso: '+brl4(matCusto(m))+' por '+matUn(m)+(m.tipo==='tecido'&&m.cobr==='kg'&&!(+m.rend>0)?' (informe o rendimento)':'')}
 function fichaLinha(i){return `<div class="fr" style="display:grid;grid-template-columns:1fr 110px auto;gap:6px;margin-bottom:6px"><select>${S.materiais.filter(m=>m.tipo!=='tecido').sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(m=>`<option value="${m.id}"${m.id===i.matId?' selected':''}>${esc(m.nome)}${m.cor?' · '+esc(m.cor):''} (${esc(matUn(m))})</option>`).join('')}</select><input type="number" step="0.001" min="0" value="${i.qtd??1}" placeholder="Qtde"><button type="button" class="sm del" onclick="this.parentNode.remove()">×</button></div>`}
-function lerFicha(form,mo,fixo){return {itens:[...form.querySelectorAll('.fr')].map(r=>({matId:r.querySelector('select').value,qtd:+r.querySelector('input').value||0})).filter(i=>i.matId&&i.qtd>0),mo:+mo||0,fixo:+fixo||0}}
+function procLinha(q){return `<div class="pr" style="display:grid;grid-template-columns:1fr 70px 80px auto;gap:6px;margin-bottom:6px"><input class="pn" value="${esc(q.nome)}" placeholder="Processo"><input class="pm" type="number" step="0.1" min="0" value="${+q.min||''}" placeholder="min"><input class="pc" type="number" step="0.01" min="0" value="${+q.custoMin||''}" placeholder="R$/min"><button type="button" class="sm del" onclick="this.parentNode.remove()">×</button></div>`}
+function procsHtml(f){const ps=f.processos||[],t=ps.reduce((a,q)=>a+(+q.min||0)*(+q.custoMin||0),0);return `<label style="margin-top:10px">Processos (opcional)</label><div class="procs">${ps.map(procLinha).join('')}</div>
+ <button type="button" class="ghost" onclick="this.previousElementSibling.insertAdjacentHTML('beforeend',procLinha({}))">+ Processo</button>
+ <small style="display:block">Opcional: minutos × R$/min de cada processo (ex.: bordado, estampa) somam à mão de obra acima.${t?' Hoje: '+brl(t)+'.':''}</small>`}
+function lerFicha(form,mo,fixo){return {processos:[...form.querySelectorAll('.pr')].map(r=>({nome:r.querySelector('.pn').value.trim(),min:+r.querySelector('.pm').value||0,custoMin:+r.querySelector('.pc').value||0})).filter(q=>q.min>0&&q.custoMin>0),itens:[...form.querySelectorAll('.fr')].map(r=>({matId:r.querySelector('select').value,qtd:+r.querySelector('input').value||0})).filter(i=>i.matId&&i.qtd>0),mo:+mo||0,fixo:+fixo||0}}
 function toggleFichaProp(cb){$('#fichaprop').style.display=cb.checked?'':'none';$('#fichaPadMsg').style.display=cb.checked?'none':'block'}
 function fFicha(){
 if(!S.materiais.some(m=>m.tipo!=='tecido')){aviso('Cadastre os aviamentos antes de montar a ficha padrão.');return}
@@ -994,6 +1003,7 @@ modal('Ficha técnica padrão',`<label>Aviamentos e quantidade por peça</label>
  <button type="button" class="ghost" onclick="$('#fitens').insertAdjacentHTML('beforeend',fichaLinha({}))">+ Item</button>
  <div class="g2" style="margin-top:10px"><label>Mão de obra (R$ por peça)<input name="mo" type="number" step="0.01" min="0" value="${f.mo??''}"></label>
  <label>Custo fixo (R$ por peça)<input name="fixo" type="number" step="0.01" min="0" value="${f.fixo??''}"></label></div>
+ ${procsHtml(f)}
  <fieldset style="border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:8px 0"><legend style="padding:0 6px;font-weight:600">Deduções sobre a venda</legend>
  <div class="g2"><label>Imposto (%)<input name="imp" type="number" step="0.01" min="0" max="100" value="${f.imp??''}" placeholder="Ex.: 6"></label>
  <label>Outras despesas (%)<input name="desp" type="number" step="0.01" min="0" max="100" value="${f.desp??''}" placeholder="Ex.: 3"></label></div>
@@ -1728,6 +1738,9 @@ const t=[['aviamento 20/10un x2 + tecido 10x2m',a.mp,24],
 ['frente+costas oferece virar',+foto({imgF:'a.jpg',imgC:'b.jpg'},'foto').includes('data-verso'),1],
 ['url aponta para o bucket publico',+imgUrl('a b.jpg').endsWith('/storage/v1/object/public/produtos/a%20b.jpg'),1],
 ['alt escapa aspas da descricao',+foto({imgF:'a.jpg',nome:'short 4"'},'foto').includes('&quot;'),1],
+['ficha sem processos: mo igual',custoFicha({tecidoId:'t1',cons:2,ficha:{itens:[],mo:1,fixo:0}},false).mo,1],
+['processos somam min x R$/min a mo',+custoFicha({tecidoId:'t1',cons:2,ficha:{itens:[],mo:1,fixo:0,processos:[{nome:'a',min:2,custoMin:0.5},{nome:'b',min:3,custoMin:0.4}]}},false).mo.toFixed(4),3.2],
+['processos entram no total',+custoFicha({tecidoId:'t1',cons:2,ficha:{itens:[],mo:1,fixo:0,processos:[{min:2,custoMin:0.5}]}},false).total.toFixed(4),22],
 ...(()=>{
 // enfesto e consumo estimado
 const c1=consEstimado(1.6,50,70,0),c2=consEstimado(1.6,50,70,10);
