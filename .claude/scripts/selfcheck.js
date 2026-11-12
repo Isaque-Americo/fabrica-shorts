@@ -75,6 +75,10 @@ vm.createContext(g);
 
 process.on('unhandledRejection', () => {}); // os fluxos async de login morrem nos stubs; não interessa aqui
 
+// scripts locais (<script src="molde/...">) rodam antes, como no navegador
+for (const [, src] of html.matchAll(/<script[^>]*\bsrc="(molde\/[^"]+)"/g))
+  vm.runInContext(fs.readFileSync(path.join(path.dirname(arquivo), src), 'utf8'), g, { filename: src });
+
 blocos.forEach((src, i) => {
   try { vm.runInContext(src, g, { filename: 'script#' + (i + 1) }); }
   catch (e) { saida.push('script #' + (i + 1) + ' parou nos stubs: ' + e.message); }

@@ -10,6 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="molde/encaixe.js"></script>
 <style>
 :root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;--sidebar:#212529;--sidebar-active:#007bff;
 color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -1454,70 +1455,8 @@ out.push({tams:risco,cam,risco:L,metros:L*cam,pecas:cam*risco.length});
 }
 return out;
 }
-// encaixe real sobre os polígonos do molde: preenchimento inferior-esquerdo numa grade de 2 cm,
-// testando algumas estratégias e ficando com o risco mais curto. Heurística gulosa sozinha erra:
-// girar um painel pode encostá-lo na ourela e estragar o resto do risco.
-const ENC_RES=20;
-// giro em quartos de volta: 0=0°, 1=90°, 2=180°, 3=270°
-function rasterPol(pts,giro){
-let p=pts;for(let g=0;g<(giro||0);g++)p=p.map(([x,y])=>[-y,x]);
-let x0=1/0,y0=1/0,x1=-1/0,y1=-1/0;
-for(const q of p){if(q[0]<x0)x0=q[0];if(q[0]>x1)x1=q[0];if(q[1]<y0)y0=q[1];if(q[1]>y1)y1=q[1]}
-p=p.map(([x,y])=>[x-x0,y-y0]);
-const cw=Math.max(1,Math.ceil((x1-x0)/ENC_RES)),ch=Math.max(1,Math.ceil((y1-y0)/ENC_RES)),m=new Uint8Array(cw*ch);
-const dentro=(px,py)=>{let d=false;for(let i=0,j=p.length-1;i<p.length;j=i++){const [xi,yi]=p[i],[xj,yj]=p[j];
-if((yi>py)!==(yj>py)&&px<(xj-xi)*(py-yi)/(yj-yi)+xi)d=!d}return d};
-for(let cy=0;cy<ch;cy++)for(let cx=0;cx<cw;cx++)if(dentro((cx+.5)*ENC_RES,(cy+.5)*ENC_RES))m[cy*cw+cx]=1;
-return {cw,ch,m};
-}
-function encaixaBLF(lista,largCel,maxCel,custo){
-const occ=new Uint8Array(maxCel*largCel);let maxX=0;
-const livre=(r,ox,oy)=>{if(oy+r.ch>largCel||ox+r.cw>maxCel)return false;
-for(let cy=0;cy<r.ch;cy++)for(let cx=0;cx<r.cw;cx++)if(r.m[cy*r.cw+cx]&&occ[(ox+cx)*largCel+oy+cy])return false;
-return true};
-for(const pc of lista){
-let b=null;
-for(let ox=0;ox<=maxX&&!b;ox++){const cand=[];
-pc.rot.forEach((r,i)=>{for(let oy=0;oy+r.ch<=largCel;oy++)if(livre(r,ox,oy)){cand.push({r,ox,oy,i});break}});
-if(cand.length){cand.sort((x,y)=>custo(x)-custo(y));b=cand[0]}}
-if(!b)b={r:pc.rot[0],ox:maxX,oy:0};
-for(let cy=0;cy<b.r.ch;cy++)for(let cx=0;cx<b.r.cw;cx++)if(b.r.m[cy*b.r.cw+cx])occ[(b.ox+cx)*largCel+b.oy+cy]=1;
-maxX=Math.max(maxX,b.ox+b.r.cw);
-}
-return maxX;
-}
-// variantes de giro permitidas pela peça: sem `rot` (produto antigo) vale '180'
-function rasterRot(pts,rot){
-return (rot==='nenhuma'?[0]:rot==='livre'?[0,1,2,3]:[0,2]).map(g=>rasterPol(pts,g));
-}
-// peças do risco: a de cada tamanho (porTam, senão a base), só do tecido principal
-function pecasDoRisco(p,tams){
-const m=p&&p.mol;if(!m)return [];
-return (tams||[]).flatMap(t=>(m.porTam&&m.porTam[t]&&m.porTam[t].length?m.porTam[t]:m.pecas)||[]).filter(q=>!q.tecido);
-}
-// comprimento do risco, em metros, para a lista de peças (já com os tamanhos do risco) no tecido de `largMm` de largura útil
-function encaixeMol(pecas,largMm){
-const largCel=Math.floor(largMm/ENC_RES);
-if(!(largCel>0))return null;
-const lista=[],ras=new Map();
-for(const q of pecas||[]){
-if(!(q.pts&&q.pts.length>2))return null;
-if(!ras.has(q))ras.set(q,rasterRot(q.pts,q.rot).filter(r=>r.ch<=largCel));
-const rot=ras.get(q);
-if(!rot.length)return null;
-const n=Math.max(0,Math.round(+q.qtd||0));
-for(let c=0;c<n;c++)lista.push({a:(+q.w||0)*(+q.h||0),rot});
-}
-if(!lista.length)return null;
-const maxCel=lista.reduce((a,x)=>a+x.rot[0].cw,0)+4;
-let melhor=null;
-for(const ord of [(a,b)=>b.a-a.a,(a,b)=>b.rot[0].ch-a.rot[0].ch||b.a-a.a])
-for(const custo of [c=>c.oy*1e4+c.ox+c.r.cw,c=>(c.ox+c.r.cw)*1e4+c.oy,c=>c.i*1e4+c.oy]){
-const n=encaixaBLF(lista.slice().sort(ord),largCel,maxCel,custo);
-if(melhor==null||n<melhor)melhor=n;
-}
-return melhor==null?null:melhor*ENC_RES/1000;
-}
+// encaixe real: molde/encaixe.js
+const {rasterPol,rasterRot,pecasDoRisco,encaixeMol}=MoldeEncaixe;
 let encCache=new Map();
 function encaixeRisco(p,larg,tams,perda){
 const pecas=pecasDoRisco(p,tams);

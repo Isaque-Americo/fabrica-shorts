@@ -312,6 +312,68 @@ testes.push(
   ['GRADES pgg', M.GRADES.pgg, ['P', 'M', 'G', 'GG']],
 );
 
+
+// encaixe (molde/encaixe.js). Review 2: números tirados do index.html em 9f5b2e0 antes de mover o código
+const E = fs.existsSync(path.join(raiz, 'encaixe.js')) ? require(path.join(raiz, 'encaixe.js')) : {};
+const antigos = {
+  tri: [[0, 0], [300, 0], [0, 250]],
+  L: [[0, 0], [400, 0], [400, 120], [150, 120], [150, 300], [0, 300]],
+  sq: [[0, 0], [200, 0], [200, 200], [0, 200]]
+};
+const baseline = {
+  tri: { '1@1': 0.3, '1@1.6': 0.3, '2@1': 0.3, '2@1.6': 0.3, '3@1': 0.58, '3@1.6': 0.3, '5@1': 1.14, '5@1.6': 0.68 },
+  L: { '1@1': 0.4, '1@1.6': 0.4, '2@1': 0.96, '2@1.6': 0.56, '3@1': 1.12, '3@1.6': 0.8, '5@1': 1.92, '5@1.6': 1.12 },
+  sq: { '1@1': 0.2, '1@1.6': 0.2, '2@1': 0.4, '2@1.6': 0.2, '3@1': 0.6, '3@1.6': 0.4, '5@1': 0.8, '5@1.6': 0.6 }
+};
+const TAMS = ['P', 'M', 'G', 'GG', 'XG'];
+const encAntigo = {};
+for (const k in antigos) {
+  const [w, h] = [Math.max(...antigos[k].map(p => p[0])), Math.max(...antigos[k].map(p => p[1]))];
+  const prod = { id: k, mol: { pecas: [{ w, h, qtd: 4, pts: antigos[k] }] } };
+  encAntigo[k] = {};
+  for (const n of [1, 2, 3, 5]) for (const l of [1, 1.6]) encAntigo[k][n + '@' + l] = E.encaixeMol ? E.encaixeMol(E.pecasDoRisco(prod, TAMS.slice(0, n)), l * 1000) : null;
+}
+// célula ocupada no máximo uma vez e dentro da largura
+function posicoesOk(itens, r, largMm) {
+  if (!r || !r.posicoes || r.posicoes.length !== itens.length) return false;
+  const R = E.ENC_RES, occ = new Set(), largCel = Math.floor(largMm / R);
+  for (const p of r.posicoes) {
+    const ra = itens[p.i].rasters[p.var], ox = p.ox / R, oy = p.oy / R;
+    if (oy < 0 || oy + ra.ch > largCel || ox + ra.cw > r.comp / R) return false;
+    for (let cy = 0; cy < ra.ch; cy++) for (let cx = 0; cx < ra.cw; cx++) if (ra.m[cy * ra.cw + cx]) {
+      const c = (ox + cx) + ',' + (oy + cy);
+      if (occ.has(c)) return false;
+      occ.add(c);
+    }
+  }
+  return new Set(r.posicoes.map(p => p.i)).size === itens.length;
+}
+const va = (pts, o) => E.variantes ? E.variantes(pts, o) : [];
+const mix = [...Array(4)].map((_, i) => ({ pecaIdx: 0, rasters: va(antigos.L, { rot: 'livre' }) }))
+  .concat([...Array(5)].map(() => ({ pecaIdx: 1, rasters: va(antigos.tri, {}) })));
+const rMix = E.encaixar ? E.encaixar(mix, 1000) : null;
+const bordaIt = [...Array(3)].map(() => ({ pecaIdx: 0, rasters: va(antigos.sq, {}), borda0: true })).concat([{ pecaIdx: 1, rasters: va(antigos.tri, {}) }]);
+const rBorda = E.encaixar ? E.encaixar(bordaIt, 1000) : null;
+const rTodos0 = E.encaixar ? E.encaixar(bordaIt.map(x => ({ ...x, borda0: false })), 1000, { borda0: true }) : null;
+const itTri = o => [...Array(6)].map(() => ({ pecaIdx: 0, rasters: va(antigos.tri, o) }));
+const cTri = o => E.encaixar ? E.encaixar(itTri(o), 1000).comp : null;
+testes.push(
+  ['review2 antigos mesmo comprimento do index.html', encAntigo, baseline, 1e-9],
+  ['encaixe ENC_RES 20', E.ENC_RES, 20],
+  ['encaixar posicoes sem sobrepor e dentro da largura', posicoesOk(mix, rMix, 1000), true],
+  ['encaixar comp em mm multiplo de ENC_RES', rMix && rMix.comp % 20, 0],
+  ['encaixar posicoes em mm', rMix && rMix.posicoes.every(p => p.ox % 20 === 0 && p.oy % 20 === 0), true],
+  ['borda0 da peca: oy 0', rBorda && [posicoesOk(bordaIt, rBorda, 1000), rBorda.posicoes.filter(p => bordaIt[p.i].borda0).every(p => p.oy === 0)], [true, true]],
+  ['opts.borda0: todas oy 0', rTodos0 && rTodos0.posicoes.every(p => p.oy === 0), true],
+  ['espelhar dobra variantes', [va(antigos.L, { rot: 'livre', espelhar: true }).length, va(antigos.L, { rot: 'nenhuma', espelhar: true }).length], [8, 2]],
+  ['espelhada e o reflexo em Y', (() => { const [n, r] = va(antigos.L, { rot: 'nenhuma', espelhar: true });
+    return !!r && [...Array(n.ch)].every((_, y) => [...Array(n.cw)].every((_, x) => n.m[y * n.cw + x] === r.m[(n.ch - 1 - y) * n.cw + x])); })(), true],
+  ['escala 1,1 x 1 alarga o raster', va(antigos.sq, { escala: { x: 1.1, y: 1 } }).map(r => [r.cw, r.ch])[0], [11, 10]],
+  ['escala 1,1 x 1: comprimento maior ou igual', cTri({ escala: { x: 1.1, y: 1 } }) >= cTri({}), true],
+  ['encaixar peca mais larga que o tecido: null', E.encaixar ? E.encaixar([{ pecaIdx: 0, rasters: va(antigos.L, { rot: 'nenhuma' }) }], 200) : 0, null],
+  ['encaixar lista vazia: null', E.encaixar ? E.encaixar([], 1000) : 0, null],
+);
+
 const perto = (a, b, tol) => typeof a === 'number' ? Math.abs(a - b) <= tol
   : a && typeof a === 'object' ? Object.keys(b).length === Object.keys(a).length && Object.keys(b).every(k => perto(a[k], b[k], tol)) : a === b;
 
