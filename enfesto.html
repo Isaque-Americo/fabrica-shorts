@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Enfesto</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="molde/encaixe.js"></script>
+<script src="molde/ordem.js"></script>
+<style>
+:root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;
+--t0:#c92a2a;--t1:#1c6dd0;--t2:#2b8a3e;--t3:#d9480f;--t4:#7048e8;--t5:#8d5b3a;--t6:#c2255c;--t7:#0b7285;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;--t0:#ff6b6b;--t1:#5aa9ff;--t2:#4ade80;--t3:#ffa94d;--t4:#b794f6;--t5:#d4a373;--t6:#f783ce;--t7:#3bd4e6;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;--t0:#ff6b6b;--t1:#5aa9ff;--t2:#4ade80;--t3:#ffa94d;--t4:#b794f6;--t5:#d4a373;--t6:#f783ce;--t7:#3bd4e6;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{min-height:100%}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button.pri,button.ghost,button.sm{font:inherit;border-radius:8px;cursor:pointer;padding:8px 14px;border:1px solid var(--ac)}
+button.pri{background:var(--ac);color:var(--acx)}
+button.ghost,button.sm{background:none;color:var(--ac)}
+button.sm{padding:4px 10px;font-size:13px}
+button:disabled{opacity:.5;cursor:default}
+button:focus-visible,a:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+a{color:var(--ac)}
+#aviso{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
+#aviso .c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:24px;max-width:460px}
+.topo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--bd)}
+.topo a{text-decoration:none;font-size:14px}
+.topo h1{margin:0;font:600 17px 'Poppins',sans-serif;flex:1;min-width:0;overflow-wrap:anywhere}
+main{max-width:1400px;margin:0 auto;padding:16px}
+.vazio{color:var(--mut);font-size:13px}
+.nota{font-size:13px;color:var(--mut);margin:0 0 10px}
+.painel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:0 0 10px}
+.painel div{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px 12px}
+.painel dt{font-size:12px;color:var(--mut)}
+.painel dd{margin:0;font-weight:600;font-size:17px}
+.painel dd small{font-weight:400;font-size:12px;color:var(--mut);display:block}
+#avisos{margin:0 0 10px;padding:0;list-style:none}
+#avisos li{color:var(--bad);font-size:14px;font-weight:600}
+#avisos li.leve{color:var(--mut);font-weight:400}
+.ferr{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:0 0 8px}
+.ferr .esp{flex:1}
+#sel{font-size:13px;color:var(--mut);min-width:200px}
+.leg{display:flex;gap:10px;flex-wrap:wrap;font-size:13px;margin:0 0 8px}
+.leg span::before{content:'';display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--c);margin-right:4px;vertical-align:-1px}
+#area{overflow:auto;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px;max-height:75vh}
+#risco{display:block}
+#risco .tecido{fill:var(--bg);stroke:var(--bd);vector-effect:non-scaling-stroke}
+#risco .ourela,#risco .cab{fill:var(--mut);fill-opacity:.18}
+#risco .lim{stroke:var(--ac);stroke-dasharray:6 4;vector-effect:non-scaling-stroke}
+#risco .fim{stroke:var(--tx);stroke-width:2px;vector-effect:non-scaling-stroke}
+#risco .mesa{stroke:var(--bad);stroke-width:2px;stroke-dasharray:8 4;vector-effect:non-scaling-stroke}
+#risco .tick{stroke:var(--mut);vector-effect:non-scaling-stroke}
+#risco .rt{fill:var(--mut)}
+#risco .rt.mesa-t{fill:var(--bad);stroke:none}
+#risco .pc{cursor:grab;touch-action:none;outline:none}
+#risco .pc polygon{fill:var(--c);fill-opacity:.22;stroke:var(--c);stroke-width:1.5px;vector-effect:non-scaling-stroke}
+#risco .pc text{fill:var(--tx);text-anchor:middle;dominant-baseline:middle;pointer-events:none}
+#risco .pc.sel polygon{fill-opacity:.45;stroke-width:3px}
+#risco .pc:focus-visible polygon{stroke:var(--ac);stroke-width:3px}
+#risco .pc.bloq polygon{stroke:var(--bad);stroke-dasharray:4 3}
+#risco.arrastando .pc{cursor:grabbing}
+#toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:#fff;padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
+@media (max-width:560px){main{padding:12px}}
+</style>
+</head>
+<body>
+<div id="aviso"><div class="c" id="aviso-c">Carregando…</div></div>
+
+<div id="enf-v" hidden>
+  <header class="topo">
+    <a id="volta" href="corte.html">← Ordem</a>
+    <h1 id="titulo">Enfesto</h1>
+  </header>
+  <main>
+    <dl class="painel" id="painel"></dl>
+    <ul id="avisos" aria-live="polite"></ul>
+    <p class="nota">O ajuste manual não é salvo: recarregar a página ou “Refazer encaixe automático” volta ao encaixe calculado. Para mudar o enfesto de vez, edite a ordem.</p>
+    <div class="ferr">
+      <span id="sel" role="status" aria-live="polite">Clique numa peça para arrastar, ou selecione com Tab e use as setas.</span>
+      <button class="sm" type="button" id="b-girar" disabled aria-keyshortcuts="r">Girar (R)</button>
+      <button class="sm" type="button" id="b-esp" disabled aria-keyshortcuts="e">Espelhar (E)</button>
+      <span class="esp"></span>
+      <button class="sm" type="button" id="b-zm" aria-label="Diminuir zoom">−</button>
+      <button class="sm" type="button" id="b-zp" aria-label="Aumentar zoom">+</button>
+      <button class="sm" type="button" id="b-refazer">Refazer encaixe automático</button>
+    </div>
+    <div class="leg" id="leg"></div>
+    <div id="area"><svg id="risco" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Risco do enfesto"><g id="fundo"></g><g id="pecas"></g></svg></div>
+  </main>
+</div>
+<div id="toast" role="status"></div>
+<script>
+const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
+const IS_DEV=location.hostname==='localhost'||location.hostname==='127.0.0.1';
+const Q=new URLSearchParams(location.search);
+// ?local=1 só em localhost: lê o mesmo localStorage do corte.html (abra a ordem lá primeiro)
+const LOCAL=IS_DEV&&Q.get('local')==='1';
+const sb=LOCAL?null:supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s);
+const MO=window.MoldeOrdem,E=window.MoldeEncaixe,RES=E.ENC_RES;
+const SZ=['P','M','G','GG','G1','G2','G3','G4'];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+const nf=(v,d=2)=>(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
+const nomePeca=n=>/^\d+$/.test(n)?'Peça '+(+n+1):n;
+function ptErro(e){
+const m=String((e&&e.message)||e||'');
+if(/failed to fetch|networkerror|network request|load failed/i.test(m))return 'Sem conexão com o servidor.';
+if(/session|jwt|refresh token|sessão/i.test(m))return 'Sua sessão expirou. Entre novamente no app.';
+return m||'Erro.';
+}
+function toast(t){const d=$('#toast');d.textContent=t;d.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>d.style.display='none',3500)}
+
+// ---- leitura (esta página nunca grava a ordem) ----
+const B=LOCAL?(()=>{
+const ler=k=>{try{return JSON.parse(localStorage.getItem('corte-local:'+k))}catch(e){return null}};
+const lista=k=>Object.entries(ler(k)||{}).map(([id,data])=>({id,data}));
+return {async ordem(id){return (ler('ordens')||{})[id]||null},async produtos(){return lista('produtos')},async materiais(){return lista('materiais')}};
+})():(()=>{
+const ok=r=>{if(r.error)throw r.error;return r.data};
+const doCol=async c=>ok(await sb.from('docs').select('id,data').eq('col',c).order('created_at'));
+return {
+async ordem(id){const r=ok(await sb.from('docs').select('data').eq('id',id).eq('col','ordens').maybeSingle());return r?r.data:null},
+produtos:()=>doCol('produtos'),materiais:()=>doCol('materiais')
+};
+})();
+
+// ---- estado ----
+let O=null,ENF=null,MAT=null,PRODS=[],MATS=[];
+let C=null,P=[],OC=null,selJ=-1,Z=0,W=0; // C = calcularEnfesto; P = posições ajustadas (cópia); OC = ocupação
+const extras=[];
+function corTam(t){let i=SZ.indexOf(t);if(i<0){if(!extras.includes(t))extras.push(t);i=SZ.length+extras.indexOf(t)}return `var(--t${i%8})`}
+const oe=()=>MAT&&MAT.tubular?0:ENF.ourelaE; // tubular não tem ourela
+const larg=()=>(+MAT.larg||0)*1000;
+const compAtual=()=>E.compPosicoes(C.itens,P)+ENF.cabeceira;
+const NS='http://www.w3.org/2000/svg';
+
+function bloquear(msg,entrar){
+$('#enf-v').hidden=true;$('#aviso').hidden=false;const c=$('#aviso-c');c.textContent=msg;
+if(entrar){const a=document.createElement('a');a.href='index.html';a.textContent='Entrar';a.style.cssText='display:block;margin-top:14px';c.append(a)}
+}
+
+// calcula uma vez (no carregar e no "refazer")
+function calcular(){
+C=MO.calcularEnfesto(ENF,O,PRODS,MATS);
+selJ=-1;
+if(!C){P=[];OC=null;$('#area').innerHTML='<p class="vazio">Não foi possível montar o risco: confira o tecido do enfesto, as peças e a grade, e se alguma peça é mais larga que o tecido.</p>';painel();return}
+P=C.posicoes.map(p=>({...p}));OC=E.ocupacao(C.itens,P,C.largUtil);
+desenharPecas();desenharFundo();painel();selecionar(-1);
+}
+
+function painel(){
+const cam=ENF.camadas,lista=[],av=[];
+if(!C){$('#painel').innerHTML='';$('#avisos').innerHTML='';return}
+const comp=compAtual(),ap=comp>0&&C.largUtil>0?C.areaPecas/(comp*C.largUtil):0;
+const item=(t,v,s)=>lista.push(`<div><dt>${esc(t)}</dt><dd>${esc(v)}${s?`<small>${esc(s)}</small>`:''}</dd></div>`);
+item('Aproveitamento',nf(ap*100,1)+'%',comp!==C.comp?'automático '+nf(C.aproveitamento*100,1)+'%':'');
+item('Comprimento',nf(comp/1000)+' m',(ENF.cabeceira?'com cabeceira de '+nf(ENF.cabeceira/10,1)+' cm':'')+(comp!==C.comp?(ENF.cabeceira?' · ':'')+'automático '+nf(C.comp/1000)+' m':''));
+item('Total de tecido',nf(comp/1000*cam)+' m',nf(comp/1000)+' m × '+cam+' camada(s)');
+item('Camadas',String(cam),ENF.alturaMax?'altura máx. '+ENF.alturaMax:'');
+item('Largura útil',nf(C.largUtil/10,1)+' cm',MAT.tubular?'tubular':'');
+item('Peças cortadas',String(C.pecasTotal*cam),C.pecasTotal+' por camada');
+$('#painel').innerHTML=lista.join('');
+if(ENF.compMax&&comp>ENF.compMax)av.push(['','Passa do comprimento máximo da mesa ('+nf(ENF.compMax/1000)+' m).']);
+if(ENF.alturaMax&&cam>ENF.alturaMax)av.push(['','Camadas acima da altura máxima ('+ENF.alturaMax+').']);
+for(const a of C.avisos||[])av.push(['leve',`${nomePeca(a.peca)} (${a.tam}): ${a.motivo}.`]);
+$('#avisos').innerHTML=av.map(([c,t])=>`<li class="${c}">${esc(t)}</li>`).join('');
+}
+
+// ---- desenho (mm; X = comprimento, Y = largura) ----
+const PO=new Map(); // rasters -> poses (mesma transformação do encaixe, como MoldeExporta.formas)
+function poseDe(j){const it=C.itens[P[j].i];if(!PO.has(it.rasters))PO.set(it.rasters,E.poses(it.pts,{rot:it.rot,espelhar:it.espelhar,escala:it.escala}));return PO.get(it.rasters)[P[j].var]}
+function desenharPecas(){
+const g=$('#pecas');g.textContent='';PO.clear();extras.length=0;
+P.forEach((p,j)=>{
+const it=C.itens[p.i],el=document.createElementNS(NS,'g');
+el.setAttribute('class','pc');el.dataset.j=j;el.setAttribute('tabindex','0');el.setAttribute('role','button');
+el.style.setProperty('--c',corTam(it.tam));
+el.append(document.createElementNS(NS,'polygon'),document.createElementNS(NS,'text'));
+el.lastChild.textContent=[nomePeca(it.nome),it.tam].filter(Boolean).join(' ');
+g.append(el);posPeca(j);
+});
+const tams=[...new Set(C.itens.map(it=>it.tam))];
+$('#leg').innerHTML=tams.map(t=>`<span style="--c:${corTam(t)}">${esc(t)}</span>`).join('');
+}
+// só a peça j: pose, posição e rótulo
+function posPeca(j){
+const el=$('#pecas').children[j],p=P[j],pts=poseDe(j),it=C.itens[p.i];
+let mx=0,my=0;for(const [x,y] of pts){if(x>mx)mx=x;if(y>my)my=y}
+el.setAttribute('transform',`translate(${p.ox+ENF.cabeceira} ${p.oy+oe()})`);
+el.firstChild.setAttribute('points',pts.map(q=>q.join(',')).join(' '));
+el.lastChild.setAttribute('x',mx/2);el.lastChild.setAttribute('y',my/2);
+el.setAttribute('aria-label',`${nomePeca(it.nome)} ${it.tam}${it.cor?' '+it.cor:''}, x ${nf((p.ox+ENF.cabeceira)/10,0)} cm, y ${nf((p.oy+oe())/10,0)} cm`);
+}
+function desenharFundo(){
+const L=larg(),comp=compAtual(),cab=ENF.cabeceira,R=70;
+W=Math.max(comp,C.comp,ENF.compMax||0)+1000;
+const s=[`<rect class="tecido" x="0" y="0" width="${comp}" height="${L}"/>`];
+if(cab)s.push(`<rect class="cab" x="0" y="0" width="${cab}" height="${L}"><title>Cabeceira</title></rect>`);
+if(!MAT.tubular){
+if(ENF.ourelaE)s.push(`<rect class="ourela" x="0" y="0" width="${comp}" height="${ENF.ourelaE}"><title>Ourela esquerda</title></rect>`);
+if(ENF.ourelaD)s.push(`<rect class="ourela" x="0" y="${L-ENF.ourelaD}" width="${comp}" height="${ENF.ourelaD}"><title>Ourela direita</title></rect>`);
+}
+for(const y of [oe(),oe()+C.largUtil])s.push(`<line class="lim" x1="0" x2="${W}" y1="${y}" y2="${y}"/>`);
+s.push(`<line class="fim" x1="${comp}" x2="${comp}" y1="${-R/2}" y2="${L}"/>`);
+if(ENF.compMax)s.push(`<line class="mesa" x1="${ENF.compMax}" x2="${ENF.compMax}" y1="${-R/2}" y2="${L}"/><text class="rt mesa-t" x="${ENF.compMax+10}" y="${L+R*.6}">mesa</text>`);
+// régua em cm: traço a cada 10 cm, número a cada 50 cm (a cada 1 m em risco longo)
+const passo=W>8000?1000:500;
+for(let x=0;x<=W;x+=100){const g=x%passo===0;s.push(`<line class="tick" x1="${x}" x2="${x}" y1="${g?-R:-R/2}" y2="0"/>`);if(g)s.push(`<text class="rt" x="${x+8}" y="${-R*.55}">${x/10}</text>`)}
+s.push(`<text class="rt" x="${W-8}" y="${-R*.55}" text-anchor="end">cm</text>`);
+$('#fundo').innerHTML=s.join('');
+const svg=$('#risco'),H=L+2*R;
+svg.setAttribute('viewBox',`-20 ${-R} ${W+20} ${H}`);
+if(!Z)Z=Math.max(.08,Math.min(1,($('#area').clientWidth-16)/(W+20)));
+svg.style.width=(W+20)*Z+'px';svg.style.height=H*Z+'px';svg.style.fontSize=(12/Z)+'px';
+}
+
+// ---- ajuste manual (não é salvo) ----
+const nGiros=it=>it.rot==='nenhuma'?1:it.rot==='livre'?4:2;
+function selecionar(j){
+selJ=j;[...$('#pecas').children].forEach((el,k)=>el.classList.toggle('sel',k===j));
+const it=j>=0&&C.itens[P[j].i];
+$('#b-girar').disabled=!it||nGiros(it)<2;$('#b-esp').disabled=!it||!it.espelhar;
+$('#sel').textContent=it?`Selecionada: ${nomePeca(it.nome)} ${it.tam}${it.cor?' · '+it.cor:''} (variante ${P[j].var+1} de ${it.rasters.length})`:'Clique numa peça para arrastar, ou selecione com Tab e use as setas.';
+}
+function mover(j,ox,oy,v){
+const ok=E.moverPeca(OC,C.itens,P,j,ox,oy,v);
+$('#pecas').children[j].classList.toggle('bloq',!ok);
+if(ok){posPeca(j);painel();$('#fundo .fim').setAttribute('x1',compAtual());$('#fundo .fim').setAttribute('x2',compAtual());$('#fundo .tecido').setAttribute('width',compAtual())}
+return ok;
+}
+function variante(tipo){
+if(selJ<0)return;const it=C.itens[P[selJ].i],ng=nGiros(it),v=P[selJ].var;
+const nv=tipo==='girar'?Math.floor(v/ng)*ng+(v%ng+1)%ng:(v+ng)%it.rasters.length;
+if(mover(selJ,P[selJ].ox,P[selJ].oy,nv)){selecionar(selJ);desenharFundo()}else toast('Não cabe assim aqui: arraste a peça para um espaço livre e tente de novo.');
+}
+$('#b-girar').onclick=()=>variante('girar');
+$('#b-esp').onclick=()=>variante('espelhar');
+$('#b-refazer').onclick=()=>{calcular();toast('Encaixe automático refeito.')};
+$('#b-zm').onclick=()=>{Z/=1.25;if(C)desenharFundo()};
+$('#b-zp').onclick=()=>{Z*=1.25;if(C)desenharFundo()};
+
+const svg=$('#risco');let drag=null;
+const ptMm=ev=>new DOMPoint(ev.clientX,ev.clientY).matrixTransform(svg.getScreenCTM().inverse());
+const grade=v=>Math.round(v/RES)*RES;
+svg.addEventListener('pointerdown',ev=>{
+const el=ev.target.closest('.pc');if(!el||ev.button)return;
+const j=+el.dataset.j;selecionar(j);el.focus({preventScroll:true});
+drag={j,el,a:ptMm(ev),ox:P[j].ox,oy:P[j].oy};el.setPointerCapture(ev.pointerId);svg.classList.add('arrastando');ev.preventDefault();
+});
+svg.addEventListener('pointermove',ev=>{
+if(!drag)return;const b=ptMm(ev),p=P[drag.j];
+const ox=grade(drag.ox+b.x-drag.a.x),oy=grade(drag.oy+b.y-drag.a.y);
+if(ox!==p.ox||oy!==p.oy)mover(drag.j,ox,oy,p.var);
+});
+const soltar=()=>{if(!drag)return;drag.el.classList.remove('bloq');drag=null;svg.classList.remove('arrastando');desenharFundo();selecionar(selJ)};
+svg.addEventListener('pointerup',soltar);svg.addEventListener('pointercancel',soltar);
+svg.addEventListener('focusin',ev=>{const el=ev.target.closest('.pc');if(el&&+el.dataset.j!==selJ)selecionar(+el.dataset.j)});
+svg.addEventListener('keydown',ev=>{
+const el=ev.target.closest('.pc');if(!el)return;const j=+el.dataset.j,p=P[j],d=ev.shiftKey?5*RES:RES;
+const k={ArrowLeft:[-d,0],ArrowRight:[d,0],ArrowUp:[0,-d],ArrowDown:[0,d]}[ev.key];
+if(k){ev.preventDefault();if(!mover(j,p.ox+k[0],p.oy+k[1],p.var))toast('Não dá para mover para lá: sobrepõe outra peça ou sai do tecido.');else{el.classList.remove('bloq');desenharFundo();selecionar(j)}}
+else if(ev.key==='r'||ev.key==='R'){ev.preventDefault();variante('girar')}
+else if((ev.key==='e'||ev.key==='E')&&C.itens[p.i].espelhar){ev.preventDefault();variante('espelhar')}
+});
+
+async function iniciar(){
+try{
+if(!LOCAL){
+const {data:{session}}=await sb.auth.getSession();
+const {data:{user}}=session?await sb.auth.getUser():{data:{}};
+if(!session||!user)return bloquear('Entre no app para ver o enfesto.',true);
+const {data:perfil}=await sb.from('user_profiles').select('role').eq('user_id',user.id).maybeSingle();
+if(!perfil||perfil.role!=='admin')return bloquear('Só administradores veem as ordens de corte.');
+}
+const id=Q.get('ordem'),enfId=Q.get('enf');
+if(!id||!enfId)return bloquear('Abra o enfesto pela ordem de corte.');
+const [doc,ps,ms]=await Promise.all([B.ordem(id),B.produtos(),B.materiais()]);
+if(!doc)return bloquear('Ordem não encontrada.');
+// alteração do corte.html que ainda não chegou ao servidor: o mesmo rascunho que ele guarda
+let r=null;try{r=JSON.parse(localStorage.getItem('ordem:'+id))}catch(e){}
+O=MO.normalizar(r&&r.em>(doc.salvoEm||0)?r.o:doc);
+PRODS=ps.map(x=>({...x.data,id:x.id}));MATS=ms.map(x=>({...x.data,id:x.id}));
+ENF=O.enfestos.find(e=>e.id===enfId);
+if(!ENF)return bloquear('Enfesto não encontrado nesta ordem.');
+const aba=O.tecidos.find(t=>t.id===ENF.tecidoId);MAT=aba&&MATS.find(m=>m.id===aba.materiaId);
+const u=new URLSearchParams(LOCAL?'local=1':'');u.set('id',id);$('#volta').href='corte.html?'+u;
+const tit=[O.nome||'Ordem',ENF.nome,MAT?[MAT.nome,MAT.cor].filter(Boolean).join(' '):''].filter(Boolean).join(' · ');
+$('#titulo').textContent=tit;document.title=ENF.nome+' · Enfesto';
+$('#aviso').hidden=true;$('#enf-v').hidden=false;
+if(!MAT)return void($('#area').innerHTML='<p class="vazio">Este enfesto não tem tecido (matéria-prima) escolhido. Escolha em Propriedades, na ordem.</p>');
+calcular();
+}catch(e){console.error(e);bloquear('Não foi possível abrir o enfesto. '+ptErro(e))}
+}
+iniciar();
+</script>
+</body>
+</html>

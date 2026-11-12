@@ -67,6 +67,14 @@ table.lst td.n,table.lst th.n{text-align:right}
 .add{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:12px 0}
 .add select{min-width:220px}
 .resultado{border:1px dashed var(--bd);border-radius:10px;padding:12px;margin-top:12px}
+.resultado h3{margin:0 0 8px;font:600 16px 'Poppins',sans-serif}
+.resultado .enf-l{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin:0;font-size:14px}
+.resultado .ruim{color:var(--bad);font-weight:600}
+.painel{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:0 0 10px}
+.painel div{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:8px 12px}
+.painel dt{font-size:12px;color:var(--mut)}
+.painel dd{margin:0;font-weight:600}
+.painel dd small{font-weight:400;font-size:12px;color:var(--mut)}
 .campo{display:flex;flex-direction:column;gap:4px;margin:8px 0;font-size:14px}
 .duas{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
 fieldset.grp{border:1px solid var(--bd);border-radius:8px;margin:12px 0 0;padding:6px 12px 10px}
@@ -110,6 +118,7 @@ textarea{resize:vertical;min-height:60px}
       <span class="acoes"><button class="sm" type="button" id="enf-novo">+ Enfesto</button><button class="sm" type="button" id="enf-ren">Renomear</button><button class="sm perigo" type="button" id="enf-apagar">Apagar enfesto</button></span>
     </div>
     <section id="enf-corpo" role="tabpanel" aria-labelledby=""></section>
+    <section class="resultado" id="res-ordem" aria-labelledby="res-ordem-t"><h3 id="res-ordem-t">Resultados da ordem</h3><div id="res-ordem-c" aria-live="polite"><p class="vazio">Calculando…</p></div></section>
   </main>
 </div>
 
@@ -153,6 +162,7 @@ const num=v=>{const n=parseFloat(String(v??'').replace(',','.'));return Number.i
 const nf=(v,d=2)=>(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const campo=v=>v?String(+v.toFixed(3)).replace('.',','):''; // valor de input com vírgula; 0 fica vazio
 const brl=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const urlEnf=enf=>{const u=new URLSearchParams(LOCAL?'local=1':'');u.set('ordem',ordId);u.set('enf',enf);return 'enfesto.html?'+u};
 const urlCom=(k,v)=>{const u=new URLSearchParams(LOCAL?'local=1':'');if(k)u.set(k,v);const s=String(u);return 'corte.html'+(s?'?'+s:'')};
 
 function ptErro(e){
@@ -319,6 +329,7 @@ const aba=curTec(),m=mat(aba.materiaId);
 $('#tec-resumo').textContent=m?infoMat(m):'Escolha a matéria-prima em Propriedades.';
 const c=$('#enf-corpo'),e=curEnf();
 c.setAttribute('aria-labelledby',e?'tab-'+e.id:'');
+agendarRes();
 if(!e){c.innerHTML='<p class="vazio">Nenhum enfesto neste tecido. Use “+ Enfesto”.</p>';return restaurar(foco)}
 const tub=!!(m&&m.tubular);
 const res=[`${e.camadas} camada(s)`,e.alturaMax?`altura máx. ${e.alturaMax}`:'',e.compMax?`comp. máx. ${nf(e.compMax/1000)} m`:'',
@@ -330,8 +341,33 @@ c.innerHTML=`<p class="resumo">${res}${alto} <button class="sm" type="button" da
 (e.itens.length?e.itens.map((it,i)=>itemHtml(e,it,i,aba)).join(''):'<p class="vazio">Nenhum produto neste enfesto.</p>')+
 `<div class="add"><label for="add-prod" class="vazio">Adicionar produto</label><select id="add-prod" data-foco="add-prod">${PRODS.slice().sort((a,b)=>String(a.ref||'').localeCompare(String(b.ref||''))).map(p=>`<option value="${esc(p.id)}">${esc(nomeProd(p))}${p.mol?'':' (sem molde)'}${usados.has(p.id)?' ✓':''}</option>`).join('')}</select>
 <input id="add-cor" aria-label="Cor do produto a adicionar" placeholder="Cor" autocomplete="off" style="width:140px"><button class="sm" type="button" data-acao="add" data-foco="add">Adicionar</button></div>
-<section class="resultado" id="res-${esc(e.id)}" data-enf="${esc(e.id)}" aria-label="Resultados do enfesto"><p class="vazio">Risco e resultados deste enfesto: em breve.</p></section>`;
+<section class="resultado" id="res-${esc(e.id)}" data-enf="${esc(e.id)}" aria-label="Resultados do enfesto"><p class="enf-l"><span data-linha>Calculando o risco…</span>
+<a href="${esc(urlEnf(e.id))}" target="_blank" rel="noopener" data-enfesto>Abrir enfesto<span class="vazio"> (nova aba)</span></a></p></section>`;
 restaurar(foco);
+}
+// resultados: calcula todos os enfestos um pouco depois do último render (o +/− da grade não refaz o encaixe a cada clique)
+let resT=null;
+function agendarRes(){clearTimeout(resT);resT=setTimeout(mostrarRes,300)}
+function mostrarRes(){
+if(!O)return;
+const cs=O.enfestos.map(e=>{try{return MO.calcularEnfesto(e,O,PRODS,MATS)}catch(x){console.error(x);return null}});
+const e=curEnf(),lin=e&&document.querySelector(`#res-${CSS.escape(e.id)} [data-linha]`);
+if(lin){
+const c=cs[O.enfestos.indexOf(e)];
+lin.innerHTML=c?`Risco ${nf(c.comp/1000)} m · ${nf(c.comp/1000*e.camadas)} m de tecido · aproveitamento ${nf(c.aproveitamento*100,1)}%`+
+  (e.compMax&&c.comp>e.compMax?' · <span class="ruim">passa do comprimento máximo</span>':'')
+  :'<span class="vazio">Sem risco: falta tecido, peças ou grade, ou alguma peça é mais larga que o tecido.</span>';
+}
+const r=MO.resultados(O,cs,MATS),fora=O.enfestos.filter((x,k)=>!cs[k]).map(x=>x.nome);
+const it=(t,v,s)=>`<div><dt>${esc(t)}</dt><dd>${esc(v)}${s?` <small>${esc(s)}</small>`:''}</dd></div>`;
+const tams=[...new Set(Object.values(r.grade).flatMap(Object.keys))].sort((a,b)=>(SZ.indexOf(a)+1||99)-(SZ.indexOf(b)+1||99)||a.localeCompare(b));
+const grade=tams.length?`<table class="lst" aria-label="Grade total por referência e tamanho"><thead><tr><th>Referência</th>${tams.map(t=>`<th class="n">${esc(t)}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>`+
+  Object.entries(r.grade).map(([ref,g])=>{const nome=(PRODS.find(p=>(p.ref||p.id)===ref)||{}).nome;return `<tr><td>${esc(ref)}${nome?` <span class="vazio">${esc(nome)}</span>`:''}</td>${tams.map(t=>`<td class="n">${g[t]||0}</td>`).join('')}<td class="n">${Object.values(g).reduce((a,b)=>a+b,0)}</td></tr>`}).join('')+'</tbody></table>':'';
+$('#res-ordem-c').innerHTML=`<dl class="painel">${[
+  it('Tecido',nf(r.metros)+' m'),it('Peso do tecido',nf(r.pesoTecido)+' kg'),it('Peso das peças',nf(r.pesoPecas)+' kg'),
+  it('Desperdício',nf(r.pesoDesperdicio)+' kg',r.pesoTecido?nf(r.pesoDesperdicio/r.pesoTecido*100,1)+'%':''),
+  it('Consumo linear',nf(r.consumoLinear,3)+' m/peça'),it('Custo do tecido',brl(r.custo)),it('Peças de roupa',String(r.pecas))].join('')}</dl>`+
+  grade+(fora.length?`<p class="vazio">Fora do cálculo (sem risco): ${esc(fora.join(', '))}.</p>`:'');
 }
 function restaurar(foco){if(foco){const el=document.querySelector(`[data-foco="${CSS.escape(foco)}"]`);if(el)el.focus()}}
 
@@ -395,6 +431,8 @@ else if(a==='mais'||a==='menos')MO.ajustarGrade(it,b.dataset.t,a==='mais'?1:-1);
 else if(a==='rm'){if(!confirm(`Remover ${nomeProd(prod(it.produtoId))}${it.cor?' ('+it.cor+')':''} do enfesto?`))return;e.itens.splice(+b.dataset.i,1)}
 sujou();render();
 });
+// abre numa aba nova: grava antes o rascunho (salvar guarda no localStorage na hora) para o enfesto ver o que está na tela
+corpo.addEventListener('click',ev=>{if(ev.target.closest('a[data-enfesto]')&&estado!=='salvo')salvar()});
 corpo.addEventListener('input',ev=>{
 const x=ev.target;if(x.dataset.acao!=='cor')return;
 const it=(curEnf()||{itens:[]}).itens[+x.dataset.i];if(!it)return;it.cor=x.value;sujou();

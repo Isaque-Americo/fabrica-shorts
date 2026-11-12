@@ -118,7 +118,42 @@
     return r && r.comp / 1000;
   }
 
-  const MoldeEncaixe = { ENC_RES, pose, poses, rasterPol, rasterRot, variantes, encaixar, pecasDoRisco, encaixeMol };
+  // ajuste manual do risco: ocupação por célula com o dono (j+1, j = índice em posicoes), colunas ao longo de X
+  // (cresce para a direita sem remontar). posicoes/itens no formato de encaixar (mm, múltiplos de ENC_RES)
+  function marcar(o, r, cx0, cy0, v) {
+    const need = (cx0 + r.cw) * o.L;
+    if (need > o.m.length) { const n = new Int32Array(Math.max(need, o.m.length * 2)); n.set(o.m); o.m = n; }
+    for (let cy = 0; cy < r.ch; cy++) for (let cx = 0; cx < r.cw; cx++) if (r.m[cy * r.cw + cx]) o.m[(cx0 + cx) * o.L + cy0 + cy] = v;
+  }
+  function ocupacao(itens, posicoes, largMm) {
+    const o = { L: Math.floor(largMm / ENC_RES), m: new Int32Array(0) };
+    posicoes.forEach((p, j) => marcar(o, itens[p.i].rasters[p.var], Math.round(p.ox / ENC_RES), Math.round(p.oy / ENC_RES), j + 1));
+    return o;
+  }
+  // a peça j cabe na variante v em (ox, oy) mm? Fora da largura, X negativo ou célula de outra peça: não
+  function cabe(o, itens, posicoes, j, ox, oy, v) {
+    const r = itens[posicoes[j].i].rasters[v], cx0 = Math.round(ox / ENC_RES), cy0 = Math.round(oy / ENC_RES);
+    if (!r || cx0 < 0 || cy0 < 0 || cy0 + r.ch > o.L) return false;
+    for (let cy = 0; cy < r.ch; cy++) for (let cx = 0; cx < r.cw; cx++) {
+      if (!r.m[cy * r.cw + cx]) continue;
+      const k = (cx0 + cx) * o.L + cy0 + cy, d = k < o.m.length ? o.m[k] : 0;
+      if (d && d !== j + 1) return false;
+    }
+    return true;
+  }
+  // move a peça j (mexe só nas células dela); devolve false e não muda nada se não couber
+  function moverPeca(o, itens, posicoes, j, ox, oy, v) {
+    if (!cabe(o, itens, posicoes, j, ox, oy, v)) return false;
+    const p = posicoes[j], ras = itens[p.i].rasters;
+    marcar(o, ras[p.var], Math.round(p.ox / ENC_RES), Math.round(p.oy / ENC_RES), 0);
+    p.ox = Math.round(ox / ENC_RES) * ENC_RES; p.oy = Math.round(oy / ENC_RES) * ENC_RES; p.var = v;
+    marcar(o, ras[v], p.ox / ENC_RES, p.oy / ENC_RES, j + 1);
+    return true;
+  }
+  // comprimento ocupado pelas peças, em mm (sem cabeceira): max(ox + cw·ENC_RES)
+  const compPosicoes = (itens, posicoes) => posicoes.reduce((a, p) => Math.max(a, p.ox + itens[p.i].rasters[p.var].cw * ENC_RES), 0);
+
+  const MoldeEncaixe = { ENC_RES, pose, poses, rasterPol, rasterRot, variantes, encaixar, pecasDoRisco, encaixeMol, ocupacao, cabe, moverPeca, compPosicoes };
   g.MoldeEncaixe = MoldeEncaixe;
   if (typeof module !== 'undefined') module.exports = MoldeEncaixe;
 })(typeof window !== 'undefined' ? window : globalThis);

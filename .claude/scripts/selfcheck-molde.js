@@ -463,6 +463,23 @@ testes.push(
   ['calcularEnfesto posicoes dentro', !!cCab && posicoesOk(cCab.itens, cCab, 1550), true],
 );
 
+// ajuste manual (molde/encaixe.js ocupacao/cabe/moverPeca/compPosicoes) sobre o cCab: 4 quadrados de 200 mm em 1550 mm
+const ajuste = (() => {
+  if (!cCab || !E.ocupacao) return null;
+  const its = cCab.itens, ps = cCab.posicoes.map(p => ({ ...p })), o = E.ocupacao(its, ps, cCab.largUtil);
+  const j1 = 1, outro = ps[j1], velho = { ox: ps[0].ox, oy: ps[0].oy };
+  const r = [E.compPosicoes(its, ps), E.cabe(o, its, ps, 0, ps[0].ox, ps[0].oy, 0), E.cabe(o, its, ps, 0, outro.ox, outro.oy, 0),
+    E.cabe(o, its, ps, 0, 0, 1540, 0), E.cabe(o, its, ps, 0, -20, 0, 0)];
+  const antes = JSON.stringify(ps[0]), recusa = E.moverPeca(o, its, ps, 0, outro.ox, outro.oy, 0);
+  r.push(recusa, JSON.stringify(ps[0]) === antes);
+  r.push(E.moverPeca(o, its, ps, 0, 1000, 0, 1), ps[0].ox, ps[0].var, E.compPosicoes(its, ps));
+  r.push(E.moverPeca(o, its, ps, j1, velho.ox, velho.oy, 0)); // a célula antiga da peça 0 ficou livre
+  r.push(E.cabe(o, its, ps, j1, 1000, 0, 0)); // e a nova está ocupada
+  return r;
+})();
+testes.push(['ajuste manual: cabe, recusa sobrepor, move, comprimento', ajuste,
+  [200, true, false, false, false, false, true, true, 1000, 1, 1200, true, false]]);
+
 // exportação 1:1 (molde/exporta.js). Review 1: quadrado de 100 mm sai com 100 mm em PLT, DXF e PDF
 const X = fs.existsSync(path.join(raiz, 'exporta.js')) ? require(path.join(raiz, 'exporta.js')) : null;
 const fx = (f, d) => { try { return X ? f() : d; } catch (e) { return 'erro: ' + e.message; } };
