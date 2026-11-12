@@ -27,7 +27,7 @@
 - **Três páginas separadas (pedido do dono em 2026-11-12):** `molde.html` (já existe), `corte.html` (ordens de corte: lista, propriedades, abas de tecido/enfesto, grade, resultados e relatório) e `enfesto.html` (o risco de um enfesto: desenho, painel do enfesto, ajuste manual, minimapa e exportação do encaixe). `corte.html` abre `enfesto.html?ordem=<id>&enf=<id>`. O `index.html` ganha a aba-link "Ordens de corte" e o botão "Criar ordem de corte" na aba Fabricar.
 - **Plano de enfesto da aba Fabricar continua como está** (estimativa rápida com mesa/camadas do navegador); o botão "Criar ordem de corte" leva a mesa e as camadas dali como valores iniciais do enfesto.
 - **Tubular:** cada camada tem dois panos → cada peça encaixada rende 2 (qtd por camada da grade é dividida por 2, arredondando para cima). Peça com "dobra no tecido tubular" é encaixada como meia peça (a metade do lado da dobra) encostada na borda Y=0.
-- **Sentido do enfesto:** `duplo` (camadas face a face) → peça em par rende 2 por posição; `unico` → par vira duas posições (normal + espelhada se `espelhar`, senão duas normais). Tecido `sentidoUnico` força rotação `'nenhuma'`.
+- **Sentido do enfesto (corrigido em 2026-11-12):** `duplo` (camadas face a face) → cada posição dá 1 peça por camada e metade das camadas sai espelhada; peça em par continua com 2 posições por roupa, sem variante espelhada. `unico` → par = 1 posição normal + 1 espelhada (sem `espelhar`: 2 normais e aviso). Tecido `sentidoUnico` força rotação 'nenhuma'.
 - **Encolhimento:** escala X por (1 + encolhC/100) e Y por (1 + encolhL/100) antes de encaixar e imprimir.
 - **Largura útil** = `larg·1000 − ourelaE − ourelaD` (mm); comprimento do risco = encaixe + `cabeceira` (mm) por enfesto.
 
