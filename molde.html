@@ -103,6 +103,7 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 #abas button{font:inherit;font-size:14px;font-weight:600;background:none;border:0;border-bottom:2px solid transparent;color:var(--mut);padding:6px 8px;cursor:pointer}
 #abas button[aria-selected="true"]{color:var(--tx);border-bottom-color:var(--ac)}
 #grad,#grad-tudo{border:1px solid var(--bd);border-radius:8px;margin:0 0 8px;padding:8px;min-width:0;display:flex;flex-direction:column;gap:6px}
+#g-sentido{margin:0;font-size:12px}
 #grad legend{font-weight:600;font-size:14px;padding:0 4px}
 #grad label{display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:13px}
 #grad label input,#grad label select{width:84px}
@@ -160,12 +161,13 @@ select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
       <p class="vazio" id="g-vazio"></p>
       <fieldset id="grad">
         <legend id="g-pt"></legend>
-        <table id="g-tab"><thead><tr><th></th><th>Tam.</th><th>X cm</th><th>Y cm</th></tr></thead><tbody></tbody></table>
-        <label>Passo X (cm) <input id="g-px" inputmode="decimal" autocomplete="off" value="0"></label>
-        <label>Passo Y (cm) <input id="g-py" inputmode="decimal" autocomplete="off" value="0"></label>
+        <table id="g-tab"><thead><tr><th></th><th>Tam.</th><th>X cm (→)</th><th>Y cm (↓)</th></tr></thead><tbody></tbody></table>
+        <p class="vazio" id="g-sentido">Positivo: X para a direita, Y para baixo.</p>
+        <label>Passo X cm (→) <input title="Positivo: X para a direita, Y para baixo." id="g-px" inputmode="decimal" autocomplete="off" value="0"></label>
+        <label>Passo Y cm (↓) <input title="Positivo: X para a direita, Y para baixo." id="g-py" inputmode="decimal" autocomplete="off" value="0"></label>
         <label>Salto a partir de <select id="g-sde"></select></label>
-        <label>Salto X (cm) <input id="g-sx" inputmode="decimal" autocomplete="off" placeholder="opcional"></label>
-        <label>Salto Y (cm) <input id="g-sy" inputmode="decimal" autocomplete="off" placeholder="opcional"></label>
+        <label>Salto X cm (→) <input title="Positivo: X para a direita, Y para baixo." id="g-sx" inputmode="decimal" autocomplete="off" placeholder="opcional"></label>
+        <label>Salto Y cm (↓) <input title="Positivo: X para a direita, Y para baixo." id="g-sy" inputmode="decimal" autocomplete="off" placeholder="opcional"></label>
         <button class="sm" type="button" id="g-aplicar">Aplicar passo</button>
         <button class="sm" type="button" id="g-copiar" title="Shift+clique com a ferramenta Graduar marca os pontos de destino; traços selecionados também contam">Copiar regra para os selecionados</button>
       </fieldset>
@@ -922,7 +924,7 @@ const tr=document.createElement('tr'),c=document.createElement('span'),nm=docume
 c.className='cor';c.style.setProperty('--c',`var(--t${i%8})`);td0.append(c);nm.textContent=t+(t===M.base?' (base)':'');tr.append(td0,nm);
 for(const k of ['dx','dy']){
 const td=document.createElement('td'),inp=document.createElement('input');
-inp.inputMode='decimal';inp.autocomplete='off';inp.dataset.tam=t;inp.dataset.k=k;inp.setAttribute('aria-label',(k==='dx'?'X':'Y')+' cm, tamanho '+t);
+inp.inputMode='decimal';inp.autocomplete='off';inp.dataset.tam=t;inp.dataset.k=k;inp.setAttribute('aria-label',(k==='dx'?'X cm (direita)':'Y cm (para baixo)')+', tamanho '+t);inp.title='Positivo: X para a direita, Y para baixo.';
 inp.value=val(t,k);inp.disabled=t===M.base;
 inp.onchange=()=>{
 const v=MD.medida(inp.value);if(!v||v.length>1){toast('Medida inválida. Ex.: 1 ou -0,5');inp.value=cm2(((M.grad[gradPt]||{})[t]||{})[k]||0);return}
