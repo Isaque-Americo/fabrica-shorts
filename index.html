@@ -936,8 +936,8 @@ const f=fichaDe(p),linhas=[];
 (f.itens||[]).forEach(i=>{const m=mat(i.matId);if(!m)return;const cu=matCusto(m);linhas.push({nome:m.nome,cor:m.cor||'',q:+i.qtd||0,un:matUn(m),cu,ct:cu*(+i.qtd||0)})});
 const t=mat(p.tecidoId);
 if(t){const q=consDe(p,g);const cu=matCusto(t);linhas.push({nome:'Tecido: '+t.nome,cor:t.cor||'Cor do produto',q,un:'MT',cu,ct:cu*q,tec:true})}
-const mp=linhas.reduce((a,x)=>a+x.ct,0),mo=(+f.mo||0)+(f.processos||[]).reduce((a,q)=>a+(+q.min||0)*(+q.custoMin||0),0),fixo=+f.fixo||0,extra=+p.extra||0;
-return {linhas,mp,mo,fixo,extra,total:mp+mo+fixo+extra};
+const mp=linhas.reduce((a,x)=>a+x.ct,0),proc=(f.processos||[]).reduce((a,q)=>a+(+q.min||0)*(+q.custoMin||0),0),mo=(+f.mo||0)+proc,fixo=+f.fixo||0,extra=+p.extra||0;
+return {linhas,mp,mo,proc,fixo,extra,total:mp+mo+fixo+extra};
 }
 const custoP=(p,g)=>p.tecidoId?custoFicha(p,g).total:(+p.custo||0);
 function materia(){
@@ -958,7 +958,7 @@ return `<div class="bar">${campoBusca('Buscar por nome ou fornecedor')}<button c
  <div class="bar"><h2>Ficha técnica padrão</h2><button class="pri" onclick="fFicha()">Editar ficha padrão</button></div>
  <p style="color:var(--mut);margin-top:0">Itens iguais em todas as referências. O tecido e o consumo de cada referência são informados no cadastro do produto.</p>
  <div class="tw"><table><tr><th>Item</th><th>Cor</th><th class="n">Qtde</th><th>Un</th><th class="n">Custo un.</th><th class="n">Custo total</th></tr>${fr||'<tr><td colspan="6" class="empty">Nenhum item na ficha padrão.</td></tr>'}
- <tr><th colspan="5">Aviamentos</th><th class="n">${brl4(sub)}</th></tr><tr><td colspan="5">Mão de obra (por peça)</td><td class="n">${brl(f.mo)}</td></tr><tr><td colspan="5">Custo fixo (por peça)</td><td class="n">${brl(f.fixo)}</td></tr>
+ <tr><th colspan="5">Aviamentos</th><th class="n">${brl4(sub)}</th></tr><tr><td colspan="5">Mão de obra (por peça)</td><td class="n">${brl(f.mo)}</td></tr>${(f.processos||[]).length?`<tr><td colspan="5">Processos (por peça)</td><td class="n">${brl(custoFicha({ficha:f}).proc)}</td></tr>`:''}<tr><td colspan="5">Custo fixo (por peça)</td><td class="n">${brl(f.fixo)}</td></tr>
  <tr><td colspan="5">Imposto sobre a venda</td><td class="n">${nf(f.imp||0,2)}%</td></tr>
  <tr><td colspan="5">Outras despesas sobre a venda</td><td class="n">${nf(f.desp||0,2)}%</td></tr>
  <tr><td colspan="5">Comissão considerada (maior cadastrada)</td><td class="n">${nf(comMax(),2)}%</td></tr></table></div>
@@ -1037,7 +1037,7 @@ d.innerHTML=`<form method="dialog"><h3>Ficha técnica · Ref. ${esc(p.ref)} · $
  ${secao('Matéria-prima')}${itens}
  <tr><td><b>Subtotal da matéria-prima</b></td><td></td>${col('<b>'+brl(a.mp)+'</b>','<b>'+brl(b.mp)+'</b>')}</tr>
  ${secao('Outros custos por peça')}
- <tr><td>Mão de obra</td><td></td>${col(brl(a.mo),brl(b.mo))}</tr>
+ <tr><td>Mão de obra</td><td></td>${col(brl(a.mo-a.proc),brl(b.mo-b.proc))}</tr>${a.proc>0?`<tr><td>Processos</td><td></td>${col(brl(a.proc),brl(b.proc))}</tr>`:''}
  <tr><td>Custo fixo</td><td></td>${col(brl(a.fixo),brl(b.fixo))}</tr>
  <tr><td>Custo extra</td><td></td>${col(brl(a.extra),brl(b.extra))}</tr>
  <tr><th>Preço de custo</th><th></th>${colh(brl(a.total),brl(b.total))}</tr>
@@ -1740,6 +1740,7 @@ const t=[['aviamento 20/10un x2 + tecido 10x2m',a.mp,24],
 ['alt escapa aspas da descricao',+foto({imgF:'a.jpg',nome:'short 4"'},'foto').includes('&quot;'),1],
 ['ficha sem processos: mo igual',custoFicha({tecidoId:'t1',cons:2,ficha:{itens:[],mo:1,fixo:0}},false).mo,1],
 ['processos somam min x R$/min a mo',+custoFicha({tecidoId:'t1',cons:2,ficha:{itens:[],mo:1,fixo:0,processos:[{nome:'a',min:2,custoMin:0.5},{nome:'b',min:3,custoMin:0.4}]}},false).mo.toFixed(4),3.2],
+['proc separado da mo',+custoFicha({tecidoId:'t1',cons:2,ficha:{itens:[],mo:1,fixo:0,processos:[{min:2,custoMin:0.5}]}},false).proc.toFixed(4),1],
 ['processos entram no total',+custoFicha({tecidoId:'t1',cons:2,ficha:{itens:[],mo:1,fixo:0,processos:[{min:2,custoMin:0.5}]}},false).total.toFixed(4),22],
 ...(()=>{
 // enfesto e consumo estimado
