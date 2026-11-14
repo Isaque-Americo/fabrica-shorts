@@ -12,7 +12,7 @@
   };
 
   // calc = MoldeOrdem.calcularEnfesto; opts: {cabeceira, ourelaE (mm; passe 0 no tubular, que não tem ourela),
-  // nome (ref do produto no texto), textos (peça e tamanho), fio (seta ao longo de X), margem}.
+  // pedido (ex. 'Ped. 12', antes da ref), nome (ref do produto no texto), textos (peça e tamanho), fio (seta ao longo de X), margem}.
   // Cada posição volta ao polígono real com E.poses (mesma escala/giro/espelho do raster) + (ox, oy) + deslocamentos.
   // costura sempre null: p.mol só guarda a linha de corte (molde/modelo.js pecaProduto), não há costura para desenhar
   function formas(calc, produtos, opts) {
@@ -24,7 +24,7 @@
       const pts = cache.get(it.rasters)[p.var].map(([x, y]) => [r3(x + p.ox + dx), r3(y + p.oy + dy)]);
       const b = bbox(pts), cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2;
       const prod = (produtos || []).find(x => x.id === it.produtoId);
-      const s = [o.nome && prod && (prod.ref || prod.nome), o.textos && [it.nome, it.tam].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
+      const s = [o.pedido, o.nome && prod && (prod.ref || prod.nome), o.textos && [it.nome, it.tam].filter(Boolean).join(' ')].filter(Boolean).join(' · ');
       const meio = (b.x1 - b.x0) * 0.3; // seta do fio: 60% da peça, no centro
       return { pts, texto: s ? { s, x: r3(cx), y: r3(cy) } : null, fio: o.fio ? [[r3(cx - meio), r3(cy)], [r3(cx + meio), r3(cy)]] : null, costura: null, cor: it.cor || '' };
     });

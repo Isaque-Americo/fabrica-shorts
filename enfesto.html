@@ -133,7 +133,8 @@ body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   </fieldset>
   <fieldset>
     <legend>Mostrar</legend>
-    <label><input type="checkbox" id="x-nome" checked> Nome do molde</label>
+    <label><input type="checkbox" id="x-nome" checked> Referência do produto</label>
+    <label id="x-ped-l" hidden><input type="checkbox" id="x-ped" checked> Nº do pedido</label>
     <label><input type="checkbox" id="x-textos" checked> Textos (peça e tamanho)</label>
     <label><input type="checkbox" id="x-margem" disabled aria-describedby="x-margem-d"> Margem de costura</label>
     <small id="x-margem-d">O molde ainda não guarda a linha de costura.</small>
@@ -329,8 +330,10 @@ else if((ev.key==='e'||ev.key==='E')&&C.itens[p.i].espelhar){ev.preventDefault()
 // ---- minimapa e exportação: sempre as posições atuais (P, com o ajuste manual) ----
 const X=window.MoldeExporta;
 const formasAtuais=o=>X.formas({...C,posicoes:P},PRODS,{cabeceira:ENF.cabeceira,ourelaE:oe(),...o});
+const pedPre=()=>O.pedidoNum!=null&&!String(O.nome).includes('#'+O.pedidoNum)?'Pedido #'+O.pedidoNum:''; // a ordem do pedido já se chama "Pedido #N"
+const pedTxt=()=>O.pedidoNum!=null?'Ped. '+O.pedidoNum:'';
 const nomeTecido=()=>[MAT.nome,MAT.cor].filter(Boolean).join(' ');
-const resumoTxt=()=>[O.nome||'Ordem',ENF.nome,nomeTecido(),nf(compAtual()/1000)+' m',ENF.camadas+' camada(s)'].filter(Boolean).join(' · ');
+const resumoTxt=()=>[pedPre(),O.nome||'Ordem',ENF.nome,nomeTecido(),nf(compAtual()/1000)+' m',ENF.camadas+' camada(s)'].filter(Boolean).join(' · ');
 const slug=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
 const nomeArq=(ext,suf)=>['ordem',slug(O.nome),'enfesto',slug(ENF.nome),suf].filter(Boolean).join('-')+'.'+ext;
 function baixar(dados,nome,tipo){
@@ -410,9 +413,9 @@ return doc;
 function opcoesExp(){
 const ck=id=>$('#'+id).checked,fmt=document.querySelector('input[name="x-fmt"]:checked').value;
 const marg=Math.min(30,Math.max(5,Math.round(+$('#x-marg').value||10)));
-return {fmt,marg,nome:ck('x-nome'),textos:ck('x-textos'),fio:ck('x-fio'),bordas:ck('x-bordas'),limites:ck('x-limites'),cab:ck('x-cab')};
+return {fmt,marg,nome:ck('x-nome'),pedido:ck('x-ped')&&!$('#x-ped-l').hidden?pedTxt():'',textos:ck('x-textos'),fio:ck('x-fio'),bordas:ck('x-bordas'),limites:ck('x-limites'),cab:ck('x-cab')};
 }
-const planoPdf=o=>X.pdfPlano(formasAtuais({nome:o.nome,textos:o.textos,fio:o.fio}),larg(),compAtual(),{bordas:o.bordas,limites:o.limites,cabecalho:o.cab?resumoTxt():'',calibracao:o.fmt!=='a4'});
+const planoPdf=o=>X.pdfPlano(formasAtuais({nome:o.nome,pedido:o.pedido,textos:o.textos,fio:o.fio}),larg(),compAtual(),{bordas:o.bordas,limites:o.limites,cabecalho:o.cab?resumoTxt():'',calibracao:o.fmt!=='a4'});
 function infoExp(){
 const o=opcoesExp(),pdf=o.fmt==='pdf'||o.fmt==='a4';
 document.querySelectorAll('#dlg-exp .so-pdf').forEach(c=>c.disabled=!pdf);$('#x-so-pdf').hidden=pdf;
@@ -432,7 +435,7 @@ $('#x-ok').onclick=()=>{
 try{
 const o=opcoesExp();
 if(o.fmt==='plt'||o.fmt==='dxf'){
-const fs=formasAtuais({nome:o.nome,textos:o.textos,fio:o.fio});
+const fs=formasAtuais({nome:o.nome,pedido:o.pedido,textos:o.textos,fio:o.fio});
 baixar(o.fmt==='plt'?X.plt(fs,larg(),compAtual()):X.dxf(fs,larg()),nomeArq(o.fmt),o.fmt==='plt'?'application/vnd.hp-hpgl':'application/dxf');
 }else{
 if(!window.jspdf)throw new Error('O gerador de PDF não carregou. Confira a internet e recarregue a página.');
@@ -464,8 +467,8 @@ ENF=O.enfestos.find(e=>e.id===enfId);
 if(!ENF)return bloquear('Enfesto não encontrado nesta ordem.');
 const aba=O.tecidos.find(t=>t.id===ENF.tecidoId);MAT=aba&&MATS.find(m=>m.id===aba.materiaId);
 const u=new URLSearchParams(LOCAL?'local=1':'');u.set('id',id);$('#volta').href='corte.html?'+u;
-const tit=[O.nome||'Ordem',ENF.nome,MAT?[MAT.nome,MAT.cor].filter(Boolean).join(' '):''].filter(Boolean).join(' · ');
-$('#titulo').textContent=tit;document.title=ENF.nome+' · Enfesto';
+const tit=[pedPre(),O.nome||'Ordem',ENF.nome,MAT?[MAT.nome,MAT.cor].filter(Boolean).join(' '):''].filter(Boolean).join(' · ');
+$('#titulo').textContent=tit;document.title=(O.pedidoNum!=null?'Pedido #'+O.pedidoNum+' · ':'')+ENF.nome+' · Enfesto';$('#x-ped-l').hidden=O.pedidoNum==null;
 $('#aviso').hidden=true;$('#enf-v').hidden=false;
 if(!MAT)return void($('#area').innerHTML='<p class="vazio">Este enfesto não tem tecido (matéria-prima) escolhido. Escolha em Propriedades, na ordem.</p>');
 calcular();

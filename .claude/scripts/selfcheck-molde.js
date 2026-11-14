@@ -531,6 +531,7 @@ const mesmoRaster = naCaixa && cX.posicoes.every((p, k) => {
   const r = cX.itens[p.i].rasters[p.var], s = E.rasterPol(fX[k].pts.map(([x, y]) => [x - p.ox - 30, y - p.oy - 15]), 0);
   return s.cw === r.cw && s.ch === r.ch && s.m.every((v, j) => v === r.m[j]);
 });
+const fPed = fx(() => cX && X.formas(cX, [prodO([])], { nome: true, textos: true, pedido: 'Ped. 12' }), []);
 const variasVar = !!cX && new Set(cX.posicoes.map(p => p.var)).size;
 testes.push(
   ['review1 plt IN;SP1; e 40 unidades/mm', [pltQ.startsWith('IN;SP1;'), Math.max(...pdX) - Math.min(...pdX), Math.max(...pdY) - Math.min(...pdY)], [true, 4000, 4000]],
@@ -555,6 +556,7 @@ testes.push(
     const f = [{ ...q100[0], texto: { s: 'R1 · Calção Ânus M', x: 50, y: 50 } }];
     return [X.plt(f, 100, 100).includes('LBR1 - Calcao Anus M\x03;'), X.dxf(f, 100).split(/\r?\n/).includes('R1 - Calcao Anus M')];
   })(), [true, true]],
+  ['formas: o.pedido entra antes da referencia', fPed[0] && fPed[0].texto && fPed[0].texto.s, 'Ped. 12 · R1 · Frente M'],
   ['formas: texto com nome do molde e da peca, fio ao longo de X', fX[0] && [fX[0].texto && fX[0].texto.s, fX[0].fio && fX[0].fio[0][1] === fX[0].fio[1][1], fX[0].cor, fX[0].costura], ['R1 · Frente M', true, 'Azul', null]],
 );
 
