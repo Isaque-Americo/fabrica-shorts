@@ -10,6 +10,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"></script>
+<script src="molde/geo.js"></script>
+<script src="molde/modelo.js"></script>
 <script src="molde/encaixe.js"></script>
 <script src="molde/ordem.js"></script>
 <style>
@@ -451,7 +453,7 @@ setTimeout(()=>aviso(obrigatoria?'Senha temporária trocada.':'Senha alterada.')
 const S={produtos:[],reps:[],pedidos:[],lojas:[],cadastros:[],materiais:[],config:[]};
 const SZ=['P','M','G','GG','G1','G2','G3','G4'];
 const ST=['Pendente','Faturado','Enviado','Entregue','Cancelado'];
-const TABS_ADMIN=[['painel','Painel'],['produtos','Produtos'],['materia','Matéria-prima'],['pedidos','Pedidos'],['fabricar','Fabricar'],['corte','Ordens de corte'],['reps','Representantes'],['cadastros','Cadastros'],['estoque','Estoque']];
+const TABS_ADMIN=[['painel','Painel'],['produtos','Produtos'],['materia','Matéria-prima'],['pedidos','Pedidos'],['fabricar','Fabricar'],['molde','Criar molde'],['corte','Ordens de corte'],['reps','Representantes'],['cadastros','Cadastros'],['estoque','Estoque']];
 const TABS_LOJISTA=[['catalogo','Catálogo'],['pedidos','Pedidos']];
 const TABS_REP=[['painel','Comissões'],['catalogo','Catálogo'],['pedidos','Pedidos']];
 function iconForTab(k){
@@ -461,6 +463,7 @@ case 'produtos':return 'inventory_2';
 case 'materia':return 'texture';
 case 'pedidos':return 'receipt_long';
 case 'fabricar':return 'precision_manufacturing';
+case 'molde':return 'draw';
 case 'corte':return 'content_cut';
 case 'reps':return 'groups';
 case 'cadastros':return 'person_add';
@@ -551,7 +554,7 @@ sb.auth.onAuthStateChange(async (e,s)=>{if(e==='PASSWORD_RECOVERY'&&s){history.r
 function render(){
 const tabs=appProfile?.role==='lojista'?TABS_LOJISTA:appProfile?.role==='representante'?TABS_REP:[...TABS_ADMIN,['administradores','Administradores']];
 if(!tabs.some(([k])=>k===tab))tab=tabs[0][0];
-$('#sidebar-nav').innerHTML=tabs.map(([k,l])=>k==='corte'?`<a href="corte.html"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`:`<a href="#" class="${k===tab?'active':''}" onclick="tab='${k}';render();return false;"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`).join('');
+$('#sidebar-nav').innerHTML=tabs.map(([k,l])=>k==='molde'?`<a href="molde.html?novo=1" target="_blank" rel="noopener"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`:k==='corte'?`<a href="corte.html"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`:`<a href="#" class="${k===tab?'active':''}" onclick="tab='${k}';render();return false;"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`).join('');
 $('#page-title').textContent=tabs.find(t=>t[0]===tab)?.[1]||'Painel';
 $('#page-subtitle').textContent='';
 const shell=document.getElementById('app-shell');
@@ -742,7 +745,7 @@ const c=custoP(p,false),cg=custoP(p,true),pg=precoG(p),baixo=tot(p)<=(+p.min||0)
 let cab='';
 if(agrupa&&tecDe(p)!==grupoAtual){grupoAtual=tecDe(p);cab=`<tr class="grp"><td colspan="7">${esc(grupoAtual)} · ${ordem.filter(x=>tecDe(x)===grupoAtual).length} produto(s)</td></tr>`}
 return cab+`<tr><td>${foto(p,'fmini',true)}</td><td>${esc(p.ref)}</td>
- <td>${esc(p.nome)}${p.tecidoId?`<small>${esc(mat(p.tecidoId)?.nome||'')} · ${p.ficha?'ficha própria':'ficha padrão'}</small>`:'<small>custo manual</small>'}</td>
+ <td>${esc(p.nome)}${p.tecidoId?`<small>${esc(mat(p.tecidoId)?.nome||'')} · ${p.ficha?'ficha própria':'ficha padrão'}</small>`:'<small>custo manual</small>'}${temMolde(p)?'':'<small class="aviso">sem molde</small>'}</td>
  <td class="n">${brl(p.preco)}${pg!==+p.preco?`<small>G1–G4 ${brl(pg)}</small>`:''}</td>
  <td class="n">${pct(c,+p.preco)}${cg!==c||pg!==+p.preco?`<small>G1–G4 ${pct(cg,pg)}</small>`:''}</td>
  <td class="n ${baixo?'low':''}">${tot(p)}${baixo?'<small>abaixo do mínimo</small>':''}</td>
@@ -752,9 +755,13 @@ return `<div class="bar">${campoBusca('Buscar por referência ou descrição')}<
  <div class="tw"><table><tr><th></th><th>Ref.</th><th>Descrição</th><th class="n">Preço</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>${r||'<tr><td colspan="7" class="empty">Nenhum produto cadastrado. Comece pelo botão acima.</td></tr>'}</table></div>
  <p style="color:var(--mut)">A margem desconta imposto, despesas e a maior comissão cadastrada (${nf(comMax(),2)}%). Passe o mouse nela para ver a conta, ou abra a ficha técnica para o custo detalhado.</p>`;
 }
-function fProd(id){
+async function fProd(id){
 const p=id?prod(id):{};
 pltMol=null;pltMolId=p.molId||'';
+try{await sessaoOk()}catch(e){return}
+const {data:moldes,error:em}=await sb.from('docs').select('id,nome:data->>nome').eq('col','moldes');
+if(em)return aviso('Não foi possível carregar a lista de moldes: '+ptErro(em));
+moldes.sort((a,b)=>(a.nome||'').localeCompare(b.nome||''));
 const campoFoto=k=>{const n=p['img'+k],lbl=k==='F'?'Frente':'Costas';
 return `<div style="flex:1"><small style="display:block;margin-bottom:4px">${lbl}</small>${n?`<img class="fmed" src="${imgUrl(n)}" alt="${lbl}">`:'<div class="fmed semfoto"></div>'}<input type="file" name="foto${k}" accept="image/*" style="margin-top:6px"><label style="display:${n?'flex':'none'};gap:6px;align-items:center;margin:4px 0 0;font-size:13px"><input type="checkbox" name="del${k}" style="width:auto;margin:0">Remover</label></div>`};
 modal(id?'Editar produto':'Novo produto',`
@@ -768,7 +775,8 @@ modal(id?'Editar produto':'Novo produto',`
  <div class="r2" style="align-items:flex-start;margin:0">${campoFoto('F')}${campoFoto('C')}</div>
  <small>Reduzidas para 1200px e convertidas em JPEG antes de subir. Aparecem no catálogo do lojista.</small></fieldset>
  <fieldset style="border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:8px 0"><legend style="padding:0 6px;font-weight:600">Ficha técnica</legend>
-  <label>Tecido<select name="tecidoId"><option value="">— sem ficha (usar custo manual) —</option>${S.materiais.filter(m=>m.tipo==='tecido').sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(m=>`<option value="${m.id}"${m.id===p.tecidoId?' selected':''}>${esc(m.nome)}${m.comp?' · '+esc(m.comp):''}${m.cor?' · '+esc(m.cor):''} (${brl4(matCusto(m))}/m)</option>`).join('')}</select></label>
+  <label>Molde<select name="molId" required><option value="">— escolha o molde —</option>${moldes.map(m=>`<option value="${esc(m.id)}"${m.id===p.molId?' selected':''}>${esc(m.nome||'(sem nome)')}</option>`).join('')}<option value="plt"${!p.molId&&p.mol?' selected':''}>Importar PLT</option></select><small>Crie o molde pelo menu “Criar molde”. “Importar PLT” usa o arquivo de plotter escolhido abaixo.</small></label>
+  <label>Tecido<select name="tecidoId" required><option value="">— escolha o tecido —</option>${S.materiais.filter(m=>m.tipo==='tecido').sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(m=>`<option value="${m.id}"${m.id===p.tecidoId?' selected':''}>${esc(m.nome)}${m.comp?' · '+esc(m.comp):''}${m.cor?' · '+esc(m.cor):''} (${brl4(matCusto(m))}/m)</option>`).join('')}</select></label>
  <div class="g2"><label>Consumo de tecido P–GG (m por peça)<input name="cons" type="number" step="0.001" min="0" value="${p.cons??''}"></label>
  <label>Consumo de tecido G1–G4 (m por peça)<input name="consG" type="number" step="0.001" min="0" value="${p.consG??''}" placeholder="igual ao P–GG"></label>
  <label>Custo extra (R$ por peça)<input name="extra" type="number" step="0.01" min="0" value="${p.extra??''}"></label></div>
@@ -798,17 +806,32 @@ modal(id?'Editar produto':'Novo produto',`
 async(f,form)=>{
 const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.preco||0,precoG:+f.precoG||0,est:lerEst(form),tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0,molL:+f.molL||0,molC:+f.molC||0,molLG:+f.molLG||0,molCG:+f.molCG||0,perda:+f.perda||0};delete d.id;
 if(form.querySelector('#fichaProp').checked)d.ficha=lerFicha(form,f.pmo,f.pfixo);else delete d.ficha;
-if(pltMol){d.mol={arq:pltMol.arq,un:'mm',pecas:pltMol.pecas.map(q=>({w:q.w,h:q.h,qtd:q.qtd,pts:q.pts}))};delete d.molId}
+let molDoc=null;
+if(f.molId!=='plt'){ // igual ao salvar do editor (molde.html ligarProdutos): produto ganha molId + mol, o molde lista o produto em produtoIds
+const {data:r,error:er}=await sb.from('docs').select('data').eq('id',f.molId).eq('col','moldes').single();
+if(er)throw new Error('Não foi possível ler o molde escolhido: '+ptErro(er));
+const mol=MoldeModelo.molParaProduto(MoldeModelo.normalizar(r.data));
+if(!temMolde({mol}))throw new Error('O molde escolhido ainda não tem peças.');
+d.molId=f.molId;d.mol=mol;molDoc=r.data;
+}
+else if(pltMol){d.mol={arq:pltMol.arq,un:'mm',pecas:pltMol.pecas.map(q=>({w:q.w,h:q.h,qtd:q.qtd,pts:q.pts}))};delete d.molId}
 else if(id){ // o editor de molde pode ter mudado mol/molId depois que o formulário abriu
 const {data:r,error:er}=await sb.from('docs').select('data').eq('id',id).single();
 if(er)setTimeout(()=>aviso('Não foi possível conferir o molde do produto; ele foi salvo com o molde que estava no formulário.'),100);
 if(r&&r.data){if(r.data.mol)d.mol=r.data.mol;else delete d.mol;if(r.data.molId)d.molId=r.data.molId;else delete d.molId}}
+if(!temMolde(d))throw new Error('Escolha o arquivo PLT do molde.');
 const upF=form.fotoF.files[0],upC=form.fotoC.files[0];
 if(f.delF&&!upF&&p.imgF){await sb.storage.from('produtos').remove([p.imgF]);d.imgF=''}
 if(f.delC&&!upC&&p.imgC){await sb.storage.from('produtos').remove([p.imgC]);d.imgC=''}
 if(upF)d.imgF=await subirFoto(upF,p.imgF);
 if(upC)d.imgC=await subirFoto(upC,p.imgC);
-id?await db.doc('produtos/'+id).set(d):await db.collection('produtos').add(d);
+let pid=id;
+if(id)await db.doc('produtos/'+id).set(d);
+else{await sessaoOk();const {data:r,error:e}=await sb.from('docs').insert({col:'produtos',data:d}).select('id').single();if(e)throw e;pid=r.id} // precisa do id para o produtoIds do molde; a lista atualiza pelo realtime
+if(molDoc&&!(molDoc.produtoIds||[]).includes(pid)){
+const {error:e}=await sb.from('docs').update({data:{...molDoc,produtoIds:[...(molDoc.produtoIds||[]),pid]}}).eq('id',d.molId);
+if(e)setTimeout(()=>aviso('Produto salvo, mas o molde não registrou este produto nas Referências: '+ptErro(e)+'. Abra o molde e marque o produto.'),100);
+}
 });
 }
 
@@ -889,6 +912,8 @@ t+=c*n;
 return t>0?t:null;
 }
 let pltMol=null,pltMolId='';
+// produto só entra em pedido com molde de peças (PLT ou editor: pecas do base ou porTam de algum tamanho)
+function temMolde(p){const m=p&&p.mol;return !!m&&((m.pecas||[]).length>0||Object.values(m.porTam||{}).some(l=>(l||[]).length>0))}
 const molOrigem=p=>p&&(p.molId||p.mol&&p.mol.origem==='editor')?'editor':p&&p.mol?'plt':null;
 const pltForm=()=>document.querySelector('dialog[open] form');
 async function lerPlt(fm){
@@ -902,6 +927,7 @@ try{txt=await f.text()}catch(e){prev.innerHTML='<p class="low">Não consegui ler
 const cs=moldesDePlt(txt);
 if(!cs.length){prev.innerHTML='<p class="low">Não achei contorno de painel aí. Confirme que é um PLT em HP-GL, com comandos PU e PD.</p>';return}
 pltMol={arq:f.name,pecas:cs.map(c=>({w:Math.round(c.w),h:Math.round(c.h),area:Math.round(c.area),qtd:1,x0:Math.round(c.x0),y0:Math.round(c.y0),pts:c.pts.map(p=>[Math.round(p[0]-c.x0),Math.round(p[1]-c.y0)])}))};
+if(fm.molId)fm.molId.value='plt';
 pltPrev();
 }
 function pltQtd(i,v){if(pltMol&&pltMol.pecas[i]){pltMol.pecas[i].qtd=Math.max(0,Math.round(+v||0));pltPrev()}}
@@ -1296,9 +1322,13 @@ return `<div class="bar">${campoBusca('Buscar por número ou cliente')}<span sty
 }
 
 function semProd(extra){return [...CORES_BASE,...(extra||[]).filter(c=>!CORES_BASE.includes(c))]}
+// shortcut: lojista e representante leem o catálogo sem mol (catalogo_produtos só tem ref/nome/preço), então só o admin filtra; expor um sinal de molde no catálogo para filtrar todos
+const pedEscolhe=p=>!!p&&(appProfile?.role!=='admin'||temMolde(p));
 function bloco(pid,get,extra,lida){
-const p=pid===undefined?S.produtos[0]:(pid?prod(pid):null);
-const opts=(p?'':'<option value="" selected>— escolha a referência —</option>')+S.produtos.slice().sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(x=>`<option value="${x.id}" ${p&&x.id===p.id?'selected':''}>${esc(x.ref)} · ${esc(x.nome)}</option>`).join('');
+const lista=S.produtos.filter(pedEscolhe),q=pid?prod(pid):null;
+const p=pid===undefined?lista[0]:(pedEscolhe(q)?q:null);
+if(q&&!p)lida=(q.ref||'')+' · '+(q.nome||'')+' (sem molde)';
+const opts=(p?'':'<option value="" selected>— escolha a referência —</option>')+lista.sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(x=>`<option value="${x.id}" ${p&&x.id===p.id?'selected':''}>${esc(x.ref)} · ${esc(x.nome)}</option>`).join('');
 const cores=p?coresDe(p,extra||[]):semProd(extra);
 return `<div class="blk${p?'':' need'}"><div class="r2"><span class="fth">${foto(p||{},'fmini')}</span><select class="selp" onchange="trocaProd(this)">${opts}</select><button type="button" class="sm del" onclick="this.closest('.blk').remove();checaFalta()">✕</button></div>${lida?`<small class="mut">Referência lida no arquivo: ${esc(lida)}</small>`:''}<div class="gw">${grade(cores,get||(()=>0))}</div></div>`;
 }
@@ -1326,6 +1356,7 @@ return r;
 function fPed(){
 const role=appProfile.role;
 if(!S.produtos.length){aviso('Não há produtos disponíveis para lançar pedidos.');tab=role==='admin'?'produtos':'catalogo';render();return}
+if(!S.produtos.some(pedEscolhe)){aviso('Cadastre o molde dos produtos antes de lançar pedidos.');tab='produtos';render();return}
 const cliente=role==='lojista'?`<label>Loja<input name="cliente" required value="${esc(appProfile.store_name)}" readonly></label>`:`<label>Cliente (loja)<input name="cliente" required></label>`;
 const vinculoLoja=role==='admin'||role==='representante'?`<label>Vincular à conta de lojista (opcional)<select name="ownerId" onchange="selecionaLoja(this)"><option value="">Outro cliente, sem conta cadastrada</option>${S.lojas.map(x=>`<option value="${x.id}" data-nome="${esc(x.nome)}">${esc(x.nome)}</option>`).join('')}</select><small>Pedidos vinculados também aparecem na conta da loja.</small></label>`:'';
 const representante=role==='representante'?`<label>Representante<input value="${esc(rep(appProfile.rep_id)?.nome||'')}" readonly></label>`:role==='lojista'?`<label>Representante atribuído<input value="${esc(rep(appProfile.rep_id)?.nome||'Sem representante atribuído')}" readonly></label>`:`<label>Representante (obrigatório)<input name="repNome" required list="replist" autocomplete="off" placeholder="Escolha da lista ou digite o nome"><datalist id="replist">${S.reps.map(r=>`<option value="${esc(r.nome)}">`).join('')}</datalist></label>`;

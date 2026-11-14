@@ -493,9 +493,19 @@ id=await B.criar(doc);
 pendente=criado=true; // primeiro salvamento grava molId/mol no produto
 }
 }
-if(!id)return bloquear('Nenhum molde escolhido. Abra o editor pelo produto, no app.');
+if(!id&&!pid&&Q.get('novo')==='1'){ // "Criar molde" do menu do app: molde sem produto; as Referências ligam depois
+doc=MM.novo('Novo molde');
+molId=null;
+const g=await dlgGrade(doc,true);
+if(!g)return bloquear('Molde não criado.');
+aplicarDlg(doc,g);
+doc.produtoIds=[];
+id=await B.criar(doc);
+criado=true;
+}
+if(!id)return bloquear('Nenhum molde escolhido. Use “Criar molde” no menu do app.');
 molId=id;
-const u=new URLSearchParams(location.search);u.delete('produto');u.set('id',id);history.replaceState(null,'','?'+u);
+const u=new URLSearchParams(location.search);u.delete('produto');u.delete('novo');u.set('id',id);history.replaceState(null,'','?'+u);
 M=MM.normalizar(doc);ligadosSalvos=criado?[]:[...M.produtoIds]; // recém-criado: o produto ainda não tem molId, tem de ligar
 let r=null;try{r=JSON.parse(localStorage.getItem(RASC()))}catch(e){}
 if(r&&r.em>(doc.salvoEm||0)){
