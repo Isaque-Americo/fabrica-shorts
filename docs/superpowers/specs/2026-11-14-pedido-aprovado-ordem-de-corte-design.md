@@ -13,7 +13,7 @@ O que conta como sucesso: o admin aprova o pedido, escolhe "automático" e receb
 1. **Molde primeiro.** Pelo menu lateral, "Criar molde" abre o editor (`molde.html`) sem produto, só com nome/referência (ex.: "5050").
 2. **Produto exige molde.** No cadastro do produto, o campo **Molde** é obrigatório: escolher um molde da lista ou importar um PLT (o caminho de hoje). Sem molde, Salvar recusa.
    - Os 3 produtos atuais (todos sem molde) continuam no app com o selo **"sem molde"** e **não podem entrar em pedido novo** até ganharem um.
-3. **Pedido.** Lojista, representante e admin fazem pedido como hoje. O **lojista escolhe obrigatoriamente um representante cadastrado** (hoje o representante vem fixo do perfil do lojista).
+3. **Pedido.** Lojista, representante e admin fazem pedido como hoje. O lojista continua com o representante do perfil dele (dono decidiu em 2026-11-14 não liberar a lista de representantes para lojistas).
 4. **Aprovação.** O pedido nasce **Pendente**. O admin tem **Aprovar** e **Recusar**.
    - Recusado: novo status **Recusado**, visível para lojista e representante.
    - Aprovado: novo status **Aprovado**, entre Pendente e Faturado. Daí segue Faturado → Enviado → Entregue como hoje.

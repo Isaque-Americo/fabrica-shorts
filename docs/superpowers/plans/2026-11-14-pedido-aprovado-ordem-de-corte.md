@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Pedido aprovado vira a sua ordem de corte (automática ou detalhada); todo produto tem molde; o lojista escolhe o representante; a ordem de corte tem Editar/Apagar e mostra o pedido.
+**Goal:** Pedido aprovado vira a sua ordem de corte (automática ou detalhada); todo produto tem molde; a ordem de corte tem Editar/Apagar e mostra o pedido.
 
 **Architecture:** A regra pura fica em `molde/ordem.js` (`dePedido`, `semMolde`, agrupamento por tecido + grupo), testada em Node. O `index.html` aprova o pedido, monta a ordem com `dePedido`, grava em `ordens` e marca o pedido. O `corte.html` lista e apaga ordens, e ao apagar devolve o pedido a Pendente. O molde passa a nascer antes do produto (`molde.html?novo=1`), e o produto escolhe o molde, copiando as peças com `MoldeModelo.molParaProduto`.
 
@@ -27,22 +27,24 @@
 2. Aprovar duas vezes (clique duplo, ou ordem órfã depois de apagar com falha) → nunca duas ordens para o mesmo pedido. (Task 4: busca ordem existente por `pedidoId` antes de criar.)
 3. Detalhado juntando referências de tecidos diferentes no mesmo número de enfesto → saem enfestos separados, um por tecido. (Task 2 testa.)
 4. Pedido com cores diferentes da mesma referência → itens separados por cor no mesmo enfesto, grade por cor certa. (Task 2 testa.)
-5. Lojista grava pedido com `repId` inexistente ou de outro lojista → RLS recusa; com representante cadastrado → aceita. (Task 1 testa com SQL.)
+5. Lojista grava pedido com o representante do perfil → RLS aceita; com `repId` de outro representante ou inexistente → recusa. (Task 1 testa com SQL.)
 
 ---
 
-### Task 1: RLS — lojista escolhe o representante
+### Task 1: RLS — corrigir o pedido do lojista com representante
+
+> Dono decidiu em 2026-11-14: o lojista **não** escolhe o representante (não liberar a lista para lojistas). Ele continua com o representante do perfil. Esta tarefa só corrige o erro que hoje recusa esses pedidos.
 
 **Files:**
-- Create: `supabase/migrations/20261114_lojista_escolhe_representante.sql` (criar a pasta se não existir; só registro, a aplicação é pelo MCP)
+- Create: `supabase/migrations/20261114_pedido_lojista_representante.sql` (criar a pasta se não existir; só registro, a aplicação é pelo MCP)
 
 **Interfaces:**
-- Produces: política `docs_store_insert_own_order` que aceita `data->>'repId'` vazio **ou** igual a um `id` de `private.catalog_representatives`, sem exigir o `rep_id` do perfil.
+- Produces: política `docs_store_insert_own_order` que aceita o pedido do lojista com `repId` vazio ou igual ao `rep_id` do perfil dele, desde que esse representante exista em `public.catalogo_representantes`.
 
-- [ ] **Step 1: Ler a política viva** com `select pg_get_expr(polwithcheck, polrelid) from pg_policy where polname='docs_store_insert_own_order'`. Hoje ela tem `COALESCE(p.rep_id,'') = COALESCE(docs.data->>'repId','')` e `r.id = (r.data->>'repId')` (compara a linha consigo mesma; `catalog_representatives.data` só tem `nome`/`regiao`, então todo pedido de lojista com representante falha).
-- [ ] **Step 2: Escrever a migração**: `drop policy` + `create policy docs_store_insert_own_order` igual à atual, trocando as duas condições por: tirar o `COALESCE(p.rep_id…)` do `EXISTS` do perfil e usar `(NULLIF(data->>'repId','') IS NULL OR EXISTS (select 1 from private.catalog_representatives r where r.id::text = docs.data->>'repId'))`. Manter `col='pedidos'`, `owner_id = auth.uid()`, `role='lojista'` e `store_name = data->>'cliente'`.
-- [ ] **Step 3: Aplicar** com `apply_migration` (nome `lojista_escolhe_representante`).
-- [ ] **Step 4: Verificar** com SQL em transação revertida (`begin; set local role authenticated; set local request.jwt.claims = '{"sub":"<user_id de um lojista>"}'; insert … ; rollback;`): repId de um representante cadastrado → insere; repId `'x'` → erro de RLS; repId vazio → insere. Rodar `get_advisors` (security) e conferir que nada novo aparece.
+- [ ] **Step 1: Ler a política viva** com `select pg_get_expr(polwithcheck, polrelid) from pg_policy where polname='docs_store_insert_own_order'`. Hoje ela tem `COALESCE(p.rep_id,'') = COALESCE(docs.data->>'repId','')` (fica) e `r.id = (r.data->>'repId')` (compara a linha consigo mesma; o catálogo só tem `nome`/`regiao`, então todo pedido de lojista com representante falha).
+- [ ] **Step 2: Escrever a migração**: `drop policy` + `create policy docs_store_insert_own_order` igual à atual, trocando **só** `r.id = (r.data->>'repId')` por `r.id::text = (docs.data->>'repId')`, mantendo a fonte `public.catalogo_representantes` (o lojista já enxerga o representante do próprio perfil por ela). Nenhuma outra política muda.
+- [ ] **Step 3: Aplicar** com `apply_migration` (nome `pedido_lojista_representante`).
+- [ ] **Step 4: Verificar** com SQL em transação revertida (`begin; set local role authenticated; set local request.jwt.claims = '{"sub":"<user_id de um lojista com rep_id>"}'; insert … ; rollback;`): repId = rep do perfil → insere; repId de outro representante ou `'x'` → erro de RLS. Se nenhum lojista tiver `rep_id`, dizer no relatório e testar a expressão de outro jeito. Rodar `get_advisors` (security) e conferir que nada novo aparece.
 - [ ] **Step 5: Commit** do arquivo `.sql`.
 
 ### Task 2: Regra pura — `dePedido` e `semMolde`
@@ -100,7 +102,7 @@
 - Produces: pedido com `status` em `['Pendente','Aprovado','Recusado','Faturado','Enviado','Entregue','Cancelado']` e `ordemId` (id do doc em `ordens`); ordem em `ordens` com `pedidoId`, `pedidoNum`, `refs`.
 
 - [ ] **Step 1: Status**: `ST` vira a lista acima; `.pill.s-aprovado` (cor `var(--ok)`) e `.pill.s-recusado` (cor `var(--bad)`). Onde hoje se exclui `'Cancelado'` dos totais (l.687, l.708), excluir também `'Recusado'`.
-- [ ] **Step 2: Representante no pedido do lojista**: em `fPed`, o lojista vê `<select name="repId" required>` com `S.reps` (já vem de `catalogo_representantes`), pré-selecionado com `appProfile.rep_id`. No salvar, `repId`/`repNome` do lojista vêm do select; sem escolha → erro "Escolha o representante."
+- [ ] **Step 2: Representante no pedido do lojista**: sem mudança (dono decidiu em 2026-11-14 que o lojista não escolhe; continua o do perfil).
 - [ ] **Step 3: Ações do admin** no menu do pedido:
   - Pendente: **Aprovar** (`aprovarPed(id)`), **Recusar** (`setSt(id,'Recusado')`).
   - Recusado: pode voltar a Pendente.
