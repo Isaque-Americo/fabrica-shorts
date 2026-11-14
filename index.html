@@ -806,13 +806,19 @@ modal(id?'Editar produto':'Novo produto',`
 async(f,form)=>{
 const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.preco||0,precoG:+f.precoG||0,est:lerEst(form),tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0,molL:+f.molL||0,molC:+f.molC||0,molLG:+f.molLG||0,molCG:+f.molCG||0,perda:+f.perda||0};delete d.id;
 if(form.querySelector('#fichaProp').checked)d.ficha=lerFicha(form,f.pmo,f.pfixo);else delete d.ficha;
-let molDoc=null;
+let ligar=false;
 if(f.molId!=='plt'){ // igual ao salvar do editor (molde.html ligarProdutos): produto ganha molId + mol, o molde lista o produto em produtoIds
 const {data:r,error:er}=await sb.from('docs').select('data').eq('id',f.molId).eq('col','moldes').single();
 if(er)throw new Error('Não foi possível ler o molde escolhido: '+ptErro(er));
 const mol=MoldeModelo.molParaProduto(MoldeModelo.normalizar(r.data));
-if(!temMolde({mol}))throw new Error('O molde escolhido ainda não tem peças.');
-d.molId=f.molId;d.mol=mol;molDoc=r.data;
+if(temMolde({mol}))d.mol=mol;
+else{ // o editor liga produto a molde sem peça e mantém o mol atual (ex.: PLT) até haver peça: aqui também
+let cur=p;
+if(id&&f.molId===p.molId){const {data:x}=await sb.from('docs').select('data').eq('id',id).single();if(x&&x.data)cur=x.data}
+if(!(id&&f.molId===p.molId&&cur.molId===f.molId&&temMolde(cur)))throw new Error('O molde escolhido ainda não tem peças.');
+d.mol=cur.mol;
+}
+d.molId=f.molId;ligar=true;
 }
 else if(pltMol){d.mol={arq:pltMol.arq,un:'mm',pecas:pltMol.pecas.map(q=>({w:q.w,h:q.h,qtd:q.qtd,pts:q.pts}))};delete d.molId}
 else if(id){ // o editor de molde pode ter mudado mol/molId depois que o formulário abriu
@@ -828,10 +834,16 @@ if(upC)d.imgC=await subirFoto(upC,p.imgC);
 let pid=id;
 if(id)await db.doc('produtos/'+id).set(d);
 else{await sessaoOk();const {data:r,error:e}=await sb.from('docs').insert({col:'produtos',data:d}).select('id').single();if(e)throw e;pid=r.id} // precisa do id para o produtoIds do molde; a lista atualiza pelo realtime
-if(molDoc&&!(molDoc.produtoIds||[]).includes(pid)){
-const {error:e}=await sb.from('docs').update({data:{...molDoc,produtoIds:[...(molDoc.produtoIds||[]),pid]}}).eq('id',d.molId);
-if(e)setTimeout(()=>aviso('Produto salvo, mas o molde não registrou este produto nas Referências: '+ptErro(e)+'. Abra o molde e marque o produto.'),100);
+if(ligar)try{ // relê o molde logo antes: o editor aberto em outra aba pode ter salvo desenho depois da leitura acima
+const {data:r,error:er}=await sb.from('docs').select('data').eq('id',d.molId).eq('col','moldes').single();
+if(er)throw er;
+const ids=r.data.produtoIds||[];
+if(!ids.includes(pid)){
+const {data:u,error:eu}=await sb.from('docs').update({data:{...r.data,produtoIds:[...ids,pid]}}).eq('id',d.molId).select('id');
+if(eu)throw eu;
+if(!u||!u.length)throw new Error('sem permissão para salvar o molde'); // update barrado pelo RLS volta vazio sem erro
 }
+}catch(e){setTimeout(()=>aviso('Produto salvo, mas o molde não registrou este produto nas Referências: '+ptErro(e)+'. Abra o molde e marque o produto.'),100)}
 });
 }
 
