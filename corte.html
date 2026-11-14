@@ -225,7 +225,7 @@ async ordem(id){rede();return (ler('ordens')||{})[id]||null},
 async criar(d){rede();const id='o'+Date.now(),t=ler('ordens')||{};t[id]=d;gravarK('ordens',t);return id},
 async gravar(id,d){rede();const t=ler('ordens')||{};t[id]=d;gravarK('ordens',t)},
 async apagar(id){rede();const t=ler('ordens')||{};delete t[id];gravarK('ordens',t)},
-async voltarPedido(pid){rede();const t=ler('pedidos')||{};if(t[pid]){t[pid]={...t[pid],status:'Pendente',ordemId:null};gravarK('pedidos',t)}},
+async voltarPedido(pid,oid){rede();const t=ler('pedidos')||{};const p=t[pid];if(p&&(!p.ordemId||p.ordemId===oid)){t[pid]={...p,ordemId:null,...(p.status==='Aprovado'?{status:'Pendente'}:{})};gravarK('pedidos',t)}},
 async produtos(){rede();return lista('produtos')},
 async materiais(){rede();return lista('materiais')}
 };
@@ -241,7 +241,7 @@ async criar(d){await sessaoOk();return ok(await sb.from('docs').insert({col:'ord
 async gravar(id,d){await sessaoOk();if(!ok(await sb.from('docs').update({data:d}).eq('id',id).eq('col','ordens').select('id')).length)throw new Error('Sem permissão para salvar.')},
 async apagar(id){await sessaoOk();if(!ok(await sb.from('docs').delete().eq('id',id).eq('col','ordens').select('id')).length)throw new Error('Sem permissão para apagar.')},
 // merge no data do pedido; pedido que já não existe não impede apagar a ordem
-async voltarPedido(pid){await sessaoOk();const r=ok(await sb.from('docs').select('data').eq('id',pid).eq('col','pedidos').maybeSingle());if(!r)return;if(!ok(await sb.from('docs').update({data:{...r.data,status:'Pendente',ordemId:null}}).eq('id',pid).eq('col','pedidos').select('id')).length)throw new Error('Sem permissão para salvar.')},
+async voltarPedido(pid,oid){await sessaoOk();const r=ok(await sb.from('docs').select('data').eq('id',pid).eq('col','pedidos').maybeSingle());if(!r||(r.data.ordemId&&r.data.ordemId!==oid))return;if(!ok(await sb.from('docs').update({data:{...r.data,ordemId:null,...(r.data.status==='Aprovado'?{status:'Pendente'}:{})}}).eq('id',pid).eq('col','pedidos').select('id')).length)throw new Error('Sem permissão para salvar.')},
 produtos:()=>doCol('produtos'),
 materiais:()=>doCol('materiais')
 };
@@ -307,9 +307,9 @@ const td=tb.querySelector(`[data-metros="${CSS.escape(x.id)}"]`);if(td)td.textCo
 function resumoDe(o){try{const r=MO.resultados(o,o.enfestos.map(e=>MO.calcularEnfesto(e,o,PRODS,MATS)),MATS);return {metros:r.metros,pecas:r.pecas}}catch(e){console.error(e);return {metros:null,pecas:null}}}
 // ordem de pedido: o pedido volta para Pendente antes de apagar; se o passo 2 falhar, apagar de novo é seguro
 async function apagarOrdem(id,o,dentro){
-if(!confirm(o.pedidoId?'Apagar a ordem do pedido #'+(o.pedidoNum??'?')+'? O pedido volta para Pendente.':'Apagar a ordem “'+(o.nome||'(sem nome)')+'”?'))return;
+if(!confirm(o.pedidoId?'Apagar a ordem do pedido #'+(o.pedidoNum??'?')+'? Se o pedido estiver Aprovado, ele volta para Pendente.':'Apagar a ordem “'+(o.nome||'(sem nome)')+'”?'))return;
 try{
-if(o.pedidoId)await B.voltarPedido(o.pedidoId);
+if(o.pedidoId)await B.voltarPedido(o.pedidoId,id);
 await B.apagar(id);
 if(dentro){clearTimeout(timer);estado='salvo';try{localStorage.removeItem('ordem:'+id)}catch(e){}location.href=urlCom();return}
 }catch(e){console.error(e);toast('Não foi possível apagar: '+ptErro(e))}

@@ -330,7 +330,7 @@ else if((ev.key==='e'||ev.key==='E')&&C.itens[p.i].espelhar){ev.preventDefault()
 // ---- minimapa e exportação: sempre as posições atuais (P, com o ajuste manual) ----
 const X=window.MoldeExporta;
 const formasAtuais=o=>X.formas({...C,posicoes:P},PRODS,{cabeceira:ENF.cabeceira,ourelaE:oe(),...o});
-const pedPre=()=>O.pedidoNum!=null&&!String(O.nome).includes('#'+O.pedidoNum)?'Pedido #'+O.pedidoNum:''; // a ordem do pedido já se chama "Pedido #N"
+const pedPre=()=>O.pedidoNum!=null&&O.nome!=='Pedido #'+O.pedidoNum?'Pedido #'+O.pedidoNum:''; // a ordem do pedido já se chama "Pedido #N"
 const pedTxt=()=>O.pedidoNum!=null?'Ped. '+O.pedidoNum:'';
 const nomeTecido=()=>[MAT.nome,MAT.cor].filter(Boolean).join(' ');
 const resumoTxt=()=>[pedPre(),O.nome||'Ordem',ENF.nome,nomeTecido(),nf(compAtual()/1000)+' m',ENF.camadas+' camada(s)'].filter(Boolean).join(' · ');
