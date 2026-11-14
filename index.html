@@ -512,7 +512,10 @@ const prod=id=>S.produtos.find(p=>p.id===id);
 const rep=id=>S.reps.find(r=>r.id===id);
 const precoG=p=>+((p&&p.precoG!=null)?p.precoG:(p&&p.preco))||0;
 const precoDe=(p,t)=>SZ.indexOf(t)>=4?precoG(p):(+p.preco||0);
-const pedTotal=o=>(o.itens||[]).reduce((a,i)=>a+i.qtd*i.preco,0);
+const pedSub=o=>(o.itens||[]).reduce((a,i)=>a+i.qtd*i.preco,0);
+const pedTotal=o=>pedSub(o)-(+o.desc||0);
+const PAG={pix:'Pix (à vista) — 5% de desconto',transferencia:'Transferência bancária',boleto:'Boleto',cheque:'Cheque'};
+const descPag=(pag,sub)=>pag==='pix'?Math.round(sub*5)/100:0;
 const precoAtual=i=>{const p=prod(i.prodId);const np=p?precoDe(p,i.tam):0;return np>0?np:(+i.preco||0)};
 const pedDesatual=o=>['Pendente','Aprovado','Faturado'].includes(o.status)&&(o.itens||[]).some(i=>Math.abs(precoAtual(i)-(+i.preco||0))>=0.005);
 
@@ -1322,12 +1325,12 @@ if(pedFiltro!=='todos'&&!ST.includes(pedFiltro))pedFiltro='todos';
 const st=o=>o.status||'Pendente';
 const lista=pedFiltro==='todos'?todos:todos.filter(o=>st(o)===pedFiltro);
 const chips=`<div class="chips"><button class="${pedFiltro==='todos'?'on':''}" onclick="setPedFiltro('todos')">Todos · ${todos.length}</button>${ST.map(s=>{const n=todos.filter(o=>st(o)===s).length;return n?`<button class="${pedFiltro===s?'on':''}" onclick="setPedFiltro('${s}')">${s} · ${n}</button>`:''}).join('')}</div>`;
-const r=lista.map(o=>`<tr><td>#${o.numero}<small>${esc((o.data||'').split('-').reverse().join('/'))}</small></td>
+const r=lista.map(o=>`<tr><td>#${o.numero}<small>${esc((o.data||'').split('-').reverse().join('/'))}</small>${o.prazo?`<small>Prazo ${esc(o.prazo.split('-').reverse().join('/'))}</small>`:''}</td>
  <td>${esc(o.cliente)}<small>${esc(rep(o.repId)?.nome||o.repNome||'sem representante')}${admin&&!rep(o.repId)?' · sem cadastro':''}</small></td>
  <td class="n">${(o.itens||[]).reduce((a,i)=>a+i.qtd,0)}</td>
  <td class="n">${brl(pedTotal(o))}${admin&&pedDesatual(o)?'<small class="aviso" title="Preço diferente do cadastro do produto">preço desatualizado</small>':''}</td>
  <td>${selo(st(o))}</td>
- <td>${acoes('pd'+o.id,[['Ver itens',`verPed('${o.id}')`],...(admin?[o.ordemId&&['Abrir ordem de corte',`abrirOrdem('${o.ordemId}')`],...(st(o)==='Pendente'?[['Aprovar',`aprovarPed('${o.id}')`],['Recusar',`setSt('${o.id}','Recusado')`]]:[]),['Trocar representante',`fRepPed('${o.id}')`],{cab:'Mudar status para'},...ST.filter(s=>s!==st(o)&&!(o.ordemId?['Pendente','Recusado']:st(o)==='Pendente'?ST.filter(x=>x!=='Cancelado'):st(o)==='Recusado'?['Faturado','Enviado','Entregue']:[]).includes(s)).map(s=>[s,s==='Aprovado'&&!o.ordemId?`aprovarPed('${o.id}')`:`setSt('${o.id}','${s}')`]),'-',['Excluir pedido',`delPed('${o.id}')`,'del']]:[])])}</td></tr>`).join('');
+ <td>${acoes('pd'+o.id,[['Ver itens',`verPed('${o.id}')`],...(admin?[o.ordemId&&['Abrir ordem de corte',`abrirOrdem('${o.ordemId}')`],!o.ordemId&&['Pendente','Recusado'].includes(st(o))&&['Editar pedido',`fPed('${o.id}')`],...(st(o)==='Pendente'?[['Aprovar',`aprovarPed('${o.id}')`],['Recusar',`setSt('${o.id}','Recusado')`]]:[]),['Trocar representante',`fRepPed('${o.id}')`],{cab:'Mudar status para'},...ST.filter(s=>s!==st(o)&&!(o.ordemId?['Pendente','Recusado']:st(o)==='Pendente'?ST.filter(x=>x!=='Cancelado'):st(o)==='Recusado'?['Faturado','Enviado','Entregue']:[]).includes(s)).map(s=>[s,s==='Aprovado'&&!o.ordemId?`aprovarPed('${o.id}')`:`setSt('${o.id}','${s}')`]),'-',['Excluir pedido',`delPed('${o.id}')`,'del']]:[])])}</td></tr>`).join('');
 return `<div class="bar">${campoBusca('Buscar por número ou cliente')}<span style="display:flex;gap:8px">${admin&&S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></span></div>
  ${todos.length?chips:''}
  <div class="tw"><table><tr><th>Nº</th><th>Cliente</th><th class="n">Peças</th><th class="n">Total</th><th>Status</th><th></th></tr>${r||`<tr><td colspan="6" class="empty">${todos.length?'Nenhum pedido com status '+esc(pedFiltro)+'.':'Nenhum pedido lançado. Comece pelo botão acima.'}</td></tr>`}</table></div>`;
@@ -1342,33 +1345,66 @@ const p=pid===undefined?lista[0]:(pedEscolhe(q)?q:null);
 if(q&&!p)lida=(q.ref||'')+' · '+(q.nome||'')+' (sem molde)';
 const opts=(p?'':'<option value="" selected>— escolha a referência —</option>')+lista.sort((a,b)=>(a.ref||'').localeCompare(b.ref||'')).map(x=>`<option value="${x.id}" ${p&&x.id===p.id?'selected':''}>${esc(x.ref)} · ${esc(x.nome)}</option>`).join('');
 const cores=p?coresDe(p,extra||[]):semProd(extra);
-return `<div class="blk${p?'':' need'}"><div class="r2"><span class="fth">${foto(p||{},'fmini')}</span><select class="selp" onchange="trocaProd(this)">${opts}</select><button type="button" class="sm del" onclick="this.closest('.blk').remove();checaFalta()">✕</button></div>${lida?`<small class="mut">Referência lida no arquivo: ${esc(lida)}</small>`:''}<div class="gw">${grade(cores,get||(()=>0))}</div></div>`;
+return `<div class="blk${p?'':' need'}"><div class="r2"><span class="fth">${foto(p||{},'fmini')}</span><select class="selp" onchange="trocaProd(this)">${opts}</select><button type="button" class="sm del" onclick="this.closest('.blk').remove();checaFalta()">✕</button></div>${lida?`<small class="mut">${pedEdit?'Referência no pedido':'Referência lida no arquivo'}: ${esc(lida)}</small>`:''}<div class="gw">${gw(p,cores,get||(()=>0))}</div></div>`;
 }
 function trocaProd(sel){
 const b=sel.closest('.blk');
 const val={};
 b.querySelectorAll('input.qi').forEach(i=>{if(+i.value)(val[i.dataset.c]=val[i.dataset.c]||{})[i.dataset.t]=i.value});
 const p=prod(sel.value),extra=Object.keys(val);
-b.querySelector('.gw').innerHTML=grade(p?coresDe(p,extra):semProd(extra),(c,s)=>(val[c]||{})[s]);
+b.querySelector('.gw').innerHTML=gw(p,p?coresDe(p,extra):semProd(extra),(c,s)=>(val[c]||{})[s]);
 b.querySelector('.fth').innerHTML=foto(p||{},'fmini');
 b.classList.toggle('need',!p);
 checaFalta();
 }
+// pedido em edição (só admin): a grade ganha o preço unitário de cada cor/tamanho
+let pedEdit=null;
+const pedPreco=(p,c,t)=>{const i=(pedEdit?.itens||[]).find(i=>i.prodId===p.id&&i.cor===c&&i.tam===t);return i?i.preco:precoDe(p,t)};
+const gw=(p,cores,get)=>grade(cores,get)+(pedEdit&&p?'<small class="mut">Preço unitário (R$)</small>'+grade(cores,(c,t)=>pedPreco(p,c,t)).replace(/class="qi"/g,'class="pc" step="0.01"'):'');
 function pendentes(root){let n=0;root.querySelectorAll('.blk').forEach(b=>{if(!prod(b.querySelector('.selp').value)&&[...b.querySelectorAll('input.qi')].some(i=>+i.value>0))n++});return n}
 function addItem(){$('#itens').insertAdjacentHTML('beforeend',bloco());checaFalta()}
 function lerItens(root){
 const r=[];
 root.querySelectorAll('.blk').forEach(b=>{
 const p=prod(b.querySelector('.selp').value);if(!p)return;
-b.querySelectorAll('input.qi').forEach(i=>{const q=+i.value||0;if(q>0)r.push({prodId:p.id,desc:p.ref+' '+p.nome,cor:i.dataset.c,tam:i.dataset.t,qtd:q,preco:precoDe(p,i.dataset.t)})});
+const pc={};b.querySelectorAll('input.pc').forEach(i=>{if(i.value!=='')pc[i.dataset.c+'|'+i.dataset.t]=+i.value});
+b.querySelectorAll('input.qi').forEach(i=>{const q=+i.value||0,k=i.dataset.c+'|'+i.dataset.t;if(q>0)r.push({prodId:p.id,desc:p.ref+' '+p.nome,cor:i.dataset.c,tam:i.dataset.t,qtd:q,preco:k in pc?pc[k]:precoDe(p,i.dataset.t)})});
 });
 return r;
 }
 
-function fPed(){
+const pedEditavel=o=>!!o&&!o.ordemId&&['Pendente','Recusado'].includes(o.status||'Pendente');
+function fPed(id){
 const role=appProfile.role;
+const o=id?S.pedidos.find(x=>x.id===id):null;
+if(id&&(role!=='admin'||!pedEditavel(o))){aviso('Este pedido não pode mais ser editado.');return}
+pedEdit=o;
 if(!S.produtos.length){aviso('Não há produtos disponíveis para lançar pedidos.');tab=role==='admin'?'produtos':'catalogo';render();return}
 if(!S.produtos.some(pedEscolhe)){aviso('Cadastre o molde dos produtos antes de lançar pedidos.');tab='produtos';render();return}
+const pagSel=`<div class="g2"><label>Forma de pagamento<select name="pag" required onchange="checaFalta()"><option value="">— escolha —</option>${Object.entries(PAG).map(([k,l])=>`<option value="${k}"${o&&o.pag===k?' selected':''}>${esc(l)}</option>`).join('')}</select></label><label>Prazo de entrega (opcional)<input name="prazo" type="date" value="${esc(o?.prazo||'')}"></label></div><div id="pagres"></div>`;
+if(o){
+// um bloco por referência, na ordem dos itens; cores fora do cadastro entram como extra
+const pids=[...new Set((o.itens||[]).map(i=>i.prodId))];
+const blocos=pids.map(pid=>{const L=o.itens.filter(i=>i.prodId===pid);return bloco(pid,(c,t)=>L.filter(i=>i.cor===c&&i.tam===t).reduce((a,i)=>a+i.qtd,0),[...new Set(L.map(i=>i.cor))],prod(pid)?'':(L[0]?.desc||'')+' (produto não cadastrado)')}).join('')||bloco();
+modal('Editar pedido #'+esc(o.numero),`
+ <div class="g2"><label>Cliente (loja)<input name="cliente" required value="${esc(o.cliente||'')}"${o.ownerId?' readonly':''}></label>
+ <label>Data<input name="data" type="date" required value="${esc(o.data||'')}"></label></div>
+ <label>Representante<input value="${esc(rep(o.repId)?.nome||o.repNome||'sem representante')}" readonly><small>Para mudar, use Trocar representante no menu do pedido.</small></label>
+ ${pagSel}
+ <label>Produtos (quantidade e preço unitário de cada cor e tamanho)</label><div id="itens" oninput="checaFalta()" onchange="checaFalta()">${blocos}</div><div id="falta"></div>
+ <button type="button" class="ghost sm" onclick="addItem()">+ Adicionar produto</button>`,
+async(f,form)=>{
+const cur=S.pedidos.find(x=>x.id===id);
+if(!pedEditavel(cur))throw new Error('Este pedido não pode mais ser editado (já tem ordem de corte ou mudou de status).');
+if(pendentes(form))throw new Error('Escolha a referência do produto nos blocos destacados em laranja.');
+const itens=lerItens(form);
+if(!itens.length)throw new Error('Informe a quantidade de ao menos um item.');
+if(!PAG[f.pag])throw new Error('Escolha a forma de pagamento.');
+await db.doc('pedidos/'+id).update({cliente:cur.ownerId?cur.cliente:f.cliente,data:f.data,itens,pag:f.pag,desc:descPag(f.pag,pedSub({itens})),prazo:f.prazo||undefined});
+});
+checaFalta();
+return;
+}
 const cliente=role==='lojista'?`<label>Loja<input name="cliente" required value="${esc(appProfile.store_name)}" readonly></label>`:`<label>Cliente (loja)<input name="cliente" required></label>`;
 const vinculoLoja=role==='admin'||role==='representante'?`<label>Vincular à conta de lojista (opcional)<select name="ownerId" onchange="selecionaLoja(this)"><option value="">Outro cliente, sem conta cadastrada</option>${S.lojas.map(x=>`<option value="${x.id}" data-nome="${esc(x.nome)}">${esc(x.nome)}</option>`).join('')}</select><small>Pedidos vinculados também aparecem na conta da loja.</small></label>`:'';
 const representante=role==='representante'?`<label>Representante<input value="${esc(rep(appProfile.rep_id)?.nome||'')}" readonly></label>`:role==='lojista'?`<label>Representante atribuído<input value="${esc(rep(appProfile.rep_id)?.nome||'Sem representante atribuído')}" readonly></label>`:`<label>Representante (obrigatório)<input name="repNome" required list="replist" autocomplete="off" placeholder="Escolha da lista ou digite o nome"><datalist id="replist">${S.reps.map(r=>`<option value="${esc(r.nome)}">`).join('')}</datalist></label>`;
@@ -1378,12 +1414,14 @@ modal('Novo pedido',`
  <div class="g2">${cliente}
  <label>Data<input name="data" type="date" required value="${new Date().toISOString().slice(0,10)}"></label></div>
  ${representante}
+ ${pagSel}
  <label>Produtos (informe a quantidade de cada cor e tamanho)</label><div id="itens" oninput="checaFalta()" onchange="checaFalta()">${bloco()}</div><div id="falta"></div>
  <button type="button" class="ghost sm" onclick="addItem()">+ Adicionar produto</button>`,
 async(f,form)=>{
 if(pendentes(form))throw new Error('Escolha a referência do produto nos blocos destacados em laranja.');
 const itens=lerItens(form);
 if(!itens.length)throw new Error('Informe a quantidade de ao menos um item.');
+if(!PAG[f.pag])throw new Error('Escolha a forma de pagamento.');
 const rn=(f.repNome||'').trim();
 const rp=role==='representante'||role==='lojista'?rep(appProfile.rep_id):achaRep(rn);
 if(role==='admin'&&!rn)throw new Error('Informe o representante.');
@@ -1396,7 +1434,7 @@ const nomeCliente=role==='lojista'?appProfile.store_name:f.cliente;
 const ownerId=role==='lojista'?appProfile.user_id:(role==='admin'||role==='representante')?f.ownerId||null:null;
 const lojaVinculada=ownerId&&role!=='lojista'?S.lojas.find(x=>x.id===ownerId):null;
 if(ownerId&&role!=='lojista'&&(!lojaVinculada||lojaVinculada.nome!==nomeCliente))throw new Error('A loja selecionada não corresponde ao cliente do pedido.');
-await db.collection('pedidos').add({numero,cliente:nomeCliente,data:f.data,repId,repNome,itens,status:'Pendente'},ownerId);
+await db.collection('pedidos').add({numero,cliente:nomeCliente,data:f.data,repId,repNome,itens,pag:f.pag,desc:descPag(f.pag,pedSub({itens})),...(f.prazo?{prazo:f.prazo}:{}),status:'Pendente'},ownerId);
 if(fl.length)setTimeout(()=>aviso('Pedido salvo. Sem estoque: '+txtFalta(fl)+'. Depois de aprovado, o pedido entra em A fabricar.'),200);
 });
 }
@@ -1609,7 +1647,13 @@ if(falta>0)r.push({ref:p.ref,cor:c,tam:t,falta});
 return r;
 }
 function txtFalta(fl){return fl.map(x=>x.ref+' '+x.cor+' '+x.tam+' ('+x.falta+' a fabricar)').join('; ')}
+function pagResumo(){
+const box=$('#pagres');if(!box)return;
+const pag=box.closest('form').elements.pag.value,sub=pedSub({itens:lerItens($('#dlg'))}),d=descPag(pag,sub);
+box.innerHTML=pag==='pix'?`<p>Total: ${brl(sub)} · Desconto Pix (5%): −${brl(d)} · <b>Total a pagar: ${brl(sub-d)}</b></p>`:`<p>Total: <b>${brl(sub)}</b></p>`;
+}
 function checaFalta(){
+pagResumo();
 if(appProfile?.role!=='admin')return;
 const box=$('#falta');if(!box)return;
 const fl=faltas(lerItens($('#dlg')));
@@ -1681,10 +1725,12 @@ await db.doc('pedidos/'+id).update({repId:rp?rp.id:'',repNome:rp?rp.nome:rn});
 async function atualizarPrecos(){
 const L=S.pedidos.filter(pedDesatual);
 if(!L.length){aviso('Os pedidos Pendente, Aprovado e Faturado já estão com os preços atuais dos produtos.');return}
-const dif=L.reduce((a,o)=>a+(o.itens||[]).reduce((b,i)=>b+i.qtd*precoAtual(i),0)-pedTotal(o),0);
+// desconto do Pix acompanha o novo subtotal
+const novo=o=>{const itens=(o.itens||[]).map(i=>({...i,preco:precoAtual(i)}));return {itens,desc:descPag(o.pag,pedSub({itens}))}};
+const dif=L.reduce((a,o)=>a+pedTotal(novo(o))-pedTotal(o),0);
 if(!await confirma(`Atualizar ${L.length} pedido(s) Pendente/Aprovado/Faturado com os preços atuais dos produtos? Pedidos Recusado, Enviado, Entregue e Cancelado não mudam. Diferença no total: ${dif>=0?'+':''}${brl(dif)}.`))return;
 try{
-for(const o of L)await db.doc('pedidos/'+o.id).update({itens:o.itens.map(i=>({...i,preco:precoAtual(i)}))});
+for(const o of L)await db.doc('pedidos/'+o.id).update(novo(o));
 aviso(L.length+' pedido(s) atualizado(s).');
 }catch(e){aviso(e.message||'Erro ao atualizar preços')}
 }
@@ -1737,7 +1783,7 @@ await db.doc('pedidos/'+id).delete();
 function verPed(id){
 const o=S.pedidos.find(x=>x.id===id);
 const d=$('#dlg');
-d.innerHTML=`<h3>Pedido #${o.numero} · ${esc(o.cliente)}</h3><div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Qtd</th><th class="n">Unit.</th><th class="n">Subtotal</th></tr>${o.itens.map(i=>`<tr><td>${esc(i.desc)}</td><td>${esc(i.cor||'—')}</td><td>${i.tam}</td><td class="n">${i.qtd}</td><td class="n">${brl(i.preco)}</td><td class="n">${brl(i.qtd*i.preco)}</td></tr>`).join('')}</table></div><p><b>Total: ${brl(pedTotal(o))}</b></p><div class="row end"><button class="pri" onclick="dlg.close()">Fechar</button></div>`;
+d.innerHTML=`<h3>Pedido #${o.numero} · ${esc(o.cliente)}</h3><div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Qtd</th><th class="n">Unit.</th><th class="n">Subtotal</th></tr>${o.itens.map(i=>`<tr><td>${esc(i.desc)}</td><td>${esc(i.cor||'—')}</td><td>${i.tam}</td><td class="n">${i.qtd}</td><td class="n">${brl(i.preco)}</td><td class="n">${brl(i.qtd*i.preco)}</td></tr>`).join('')}</table></div><p>Forma de pagamento: ${esc(PAG[o.pag]||'não informado')}<br>Prazo de entrega: ${o.prazo?esc(o.prazo.split('-').reverse().join('/')):'não informado'}</p><p>${+o.desc?`Subtotal: ${brl(pedSub(o))} · Desconto: −${brl(+o.desc)}<br>`:''}<b>Total: ${brl(pedTotal(o))}</b></p><div class="row end"><button class="pri" onclick="dlg.close()">Fechar</button></div>`;
 d.showModal();
 }
 
@@ -1839,6 +1885,11 @@ const t=[['aviamento 20/10un x2 + tecido 10x2m',a.mp,24],
 ['ficha sem processos: mo igual',custoFicha({tecidoId:'t1',cons:2,ficha:{itens:[],mo:1,fixo:0}},false).mo,1],
 ['processos somam min x R$/min a mo',+custoFicha({tecidoId:'t1',cons:2,ficha:{itens:[],mo:1,fixo:0,processos:[{nome:'a',min:2,custoMin:0.5},{nome:'b',min:3,custoMin:0.4}]}},false).mo.toFixed(4),3.2],
 ['proc separado da mo',+custoFicha({tecidoId:'t1',cons:2,ficha:{itens:[],mo:1,fixo:0,processos:[{min:2,custoMin:0.5}]}},false).proc.toFixed(4),1],
+['pedTotal desconta desc',pedTotal({itens:[{qtd:10,preco:100}],desc:50}),950],
+['pedido antigo sem desc',pedTotal({itens:[{qtd:2,preco:10}]}),20],
+['Pix: 5% de 1000 = 50',descPag('pix',1000),50],
+['Pix arredonda a 2 casas',descPag('pix',33.33),1.67],
+['outras formas sem desconto',descPag('boleto',1000)+descPag('transferencia',1000)+descPag('cheque',1000)+descPag(undefined,1000),0],
 ['processos entram no total',+custoFicha({tecidoId:'t1',cons:2,ficha:{itens:[],mo:1,fixo:0,processos:[{min:2,custoMin:0.5}]}},false).total.toFixed(4),22],
 ...(()=>{
 // enfesto e consumo estimado
