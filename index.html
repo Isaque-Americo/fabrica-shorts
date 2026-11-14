@@ -69,7 +69,7 @@ td small{display:block;color:var(--mut);font-size:12px;white-space:normal}
 .bar.end{justify-content:flex-end}
 .pill{display:inline-block;font-size:12px;font-weight:600;padding:2px 10px;border-radius:999px;border:1px solid currentColor}
 .pill.s-pendente{color:#b26a00}.pill.s-faturado{color:var(--ac)}.pill.s-enviado{color:#6a3fb5}
-.pill.s-entregue{color:var(--ok)}.pill.s-cancelado{color:var(--mut)}
+.pill.s-entregue{color:var(--ok)}.pill.s-cancelado{color:var(--mut)}.pill.s-aprovado{color:var(--ok)}.pill.s-recusado{color:var(--bad)}
 .chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
 .chips button{font:inherit;font-size:13px;padding:5px 12px;border-radius:999px;border:1px solid var(--bd);background:var(--card);color:var(--mut);cursor:pointer}
 .chips button.on{border-color:var(--ac);color:var(--ac);font-weight:600}
@@ -452,8 +452,8 @@ setTimeout(()=>aviso(obrigatoria?'Senha temporária trocada.':'Senha alterada.')
 <script>
 const S={produtos:[],reps:[],pedidos:[],lojas:[],cadastros:[],materiais:[],config:[]};
 const SZ=['P','M','G','GG','G1','G2','G3','G4'];
-const ST=['Pendente','Faturado','Enviado','Entregue','Cancelado'];
-const TABS_ADMIN=[['painel','Painel'],['produtos','Produtos'],['materia','Matéria-prima'],['pedidos','Pedidos'],['fabricar','Fabricar'],['molde','Criar molde'],['corte','Ordens de corte'],['reps','Representantes'],['cadastros','Cadastros'],['estoque','Estoque']];
+const ST=['Pendente','Aprovado','Recusado','Faturado','Enviado','Entregue','Cancelado'];
+const TABS_ADMIN=[['painel','Painel'],['produtos','Produtos'],['materia','Matéria-prima'],['pedidos','Pedidos'],['fabricar','A fabricar'],['molde','Criar molde'],['corte','Ordens de corte'],['reps','Representantes'],['cadastros','Cadastros'],['estoque','Estoque']];
 const TABS_LOJISTA=[['catalogo','Catálogo'],['pedidos','Pedidos']];
 const TABS_REP=[['painel','Comissões'],['catalogo','Catálogo'],['pedidos','Pedidos']];
 function iconForTab(k){
@@ -687,7 +687,7 @@ new MutationObserver(()=>rotula($('#dlg'))).observe($('#dlg'),{childList:true});
 
 function painel(){
 if(appProfile?.role==='representante')return painelRepresentante();
-const ok=S.pedidos.filter(o=>o.status!=='Cancelado');
+const ok=S.pedidos.filter(o=>!['Cancelado','Recusado'].includes(o.status));
 const fat=ok.reduce((a,o)=>a+pedTotal(o),0);
 const pecas=S.produtos.reduce((a,p)=>a+tot(p),0);
 const baixos=S.produtos.filter(p=>tot(p)<=(+p.min||0));
@@ -708,7 +708,7 @@ return `<div class="cards">
 }
 function painelRepresentante(){
 const r=rep(appProfile.rep_id)||S.reps[0]||{};
-const pedidos=S.pedidos.filter(o=>o.repId===appProfile.rep_id&&o.status!=='Cancelado');
+const pedidos=S.pedidos.filter(o=>o.repId===appProfile.rep_id&&!['Cancelado','Recusado'].includes(o.status));
 const vendas=pedidos.reduce((a,o)=>a+pedTotal(o),0),comissao=+r.com||0;
 return `<div class="cards"><div class="c"><small>Representante</small><b>${esc(r.nome||'—')}</b></div><div class="c"><small>Vendas não canceladas</small><b>${brl(vendas)}</b></div><div class="c"><small>Comissão (${comissao}%)</small><b>${brl(vendas*comissao/100)}</b></div><div class="c"><small>Pedidos vinculados</small><b>${pedidos.length}</b></div></div><p style="color:var(--mut)">Os valores consideram apenas pedidos vinculados ao seu cadastro. Pedidos cancelados não entram na comissão.</p>`;
 }
@@ -1327,7 +1327,7 @@ const r=lista.map(o=>`<tr><td>#${o.numero}<small>${esc((o.data||'').split('-').r
  <td class="n">${(o.itens||[]).reduce((a,i)=>a+i.qtd,0)}</td>
  <td class="n">${brl(pedTotal(o))}${admin&&pedDesatual(o)?'<small class="aviso" title="Preço diferente do cadastro do produto">preço desatualizado</small>':''}</td>
  <td>${selo(st(o))}</td>
- <td>${acoes('pd'+o.id,[['Ver itens',`verPed('${o.id}')`],...(admin?[['Trocar representante',`fRepPed('${o.id}')`],{cab:'Mudar status para'},...ST.filter(s=>s!==st(o)).map(s=>[s,`setSt('${o.id}','${s}')`]),'-',['Excluir pedido',`delPed('${o.id}')`,'del']]:[])])}</td></tr>`).join('');
+ <td>${acoes('pd'+o.id,[['Ver itens',`verPed('${o.id}')`],...(admin?[o.ordemId&&['Abrir ordem de corte',`abrirOrdem('${o.ordemId}')`],...(st(o)==='Pendente'?[['Aprovar',`aprovarPed('${o.id}')`],['Recusar',`setSt('${o.id}','Recusado')`]]:[]),['Trocar representante',`fRepPed('${o.id}')`],{cab:'Mudar status para'},...ST.filter(s=>s!==st(o)&&!(o.ordemId?['Pendente','Recusado']:st(o)==='Pendente'?['Aprovado','Recusado']:[]).includes(s)).map(s=>[s,s==='Aprovado'&&!o.ordemId?`aprovarPed('${o.id}')`:`setSt('${o.id}','${s}')`]),'-',['Excluir pedido',`delPed('${o.id}')`,'del']]:[])])}</td></tr>`).join('');
 return `<div class="bar">${campoBusca('Buscar por número ou cliente')}<span style="display:flex;gap:8px">${admin&&S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></span></div>
  ${todos.length?chips:''}
  <div class="tw"><table><tr><th>Nº</th><th>Cliente</th><th class="n">Peças</th><th class="n">Total</th><th>Status</th><th></th></tr>${r||`<tr><td colspan="6" class="empty">${todos.length?'Nenhum pedido com status '+esc(pedFiltro)+'.':'Nenhum pedido lançado. Comece pelo botão acima.'}</td></tr>`}</table></div>`;
@@ -1482,7 +1482,7 @@ const fm0=$('#dlg form');
 try{const r=await sample.json(prompt,opts);if($('#dlg form')!==fm0||!$('#dlg').open)return;preencher(r)}
 catch(e){if($('#dlg form')!==fm0)return;console.error(e);st.textContent='Não consegui ler o arquivo: '+ptErro(e.message||e.code||'erro')+' Se continuar, tente uma imagem mais nítida ou preencha manualmente.'}
 }
-const ABERTOS=['Pendente','Faturado'];
+const ABERTOS=['Aprovado','Faturado'];
 const kItem=i=>i.prodId+'|'+(i.cor||'Sem cor')+'|'+i.tam;
 function demanda(){
 const m={};
@@ -1492,7 +1492,7 @@ return m;
 function ordLinha(x,y){return String(x.ref).localeCompare(String(y.ref))||coresIdx(x.c)-coresIdx(y.c)||SZ.indexOf(x.t)-SZ.indexOf(y.t)}
 function coresIdx(c){const i=CORES_BASE.indexOf(c);return i<0?99:i}
 function fabricarPedidos(){
-const rem={},out=[];
+const out=[];
 const ped=S.pedidos.filter(o=>ABERTOS.includes(o.status)).sort((a,b)=>(a.numero||0)-(b.numero||0));
 ped.forEach(o=>{
 const ag={};
@@ -1500,9 +1500,8 @@ const ag={};
 const linhas=[];
 for(const k in ag){
 const [id,c,t]=k.split('|');const p=prod(id);if(!p)continue;
-if(!(k in rem))rem[k]=Math.max(estQ(p,c,t),0);
-const a=Math.min(rem[k],ag[k]);rem[k]-=a;
-if(ag[k]-a>0)linhas.push({id:p.id,ref:p.ref,nome:p.nome,c,t,d:ag[k],a,f:ag[k]-a,num:o.numero});
+// a fabricar = demanda do pedido aprovado, sem descontar o estoque
+if(ag[k]>0)linhas.push({id:p.id,ref:p.ref,nome:p.nome,c,t,d:ag[k],a:0,f:ag[k],num:o.numero});
 }
 linhas.sort(ordLinha);
 out.push({o,linhas});
@@ -1542,21 +1541,16 @@ const r=v==null?null:v*(1+Math.max(0,+perda||0)/100);
 encCache.set(k,r);
 return r;
 }
-// a mesa vai em metros; o corte.html converte para mm
-function criarOrdemCorte(){
-try{sessionStorage.setItem('ordemNova',JSON.stringify({lista:fabricarLista(),camadas:enfCam,compMax:enfMesa}))}catch(e){aviso('Não consegui passar os pedidos para a ordem de corte neste navegador.');return}
-location.href='corte.html?deFabricar=1';
-}
 function fabricar(){
 encCache=new Map();
 const P=fabricarPedidos();
-const com=P.filter(x=>x.linhas.length),sem=P.filter(x=>!x.linhas.length);
+const com=P.filter(x=>x.linhas.length);
 const todas=com.flatMap(x=>x.linhas);
 const total=todas.reduce((a,x)=>a+x.f,0);
 const blocos=com.map(({o,linhas})=>{
 const sub=linhas.reduce((a,x)=>a+x.f,0);
-const rows=linhas.map(x=>`<tr><td>${esc(x.ref)} · ${esc(x.nome)}</td><td>${esc(x.c)}</td><td>${x.t}</td><td class="n">${x.d}</td><td class="n">${x.a}</td><td class="n low">${x.f}</td></tr>`).join('');
-return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padding:12px 14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><strong style="font-size:16px">Pedido #${o.numero} · ${esc(o.cliente)}</strong><small>${esc(rep(o.repId)?.nome||o.repNome||'—')} · ${esc((o.data||'').split('-').reverse().join('/'))} · ${esc(o.status)}</small></div><div class="low"><strong style="font-size:16px">${sub}</strong> peças a fabricar</div></div><div class="tw" style="margin:0;border:0;border-top:1px solid var(--bd);border-radius:0"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Pedido</th><th class="n">Do estoque</th><th class="n">Fabricar</th></tr>${rows}</table></div></section>`;
+const rows=linhas.map(x=>`<tr><td>${esc(x.ref)} · ${esc(x.nome)}</td><td>${esc(x.c)}</td><td>${x.t}</td><td class="n low">${x.f}</td></tr>`).join('');
+return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padding:12px 14px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><div><strong style="font-size:16px">Pedido #${o.numero} · ${esc(o.cliente)}</strong><small>${esc(rep(o.repId)?.nome||o.repNome||'—')} · ${esc((o.data||'').split('-').reverse().join('/'))} · ${esc(o.status)}</small></div><div class="low"><strong style="font-size:16px">${sub}</strong> peças a fabricar</div></div><div class="tw" style="margin:0;border:0;border-top:1px solid var(--bd);border-radius:0"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Fabricar</th></tr>${rows}</table></div></section>`;
 }).join('');
 const g={};
 todas.forEach(x=>{const k=x.ref+'|'+x.c+'|'+x.t;const e=g[k]=g[k]||{ref:x.ref,nome:x.nome,c:x.c,t:x.t,f:0,de:[]};e.f+=x.f;e.de.push('#'+x.num+' ('+x.f+')')});
@@ -1587,18 +1581,17 @@ return `<section class="c" style="padding:0;margin-bottom:14px"><div style="padd
 }).join('');
 const enfesto=`<div class="r2" style="margin-bottom:10px"><label style="margin:0">Máximo de camadas por enfesto<input type="number" min="0" step="1" value="${enfCam||''}" onchange="setEnf('cam',this.value)" placeholder="sem limite"></label>
  <label style="margin:0">Comprimento útil da mesa (m)<input type="number" min="0" step="0.1" value="${enfMesa||''}" onchange="setEnf('mesa',this.value)" placeholder="sem limite"></label></div>
- ${enfSecs||(semCons.length?'':'<div class="c empty">Nada a fabricar: o estoque cobre todos os pedidos em aberto.</div>')}
+ ${enfSecs||(semCons.length?'':'<div class="c empty">Nada a fabricar: nenhum pedido aprovado.</div>')}
  ${semCons.length?`<div class="alert">⚠ Sem plano para ${esc(semCons.join(', '))}: informe o consumo de tecido na ficha técnica do produto.</div>`:''}
  <p style="color:var(--mut)">Cada camada do enfesto rende uma peça de cada tamanho do risco. O risco só entra na mesa se couber no comprimento informado — em vermelho, não coube nem com um tamanho só. Quando o produto tem molde importado e o tecido tem largura útil, o comprimento do risco é medido encaixando os painéis de verdade; a coluna "Estimado" mostra o que a conta por retângulo daria. Todos os tamanhos do risco usam os painéis do molde importado, sem gradação, então o ganho mostrado é conservador. O medido pode ficar <em>acima</em> do estimado quando o risco tem poucas peças para um tecido largo: a estimativa divide a faixa entre muitas peças, mas o risco de verdade precisa ser cortado como está. Nesse caso, repetir tamanhos no mesmo risco enche a largura e derruba o consumo por peça.</p>`;
 const VISTAS=[['pedido','Por pedido'],['referencia','Por referência'],['lista','Lista detalhada (cor e tamanho)'],['enfesto','Plano de enfesto']];
 if(!VISTAS.some(v=>v[0]===fabVista))fabVista='pedido';
-const vazio='<div class="c empty">Nada a fabricar: o estoque cobre todos os pedidos em aberto.</div>';
+const vazio='<div class="c empty">Nada a fabricar: nenhum pedido aprovado.</div>';
 const corpo=fabVista==='enfesto'?enfesto
 :fabVista==='referencia'?(porRef||vazio)
 :fabVista==='lista'?(resumo?`<div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Total</th><th>De quais pedidos</th></tr>${resumo}</table></div>`:vazio)
-:(blocos||vazio)+(sem.length?`<p style="color:var(--mut)">Já cobertos pelo estoque: ${sem.map(x=>'#'+x.o.numero).join(', ')}.</p>`:'');
+:(blocos||vazio);
 return `<div class="cards"><div class="c"><small>Peças a fabricar</small><b>${total}</b></div><div class="c"><small>Pedidos com itens a fabricar</small><b>${com.length}</b></div></div>
- ${todas.length?'<div class="bar end"><button class="pri" onclick="criarOrdemCorte()">Criar ordem de corte</button></div>':''}
  <div class="chips">${VISTAS.map(([k,l])=>`<button class="${k===fabVista?'on':''}" onclick="setFabVista('${k}')">${l}</button>`).join('')}</div>
  ${corpo}
  <p style="color:var(--mut)">Considera pedidos Pendente ou Faturado. O estoque (por cor e tamanho) é reservado primeiro para os pedidos mais antigos. Os pedidos não alteram o estoque: quando a produção ficar pronta, lance a entrada na aba Estoque.</p>`;
@@ -1695,14 +1688,48 @@ for(const o of L)await db.doc('pedidos/'+o.id).update({itens:o.itens.map(i=>({..
 aviso(L.length+' pedido(s) atualizado(s).');
 }catch(e){aviso(e.message||'Erro ao atualizar preços')}
 }
+const abrirOrdem=id=>{const u='corte.html?id='+encodeURIComponent(id);if(!window.open(u,'_blank'))location.href=u};
+async function aprovarPed(id){
+const o=S.pedidos.find(x=>x.id===id);if(!o)return;
+// linha com qtd 0 não bloqueia a aprovação nem entra na ordem
+const ped={...o,itens:(o.itens||[]).filter(i=>+i.qtd>0)};
+const sem=MoldeOrdem.semMolde(ped,S.produtos);
+if(sem.length){aviso('Sem molde: '+sem.join(', ')+'. Cadastre o molde antes de aprovar.');return}
+const falhou='A ordem foi criada mas o pedido não foi marcado; tente Aprovar de novo';
+const marcar=async ordemId=>{await db.doc('pedidos/'+id).update({status:'Aprovado',ordemId});abrirOrdem(ordemId)};
+let ex;
+try{await sessaoOk();const r=await sb.from('docs').select('id').eq('col','ordens').eq('data->>pedidoId',id).limit(1);if(r.error)throw r.error;ex=r.data[0]}
+catch(e){aviso(e.message||'Erro ao procurar a ordem de corte');return}
+// ordem já existe (aprovação anterior que não marcou o pedido): só marca
+if(ex){try{await marcar(ex.id)}catch(e){aviso(falhou)}return}
+const ps=[...new Set(ped.itens.map(i=>i.prodId))].map(prod).filter(Boolean),porTec={};
+ps.forEach(p=>(porTec[p.tecidoId||'']=porTec[p.tecidoId||'']||[]).push(p));
+const det=Object.entries(porTec).map(([t,L])=>`<h4>${esc(mat(t)?.nome||'Sem tecido')}</h4>${L.map(p=>`<label>${esc(p.ref)} · ${esc(p.nome)}<select name="g_${p.id}">${L.map((_,i)=>`<option value="${i+1}">Enfesto ${i+1}</option>`).join('')}</select></label>`).join('')}`).join('');
+const radio=(v,l,on)=>`<label style="display:flex;align-items:center;gap:8px"><input type="radio" name="modo" value="${v}" style="width:auto;margin:0"${on?' checked':''} onchange="$('#apdet').hidden=this.value!=='det'">${l}</label>`;
+modal('Aprovar pedido #'+o.numero,radio('auto','Enfesto automático',1)+radio('det','Enfesto detalhado')+`<div id="apdet" hidden>${det}</div>`,async(f,form)=>{
+const bt=form.querySelector('button.pri');bt.disabled=true;
+try{
+const grupos=f.modo==='det'?Object.fromEntries(ps.map(p=>[p.id,+f['g_'+p.id]||1])):undefined;
+const doc=MoldeOrdem.dePedido(ped,{produtos:S.produtos,grupos,compMax:Math.round(enfMesa*1000)});
+doc.criadaEm=new Date().toISOString();
+await sessaoOk();
+const r=await sb.from('docs').insert({col:'ordens',data:doc}).select('id').single();
+if(r.error)throw r.error;
+try{await marcar(r.data.id)}catch(e){setTimeout(()=>aviso(falhou),200)}
+}finally{bt.disabled=false}
+});
+$('#dlg button.pri').textContent='Aprovar';
+}
 async function setSt(id,s){
 const o=S.pedidos.find(x=>x.id===id);if(!o||o.status===s)return;
+if(s==='Cancelado'&&o.ordemId&&!await confirma('Este pedido tem ordem de corte. Cancelar mesmo assim? A ordem não é apagada.'))return;
 try{
 await db.doc('pedidos/'+id).update({status:s});
 }catch(e){aviso(e.message);render()}
 }
 async function delPed(id){
 const o=S.pedidos.find(x=>x.id===id);
+if(o.ordemId){aviso('Apague a ordem de corte deste pedido antes.');return}
 if(!await confirma('Excluir o pedido #'+o.numero+'?'))return;
 await db.doc('pedidos/'+id).delete();
 }
