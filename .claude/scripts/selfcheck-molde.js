@@ -612,6 +612,29 @@ testes.push(
   ['I6 frente e costas em enfestos separados: roupa so no item com a peca 0', dividido, [[{ R1: { M: 3 } }, { R1: {} }], 3, true]],
 );
 
+// pedido aprovado -> ordem de corte
+const pP = (id, ref, tecidoId, o) => ({ id, ref, tecidoId, mol: { pecas: [pc({ nome: 'Frente' })], porTam: { M: [pc({ nome: 'Frente' })] } }, ...o });
+const prodsP = [pP('pA', '6060', 'tA'), pP('pB', '5050', 'tA'), pP('pC', '7070', 'tB')];
+const ped = (itens, numero = 7) => ({ id: 'ped1', numero, itens });
+const resumo = o => !o || !o.tecidos ? o : [o.tecidos.length, o.enfestos.length, o.enfestos.map(e => e.nome)];
+const dp = (itens, opts) => fn(() => O.dePedido(ped(itens), { produtos: prodsP, ...opts }), null);
+const dpAuto = dp([{ prodId: 'pA', cor: 'Azul', tam: 'M', qtd: 2 }, { prodId: 'pB', cor: 'Azul', tam: 'M', qtd: 1 }]);
+const dpTec = dp([{ prodId: 'pA', cor: 'Azul', tam: 'M', qtd: 2 }, { prodId: 'pC', cor: 'Azul', tam: 'M', qtd: 1 }]);
+const dpGr = dp([{ prodId: 'pA', cor: 'Azul', tam: 'M', qtd: 2 }, { prodId: 'pB', cor: 'Azul', tam: 'M', qtd: 1 }], { grupos: { pA: 0, pB: 1 } });
+const dpGrTec = dp([{ prodId: 'pA', cor: 'Azul', tam: 'M', qtd: 2 }, { prodId: 'pC', cor: 'Azul', tam: 'M', qtd: 1 }], { grupos: { pA: 0, pC: 0 } });
+const dpCor = dp([{ prodId: 'pA', cor: 'Azul', tam: 'M', qtd: 3 }, { prodId: 'pA', cor: 'Preto', tam: 'M', qtd: 2 }]);
+const dpForro = fn(() => O.dePedido(ped([{ prodId: 'p1', cor: 'Azul', tam: 'M', qtd: 3 }]), { produtos: [prodF] }), null);
+testes.push(
+  ['dePedido automatico: 1 aba, 1 enfesto, 2 itens, #7, refs ordenadas', dpAuto && dpAuto.enfestos && [resumo(dpAuto), dpAuto.enfestos[0].itens.length, dpAuto.pedidoId, dpAuto.pedidoNum, dpAuto.nome, dpAuto.refs], [[1, 1, ['Enfesto 1']], 2, 'ped1', 7, 'Pedido #7', ['5050', '6060']]],
+  ['dePedido: tecidos diferentes -> 2 abas, 2 enfestos', dpTec && resumo(dpTec).slice(0, 2), [2, 2]],
+  ['dePedido detalhado grupos {pA:0,pB:1} mesmo tecido -> 1 aba, 2 enfestos', dpGr && resumo(dpGr), [1, 2, ['Enfesto 1', 'Enfesto 2']]],
+  ['dePedido detalhado grupos {pA:0,pC:0} tecidos diferentes -> 2 enfestos', dpGrTec && resumo(dpGrTec).slice(0, 2), [2, 2]],
+  ['dePedido: Azul M 3 + Preto M 2 -> 2 itens, grade, falta, camadas 1', dpCor && dpCor.enfestos && [dpCor.enfestos[0].itens.map(i => [i.grade, i.falta]), dpCor.enfestos[0].camadas], [[[{ M: 3 }, { M: 3 }], [{ M: 2 }, { M: 2 }]], 1]],
+  ['dePedido: peca de forro -> aba e enfesto proprios', dpForro && dpForro.tecidos && [dpForro.tecidos.map(t => t.materiaId), dpForro.enfestos.length], [['tA', 'tF'], 2]],
+  ['semMolde: sem mol, com pecas, inexistente', fn(() => [O.semMolde(ped([{ prodId: 'x', tam: 'M', qtd: 1 }, { prodId: 'x', tam: 'P', qtd: 1 }]), [{ id: 'x', ref: '9090' }]), O.semMolde(ped([{ prodId: 'pA', tam: 'M', qtd: 1 }]), prodsP), O.semMolde(ped([{ prodId: 'zz', tam: 'M', qtd: 1 }]), prodsP)], null), [['9090'], [], ['zz']]],
+  ['normalizar ordem antiga: pedidoId, pedidoNum, refs', fn(() => { const n = O.normalizar({}); return [n.pedidoId, n.pedidoNum, n.refs]; }, null), ['', null, []]],
+);
+
 const perto = (a, b, tol) => typeof a === 'number' ? Math.abs(a - b) <= tol
   : a && typeof a === 'object' ? Object.keys(b).length === Object.keys(a).length && Object.keys(b).every(k => perto(a[k], b[k], tol)) : a === b;
 

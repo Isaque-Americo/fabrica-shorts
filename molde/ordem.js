@@ -32,6 +32,7 @@
       ...d, nome: d.nome || '', obs: d.obs || '', criadaEm: d.criadaEm || '',
       pedidos: Array.isArray(d.pedidos) ? d.pedidos.map(String) : [],
       tecidos: (d.tecidos || []).map(t => ({ id: (t && t.id) || uid(), materiaId: (t && t.materiaId) || '' })),
+      pedidoId: d.pedidoId || '', pedidoNum: d.pedidoNum ?? null, refs: Array.isArray(d.refs) ? d.refs.map(String) : [],
       enfestos: (d.enfestos || []).map(normEnfesto), v: 1
     };
   }
@@ -45,17 +46,19 @@
   // começa com camadas 1 e grade por camada = f (o usuário ajusta); as camadas do Fabricar ficam como alturaMax sugerida; falta = f pedido
   function deFabricar(lista, opts) {
     const o = opts || {}, prods = o.produtos || [];
-    const ordem = nova(''), tecidos = [], enfestos = [];
+    const ordem = nova(''), tecidos = [], enfestos = [], gr = o.grupos;
     for (const l of lista || []) {
       const f = nn(l.f); if (!f || !l.id) continue;
       const p = prods.find(x => x.id === l.id), mat = (p && p.tecidoId) || '';
       // peças de outro tecido (forro…) ganham aba e enfesto próprios; pecasEnfesto já tira cada peça das abas que não são o tecido dela
       const outros = [...new Set(pecasTam(p, l.t).map(q => q && q.tecido).filter(t => t && t !== mat))];
       for (const m of [mat, ...outros]) {
-        let enf = enfestos.find(e => e.mat === m);
+        const k = m + '|' + (gr ? gr[l.id] ?? 0 : 0); // grupos (pedido detalhado): um enfesto por tecido e grupo, nunca junta tecidos
+        let enf = enfestos.find(e => e.k === k);
         if (!enf) {
-          const t = { id: uid(), materiaId: m }; tecidos.push(t);
-          enf = { mat: m, e: { tecidoId: t.id, camadas: 1, alturaMax: o.camadas, compMax: o.compMax, itens: [] } }; enfestos.push(enf);
+          let t = tecidos.find(x => x.materiaId === m); if (!t) tecidos.push(t = { id: uid(), materiaId: m });
+          const n = enfestos.filter(e => e.mat === m).length + 1;
+          enf = { k, mat: m, e: { ...(gr && { nome: 'Enfesto ' + n }), tecidoId: t.id, camadas: 1, alturaMax: o.camadas, compMax: o.compMax, itens: [] } }; enfestos.push(enf);
         }
         let it = enf.e.itens.find(x => x.produtoId === l.id && x.cor === (l.c || ''));
         if (!it) enf.e.itens.push(it = { produtoId: l.id, cor: l.c || '', pecas: null, grade: {}, falta: {} });
@@ -63,6 +66,24 @@
       }
     }
     return normalizar({ ...ordem, tecidos: tecidos.length ? tecidos : ordem.tecidos, enfestos: enfestos.length ? enfestos.map(x => x.e) : ordem.enfestos });
+  }
+
+  // pedido aprovado -> ordem: cada pedido vira a sua ordem. opts.grupos {prodId: n} separa enfestos do mesmo tecido
+  function dePedido(pedido, opts) {
+    const o = opts || {}, prods = o.produtos || [];
+    const lista = (pedido.itens || []).map(i => ({ id: i.prodId, c: i.cor, t: i.tam, f: i.qtd }));
+    const refs = [...new Set((pedido.itens || []).map(i => (prods.find(p => p.id === i.prodId) || {}).ref).filter(Boolean))].sort();
+    return normalizar({ ...deFabricar(lista, o), pedidoId: pedido.id, pedidoNum: pedido.numero, nome: 'Pedido #' + pedido.numero, refs });
+  }
+
+  // refs (ou prodId, se o produto não existe) dos produtos do pedido com algum tamanho sem peças no molde
+  function semMolde(pedido, produtos) {
+    const out = new Set();
+    for (const i of pedido.itens || []) {
+      const p = (produtos || []).find(x => x.id === i.prodId);
+      if (!pecasTam(p, i.tam).length) out.add(p ? p.ref || p.nome || p.id : i.prodId);
+    }
+    return [...out];
   }
 
   function ajustarGrade(item, tam, delta) {
@@ -200,7 +221,7 @@
     return cons == null && consG == null ? null : { cons, consG };
   }
 
-  const MoldeOrdem = { normalizar, nova, deFabricar, ajustarGrade, pecasEnfesto, calcularEnfesto, resultados, matCusto, meiaPeca, consumoPeloMolde };
+  const MoldeOrdem = { normalizar, nova, deFabricar, dePedido, semMolde, ajustarGrade, pecasEnfesto, calcularEnfesto, resultados, matCusto, meiaPeca, consumoPeloMolde };
   g.MoldeOrdem = MoldeOrdem;
   if (typeof module !== 'undefined') module.exports = MoldeOrdem;
 })(typeof window !== 'undefined' ? window : globalThis);
