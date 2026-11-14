@@ -111,7 +111,7 @@ body{background:#fff;font-size:10pt}
       <h2 style="margin:0;font:600 20px 'Poppins',sans-serif">Ordens de corte</h2>
       <button class="pri" type="button" id="btn-nova">Nova ordem</button>
     </div>
-    <table class="lst"><thead><tr><th>Nome</th><th>Data</th><th class="n">Metros</th></tr></thead><tbody id="lista"></tbody></table>
+    <table class="lst"><thead><tr><th>Pedido</th><th>Nome</th><th>Referências</th><th>Data</th><th class="n">Metros</th><th>Ações</th></tr></thead><tbody id="lista"></tbody></table>
   </main>
 </div>
 
@@ -120,7 +120,9 @@ body{background:#fff;font-size:10pt}
     <a id="volta" href="corte.html">← Ordens</a>
     <input id="nome" aria-label="Nome da ordem" placeholder="Nome da ordem" autocomplete="off">
     <span id="estado" role="status" aria-live="polite">Salvo</span>
+    <span id="ped-info" class="vazio"></span>
     <span class="esp"></span>
+    <button class="sm perigo" type="button" id="btn-apagar">Apagar</button>
     <button class="sm" type="button" id="btn-props">Propriedades</button>
     <button class="sm" type="button" id="btn-rel">Imprimir relatório</button>
   </header>
@@ -213,13 +215,17 @@ if(!ler('materiais'))gravarK('materiais',{
 if(!ler('ordens'))gravarK('ordens',{'o-exemplo':{nome:'Ordem de exemplo',obs:'',criadaEm:'2026-11-10T12:00:00.000Z',pedidos:[],
   tecidos:[{id:'t1',materiaId:'tec-tactel'},{id:'t2',materiaId:'tec-forro'}],
   enfestos:[{id:'e1',nome:'Enfesto 1',tecidoId:'t1',camadas:10,compMax:5000,itens:[{produtoId:'p-teste-1',cor:'Azul',pecas:null,grade:{P:1,M:2,G:1}}]},
-            {id:'e2',nome:'Forro',tecidoId:'t2',camadas:10,itens:[{produtoId:'p-teste-1',cor:'Azul',pecas:null,grade:{P:1,M:2,G:1}}]}],v:1}});
+            {id:'e2',nome:'Forro',tecidoId:'t2',camadas:10,itens:[{produtoId:'p-teste-1',cor:'Azul',pecas:null,grade:{P:1,M:2,G:1}}]}],v:1},
+  'o-pedido':{nome:'Pedido #12',obs:'',criadaEm:'2026-11-12T12:00:00.000Z',pedidos:[],pedidoId:'p-ex',pedidoNum:12,refs:['5050'],tecidos:[{id:'t1',materiaId:'tec-tactel'}],enfestos:[],v:1}});
+if(!ler('pedidos'))gravarK('pedidos',{'p-ex':{numero:12,status:'Aprovado',ordemId:'o-pedido',itens:[]}});
 const lista=k=>Object.entries(ler(k)||{}).map(([id,data])=>({id,data}));
 return {
 async ordens(){rede();return lista('ordens')},
 async ordem(id){rede();return (ler('ordens')||{})[id]||null},
 async criar(d){rede();const id='o'+Date.now(),t=ler('ordens')||{};t[id]=d;gravarK('ordens',t);return id},
 async gravar(id,d){rede();const t=ler('ordens')||{};t[id]=d;gravarK('ordens',t)},
+async apagar(id){rede();const t=ler('ordens')||{};delete t[id];gravarK('ordens',t)},
+async voltarPedido(pid){rede();const t=ler('pedidos')||{};if(t[pid]){t[pid]={...t[pid],status:'Pendente',ordemId:null};gravarK('pedidos',t)}},
 async produtos(){rede();return lista('produtos')},
 async materiais(){rede();return lista('materiais')}
 };
@@ -233,6 +239,9 @@ async ordem(id){await sessaoOk();const r=ok(await sb.from('docs').select('data')
 async criar(d){await sessaoOk();return ok(await sb.from('docs').insert({col:'ordens',data:d}).select('id').single()).id},
 // update que não acha a linha (RLS) volta vazio sem erro: tratar como falha para não perder a alteração
 async gravar(id,d){await sessaoOk();if(!ok(await sb.from('docs').update({data:d}).eq('id',id).eq('col','ordens').select('id')).length)throw new Error('Sem permissão para salvar.')},
+async apagar(id){await sessaoOk();if(!ok(await sb.from('docs').delete().eq('id',id).eq('col','ordens').select('id')).length)throw new Error('Sem permissão para apagar.')},
+// merge no data do pedido; pedido que já não existe não impede apagar a ordem
+async voltarPedido(pid){await sessaoOk();const r=ok(await sb.from('docs').select('data').eq('id',pid).eq('col','pedidos').maybeSingle());if(!r)return;if(!ok(await sb.from('docs').update({data:{...r.data,status:'Pendente',ordemId:null}}).eq('id',pid).eq('col','pedidos').select('id')).length)throw new Error('Sem permissão para salvar.')},
 produtos:()=>doCol('produtos'),
 materiais:()=>doCol('materiais')
 };
@@ -284,8 +293,9 @@ async function abrirLista(){
 const ords=(await B.ordens()).map(r=>({id:r.id,o:MO.normalizar(r.data)})).sort((a,b)=>String(b.o.criadaEm).localeCompare(String(a.o.criadaEm)));
 $('#aviso').hidden=true;$('#lista-v').hidden=false;
 const tb=$('#lista');
-if(!ords.length){tb.innerHTML='<tr><td colspan="3" class="vazio">Nenhuma ordem ainda. Use “Nova ordem” ou o botão da aba Fabricar no app.</td></tr>';return}
-tb.innerHTML=ords.map(x=>`<tr><td><a href="${esc(urlCom('id',x.id))}">${esc(x.o.nome||'(sem nome)')}</a></td><td>${dataBR(x.o.criadaEm)}</td><td class="n" data-metros="${esc(x.id)}">…</td></tr>`).join('');
+if(!ords.length){tb.innerHTML='<tr><td colspan="6" class="vazio">Nenhuma ordem ainda. Aprove um pedido no app ou use “Nova ordem”.</td></tr>';return}
+tb.innerHTML=ords.map(x=>`<tr><td>${x.o.pedidoId?'#'+esc(x.o.pedidoNum??'?'):'avulsa'}</td><td><a href="${esc(urlCom('id',x.id))}">${esc(x.o.nome||'(sem nome)')}</a></td><td>${esc(x.o.refs.join(', '))}</td><td>${dataBR(x.o.criadaEm)}</td><td class="n" data-metros="${esc(x.id)}">…</td><td><a href="${esc(urlCom('id',x.id))}">Editar</a> <button class="sm perigo" type="button" data-apagar="${esc(x.id)}">Apagar</button></td></tr>`).join('');
+tb.querySelectorAll('[data-apagar]').forEach(b=>b.onclick=()=>apagarOrdem(b.dataset.apagar,ords.find(x=>x.id===b.dataset.apagar).o,false));
 // resumo gravado a cada salvamento; ordem antiga sem resumo é calculada aqui
 for(const x of ords){
 let m=x.o.resumo&&x.o.resumo.metros;
@@ -295,6 +305,16 @@ const td=tb.querySelector(`[data-metros="${CSS.escape(x.id)}"]`);if(td)td.textCo
 }
 // metros e peças da ordem para a lista; null quando o encaixe falha
 function resumoDe(o){try{const r=MO.resultados(o,o.enfestos.map(e=>MO.calcularEnfesto(e,o,PRODS,MATS)),MATS);return {metros:r.metros,pecas:r.pecas}}catch(e){console.error(e);return {metros:null,pecas:null}}}
+// ordem de pedido: o pedido volta para Pendente antes de apagar; se o passo 2 falhar, apagar de novo é seguro
+async function apagarOrdem(id,o,dentro){
+if(!confirm(o.pedidoId?'Apagar a ordem do pedido #'+(o.pedidoNum??'?')+'? O pedido volta para Pendente.':'Apagar a ordem “'+(o.nome||'(sem nome)')+'”?'))return;
+try{
+if(o.pedidoId)await B.voltarPedido(o.pedidoId);
+await B.apagar(id);
+if(dentro){clearTimeout(timer);estado='salvo';try{localStorage.removeItem('ordem:'+id)}catch(e){}location.href=urlCom();return}
+}catch(e){console.error(e);toast('Não foi possível apagar: '+ptErro(e))}
+if(!dentro)abrirLista().catch(e=>console.error(e));
+}
 async function criarEIr(doc){doc.resumo=resumoDe(doc);const id=await B.criar(doc);location.href=urlCom('id',id)}
 
 // ---- ordem ----
@@ -310,6 +330,8 @@ if(!O.tecidos.length){O.tecidos.push({id:uid(),materiaId:''});pendente=true}
 $('#aviso').hidden=true;$('#ordem-v').hidden=false;
 $('#volta').href=urlCom();
 $('#nome').value=O.nome;
+$('#ped-info').textContent=O.pedidoId?'Pedido #'+(O.pedidoNum??'?')+(O.refs.length?' · '+O.refs.join(', '):''):'';
+$('#btn-apagar').onclick=()=>apagarOrdem(id,O,true);
 marcar('salvo');if(pendente)sujou();
 render();
 }
@@ -540,18 +562,6 @@ if(!perfil||perfil.role!=='admin')return bloquear('Só administradores veem as o
 }
 const [ps,ms]=await Promise.all([B.produtos(),B.materiais()]);
 PRODS=ps.map(r=>({...r.data,id:r.id}));MATS=ms.map(r=>({...r.data,id:r.id}));
-if(Q.get('deFabricar')==='1'){
-let s=null;try{s=JSON.parse(sessionStorage.getItem('ordemNova'))}catch(e){}
-if(!s||!Array.isArray(s.lista))return bloquear('Nada para criar: abra pela aba Fabricar do app.');
-// compMax vem da mesa da aba Fabricar, em metros; a ordem guarda mm
-const doc=MO.deFabricar(s.lista,{camadas:s.camadas,compMax:Math.round(num(s.compMax)*1000),produtos:PRODS});
-doc.nome=nomePadrao();doc.resumo=resumoDe(doc);
-// tira antes de criar: recarregar durante um criar lento não duplica a ordem
-const bruto=sessionStorage.getItem('ordemNova');sessionStorage.removeItem('ordemNova');
-let id;try{id=await B.criar(doc)}catch(e){sessionStorage.setItem('ordemNova',bruto);throw e}
-history.replaceState(null,'',urlCom('id',id));
-return abrirOrdem(id,doc);
-}
 const id=Q.get('id');
 if(!id)return abrirLista();
 const doc=await B.ordem(id);
