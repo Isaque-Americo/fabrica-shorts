@@ -32,6 +32,7 @@ jobs:
           cp molde.html _site/molde.html
           cp corte.html _site/corte.html
           cp enfesto.html _site/enfesto.html
+          cp acesso.js _site/acesso.js
           cp -r molde _site/molde
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
