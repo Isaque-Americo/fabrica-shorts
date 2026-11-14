@@ -27,20 +27,32 @@
       return d;
     };
     for (let cy = 0; cy < ch; cy++) for (let cx = 0; cx < cw; cx++) if (dentro((cx + .5) * ENC_RES, (cy + .5) * ENC_RES)) m[cy * cw + cx] = 1;
+    // conservador: só o centro deixa até meia célula da peça fora das células e a vizinha encosta por cima;
+    // marca também as células tocadas pelos vértices e pelo contorno (amostras a cada ENC_RES/4 no máximo),
+    // cada amostra um fio (1e-6 mm) para dentro da peça e da aresta: contorno sobre a linha da grade cai na célula de dentro
+    const toca = (x, y) => { m[Math.min(ch - 1, Math.max(0, Math.floor(y / ENC_RES))) * cw + Math.min(cw - 1, Math.max(0, Math.floor(x / ENC_RES)))] = 1; };
+    const sent = p.reduce((s, [x, y], i) => { const [x2, y2] = p[(i + 1) % p.length]; return s + x * y2 - x2 * y; }, 0) > 0 ? 1 : -1;
+    for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+      const [xa, ya] = p[j], [xb, yb] = p[i], l = Math.hypot(xb - xa, yb - ya), n = Math.max(1, Math.ceil(l / (ENC_RES / 4)));
+      if (!l) continue;
+      const nx = -(yb - ya) / l * sent * 1e-6, ny = (xb - xa) / l * sent * 1e-6;
+      for (let k = 0, e = 1e-6 / l; k <= n; k++) { const t = e + (1 - 2 * e) * k / n; toca(xa + (xb - xa) * t + nx, ya + (yb - ya) * t + ny); }
+    }
     return { cw, ch, m };
   }
 
   // variantes de giro permitidas pela peça: sem `rot` (produto antigo) vale '180';
-  // `espelhar` acrescenta, depois das normais, as mesmas espelhadas em Y; `escala` entra antes de rasterizar
+  // `espelhar` acrescenta, depois das normais, as mesmas espelhadas em Y; `escala` ({x: comprimento, y: largura do tecido}) entra depois do giro
   // poses = os polígonos de cada variante, na mesma ordem; o desenho do risco usa estes pontos + (ox, oy),
   // assim desenho e encaixe não podem divergir
   function poses(pts, o) {
     o = o || {};
     const sx = o.escala ? +o.escala.x || 1 : 1, sy = o.escala ? +o.escala.y || 1 : 1;
-    const p = sx === 1 && sy === 1 ? pts : pts.map(([x, y]) => [Math.round(x * sx * 1e3) / 1e3, Math.round(y * sy * 1e3) / 1e3]); // arredonda: 200·1,1 não pode virar 12 células
+    // a escala vem depois do giro: encolhC age no comprimento do tecido (X) e encolhL na largura (Y), qualquer que seja o giro
+    const esc = p => sx === 1 && sy === 1 ? p : pose(p.map(([x, y]) => [Math.round(x * sx * 1e3) / 1e3, Math.round(y * sy * 1e3) / 1e3]), 0); // arredonda: 200·1,1 não pode virar 12 células
     const giros = o.rot === 'nenhuma' ? [0] : o.rot === 'livre' ? [0, 1, 2, 3] : [0, 2];
-    const formas = o.espelhar ? [p, p.map(([x, y]) => [x, -y])] : [p];
-    return formas.flatMap(f => giros.map(k => pose(f, k)));
+    const formas = o.espelhar ? [pts, pts.map(([x, y]) => [x, -y])] : [pts];
+    return formas.flatMap(f => giros.map(k => esc(pose(f, k))));
   }
   const variantes = (pts, o) => poses(pts, o).map(p => rasterPol(p, 0));
   const rasterRot = (pts, rot) => variantes(pts, { rot });

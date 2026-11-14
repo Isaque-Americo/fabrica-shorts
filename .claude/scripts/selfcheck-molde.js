@@ -314,7 +314,8 @@ testes.push(
 );
 
 
-// encaixe (molde/encaixe.js). Review 2: números tirados do index.html em 9f5b2e0 antes de mover o código
+// encaixe (molde/encaixe.js). Review 2: números tirados do index.html em 9f5b2e0 antes de mover o código;
+// tri mudou com o raster conservador (C1): os triângulos de antes se encaixavam sobrepondo a hipotenusa
 const E = fs.existsSync(path.join(raiz, 'encaixe.js')) ? require(path.join(raiz, 'encaixe.js')) : {};
 const antigos = {
   tri: [[0, 0], [300, 0], [0, 250]],
@@ -322,7 +323,7 @@ const antigos = {
   sq: [[0, 0], [200, 0], [200, 200], [0, 200]]
 };
 const baseline = {
-  tri: { '1@1': 0.3, '1@1.6': 0.3, '2@1': 0.3, '2@1.6': 0.3, '3@1': 0.58, '3@1.6': 0.3, '5@1': 1.14, '5@1.6': 0.68 },
+  tri: { '1@1': 0.3, '1@1.6': 0.3, '2@1': 0.6, '2@1.6': 0.3, '3@1': 0.6, '3@1.6': 0.34, '5@1': 1.08, '5@1.6': 0.6 },
   L: { '1@1': 0.4, '1@1.6': 0.4, '2@1': 0.96, '2@1.6': 0.56, '3@1': 1.12, '3@1.6': 0.8, '5@1': 1.92, '5@1.6': 1.12 },
   sq: { '1@1': 0.2, '1@1.6': 0.2, '2@1': 0.4, '2@1.6': 0.2, '3@1': 0.6, '3@1.6': 0.4, '5@1': 0.8, '5@1.6': 0.6 }
 };
@@ -406,7 +407,7 @@ const r4 = res4(tec()), r4kg = res4(tec({ cobr: 'kg', preco: 60, rend: 5 }));
 const aberto = pe([pc()], tec()), tub = pe([pc()], tec({ tubular: true })), cTub = ce([pc()], tec({ tubular: true }));
 const dobraT = pe([pc({ w: 200, h: 300, pts: [[0, 0], [200, 0], [200, 300], [0, 300]], tubular: true })], tec({ tubular: true }));
 const parE = pc({ qtd: 2, par: true, espelhar: true });
-const parU = pe([parE], tec(), { sentido: 'unico' }), cParU = ce([parE], tec(), { sentido: 'unico' }), parD = pe([parE], tec());
+const parU = pe([parE], tec(), { sentido: 'unico' }), cParU = ce([parE], tec(), { sentido: 'unico' }), parD = pe([parE], tec(), { camadas: 2 }), parD1 = pe([parE], tec());
 const parN = pc({ nome: 'Bolso', qtd: 2, par: true }), parSemE = pe([parN], tec(), { sentido: 'unico' }), cParSemE = ce([parN], tec(), { sentido: 'unico' });
 const pesoDe = t => { const o = { camadas: 3 }, c = ce([pc()], t, o); return [c, c && fn(() => O.resultados(O.normalizar(ordemO(o)), [c], [t]), null)]; };
 const [cPeso, rPeso] = pesoDe(tec()), [cPesoT, rPesoT] = pesoDe(tec({ tubular: true }));
@@ -443,9 +444,12 @@ testes.push(
   ['review5 aberto duplo: 4 posicoes', aberto.length, 4],
   ['review5 tubular: 2 posicoes, 4 pecas', [tub.length, tub.reduce((a, x) => a + x.rende, 0), cTub && cTub.posicoes.length, cTub && cTub.pecasTotal], [2, 4, 2, 4]],
   ['review5 unico par espelhar: normais = espelhadas', [parU.length, parU.filter(x => x.espelho).length, cParU && cParU.posicoes.filter(p => cParU.itens[p.i].espelho).length], [8, 4, 4]],
-  ['review5 duplo par: 8 posicoes, todas normais', [parD.length, parD.every(x => !x.espelho && !x.espelhar && x.rende === 1), (parD.avisos || []).length], [8, true, 0]],
+  ['review5 duplo par (camadas pares): 8 posicoes, todas normais', [parD.length, parD.every(x => !x.espelho && !x.espelhar && x.rende === 1), (parD.avisos || []).length], [8, true, 0]],
   ['review5 unico par sem espelhar: 8 normais e 1 aviso', [parSemE.length, parSemE.filter(x => x.espelho).length, parSemE.avisos, cParSemE && (cParSemE.avisos || []).length],
     [8, 0, [{ peca: 'Bolso', tam: 'M', motivo: 'par sem espelhar no sentido único' }], 1]],
+  ['I3 duplo camadas impares, par que espelha: como no unico, 4 normais + 4 espelhadas e aviso', [parD1.length, parD1.filter(x => x.espelho).length, parD1.avisos],
+    [8, 4, [{ peca: '0', tam: 'M', motivo: 'camadas ímpares no sentido duplo: pares gerados espelhados' }]]],
+  ['I3 duplo camadas impares, par sem espelhar: continua 8 normais', [pe([parN], tec()).filter(x => x.espelho).length, pe([parN], tec()).length], [0, 8]],
   ['duas abas: roupa so no tecido principal (15, nao 30)', duasAbas, [{}, 3, 15, { R1: { M: 15 } }, true]],
   ['tubular ignora ourelas na largura util', cTubOurela && cTubOurela.largUtil, 1600],
   ['peso das pecas = area x gram x pecas (aberto, 3 camadas)', rPeso && [cPeso.pecasTotal, rPeso.pesoPecas], [4, 0.04 * 0.16 * 4 * 3], 1e-9],
@@ -552,6 +556,59 @@ testes.push(
     return [X.plt(f, 100, 100).includes('LBR1 - Calcao Anus M\x03;'), X.dxf(f, 100).split(/\r?\n/).includes('R1 - Calcao Anus M')];
   })(), [true, true]],
   ['formas: texto com nome do molde e da peca, fio ao longo de X', fX[0] && [fX[0].texto && fX[0].texto.s, fX[0].fio && fX[0].fio[0][1] === fX[0].fio[1][1], fX[0].cor, fX[0].costura], ['R1 · Frente M', true, 'Azul', null]],
+);
+
+// C1: polígonos reais das peças colocadas nunca se cruzam (raster conservador). Encostar pode; sobrepor não
+const orient = (a, b, c) => (b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0]);
+const cruza = (a, b, c, d) => orient(a, b, c) * orient(a, b, d) < -1e-6 && orient(c, d, a) * orient(c, d, b) < -1e-6;
+const dentroEstrito = (q, P) => { let d = false;
+  for (let i = 0, j = P.length - 1; i < P.length; j = i++) {
+    const [xa, ya] = P[j], [xb, yb] = P[i];
+    if (Math.abs(orient(P[j], P[i], q)) < 1e-6 && Math.min(xa, xb) <= q[0] && q[0] <= Math.max(xa, xb) && Math.min(ya, yb) <= q[1] && q[1] <= Math.max(ya, yb)) return false; // na borda
+    if ((ya > q[1]) !== (yb > q[1]) && q[0] < (xb - xa) * (q[1] - ya) / (yb - ya) + xa) d = !d;
+  } return d; };
+// pontos 0,3 mm para dentro de cada aresta (pega sobreposição com arestas colineares, que não se cruzam)
+const junto = P => { const sg = P.reduce((s, [x, y], i) => s + x * P[(i + 1) % P.length][1] - P[(i + 1) % P.length][0] * y, 0) > 0 ? 1 : -1;
+  return P.flatMap((a, i) => { const b = P[(i + 1) % P.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, nx = -(b[1] - a[1]) / l * sg * 0.3, ny = (b[0] - a[0]) / l * sg * 0.3;
+    return [0.01, 0.5, 0.99].map(t => [a[0] + (b[0] - a[0]) * t + nx, a[1] + (b[1] - a[1]) * t + ny]); }); };
+const polSobrepoe = (A, B) => A.some((a, i) => B.some((c, j) => cruza(a, A[(i + 1) % A.length], c, B[(j + 1) % B.length])))
+  || A.some(q => dentroEstrito(q, B)) || B.some(q => dentroEstrito(q, A)) || junto(A).some(q => dentroEstrito(q, B)) || junto(B).some(q => dentroEstrito(q, A))
+  || dentroEstrito(A.reduce((s, q) => [s[0] + q[0] / A.length, s[1] + q[1] / A.length], [0, 0]), B); // mesmo contorno
+// itens {pts, o}: rasters = variantes(pts, o); devolve [comp, posicoes, algum par sobreposto]
+const semSobrepor = (pecas, larg) => {
+  const itens = pecas.map(({ pts, o }) => ({ pecaIdx: 0, rasters: E.variantes(pts, o), pts, o })), r = E.encaixar(itens, larg);
+  if (!r) return null;
+  const pol = r.posicoes.map(p => E.poses(itens[p.i].pts, itens[p.i].o)[p.var].map(([x, y]) => [x + p.ox, y + p.oy]));
+  return [r.comp, r.posicoes.map(p => p.ox), pol.some((A, i) => pol.some((B, j) => j > i && polSobrepoe(A, B)))];
+};
+const r210 = [[0, 0], [210, 0], [210, 290], [0, 290]];
+const irreg = [[0, 0], [233, 17], [251, 143], [160, 131], [97, 289], [-13, 201]];
+const mistos = [...Array(5)].flatMap(() => [{ pts: irreg, o: { rot: 'livre', espelhar: true } }, { pts: antigos.tri, o: { rot: 'livre' } },
+  { pts: antigos.L, o: { escala: { x: 1.07, y: 0.97 } } }]);
+// I5: escala depois do giro — 1000×200 girada 90°: X = 200·C, Y = 1000·L
+const p1000 = E.poses([[0, 0], [1000, 0], [1000, 200], [0, 200]], { rot: 'livre', escala: { x: 1.1, y: 1.05 } });
+// I4/I6: forro no pedido do Fabricar; frente e costas em enfestos separados
+const prodF = prodO([pc({ nome: 'Frente' }), pc({ nome: 'Forro', tecido: 'tF' })]), tecsF = [tec(), { id: 'tF', larg: 1.5, gram: 100 }];
+const forro = fn(() => {
+  const ord = O.deFabricar([{ id: 'p1', c: 'Azul', t: 'M', f: 3 }], { produtos: [prodF] });
+  const cs = ord.enfestos.map(e => O.calcularEnfesto(e, ord, [prodF], tecsF));
+  return [ord.tecidos.map(t => t.materiaId), ord.enfestos.map(e => e.itens.map(i => [i.grade, i.falta])), cs.map(c => [...new Set(c.itens.map(x => x.nome))]), O.resultados(ord, cs, tecsF).pecas];
+}, null);
+const dividido = fn(() => {
+  const p = prodO([pc({ nome: 'Frente' }), pc({ nome: 'Costas' })]), it = pecas => ({ produtoId: 'p1', cor: 'Azul', pecas, grade: { M: 3 } });
+  const ord = O.normalizar({ tecidos: [{ id: 'a1', materiaId: 'tA' }], enfestos: [{ id: 'e1', tecidoId: 'a1', itens: [it(['Frente'])] }, { id: 'e2', tecidoId: 'a1', itens: [it(['Costas'])] }] });
+  const cs = ord.enfestos.map(e => O.calcularEnfesto(e, ord, [p], [tec()])), r = O.resultados(ord, cs, [tec()]);
+  return [cs.map(c => c.grade), r.pecas, r.consumoLinear === (cs[0].comp + cs[1].comp) / 1000 / 3];
+}, null);
+testes.push(
+  ['C1 dois 210x290 em 300 mm: segundo depois da borda real, sem sobrepor', semSobrepor([{ pts: r210, o: {} }, { pts: r210, o: {} }], 300), [440, [0, 220], false]],
+  ['C1 raster cobre a borda fora do centro da celula', E.rasterPol(r210, 0).cw, 11],
+  ['C1 pecas irregulares giradas/espelhadas/escaladas: poligonos reais sem sobrepor', (r => r && r[2])(semSobrepor(mistos, 1000)), false],
+  ['I5 1000x200 girada 90: X = 200*1,1 e Y = 1000*1,05; sem giro X = 1000*1,1', [bb(p1000[1]), bb(p1000[0])], [[0, 0, 220, 1050], [0, 0, 1100, 210]], 1e-9],
+  ['I5 raster da variante 90 com a escala certa', (v => [v.cw, v.ch])(E.variantes([[0, 0], [1000, 0], [1000, 200], [0, 200]], { rot: 'livre', escala: { x: 1.1, y: 1.05 } })[1]), [11, 53]],
+  ['I4 deFabricar: aba e enfesto do forro, so com o forro; roupa conta uma vez', forro,
+    [['tA', 'tF'], [[[{ M: 3 }, { M: 3 }]], [[{ M: 3 }, { M: 3 }]]], [['Frente'], ['Forro']], 3]],
+  ['I6 frente e costas em enfestos separados: roupa so no item com a peca 0', dividido, [[{ R1: { M: 3 } }, { R1: {} }], 3, true]],
 );
 
 const perto = (a, b, tol) => typeof a === 'number' ? Math.abs(a - b) <= tol

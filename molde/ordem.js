@@ -49,14 +49,18 @@
     for (const l of lista || []) {
       const f = nn(l.f); if (!f || !l.id) continue;
       const p = prods.find(x => x.id === l.id), mat = (p && p.tecidoId) || '';
-      let enf = enfestos.find(e => e.mat === mat);
-      if (!enf) {
-        const t = { id: uid(), materiaId: mat }; tecidos.push(t);
-        enf = { mat, e: { tecidoId: t.id, camadas: 1, alturaMax: o.camadas, compMax: o.compMax, itens: [] } }; enfestos.push(enf);
+      // peças de outro tecido (forro…) ganham aba e enfesto próprios; pecasEnfesto já tira cada peça das abas que não são o tecido dela
+      const outros = [...new Set(pecasTam(p, l.t).map(q => q && q.tecido).filter(t => t && t !== mat))];
+      for (const m of [mat, ...outros]) {
+        let enf = enfestos.find(e => e.mat === m);
+        if (!enf) {
+          const t = { id: uid(), materiaId: m }; tecidos.push(t);
+          enf = { mat: m, e: { tecidoId: t.id, camadas: 1, alturaMax: o.camadas, compMax: o.compMax, itens: [] } }; enfestos.push(enf);
+        }
+        let it = enf.e.itens.find(x => x.produtoId === l.id && x.cor === (l.c || ''));
+        if (!it) enf.e.itens.push(it = { produtoId: l.id, cor: l.c || '', pecas: null, grade: {}, falta: {} });
+        it.grade[l.t] = it.falta[l.t] = (it.grade[l.t] || 0) + f;
       }
-      let it = enf.e.itens.find(x => x.produtoId === l.id && x.cor === (l.c || ''));
-      if (!it) enf.e.itens.push(it = { produtoId: l.id, cor: l.c || '', pecas: null, grade: {}, falta: {} });
-      it.grade[l.t] = it.falta[l.t] = (it.grade[l.t] || 0) + f;
     }
     return normalizar({ ...ordem, tecidos: tecidos.length ? tecidos : ordem.tecidos, enfestos: enfestos.length ? enfestos.map(x => x.e) : ordem.enfestos });
   }
@@ -94,7 +98,7 @@
   // rasters = variantes(pts, {rot, espelhar, escala}). Seleção `pecas`: pelo nome da peça; sem nome, pelo índice ('0', '1'…)
   function pecasEnfesto(enf, ordem, produtos, tecidos) {
     const { aba, mat } = contexto(enf, ordem, tecidos); if (!aba) return [];
-    const tub = !!(mat && mat.tubular), su = !!(mat && mat.sentidoUnico), unico = enf.sentido === 'unico';
+    const tub = !!(mat && mat.tubular), su = !!(mat && mat.sentidoUnico), unico = enf.sentido === 'unico', impar = Math.max(1, nn(enf.camadas)) % 2 === 1;
     const escala = { x: 1 + num(mat && mat.encolhC) / 100, y: 1 + num(mat && mat.encolhL) / 100 };
     const cache = new Map(), itens = [], avisos = [];
     const item = (base, pts, o) => {
@@ -119,10 +123,11 @@
           const rot = su ? 'nenhuma' : q.rot, esp = !!q.espelhar;
           if (tub && q.tubular) { const m = meiaPeca(q.pts); repete(N, () => item(base, m, { rot: 'nenhuma', espelhar: false, meia: true, rende: 1 })); } // girar/espelhar tiraria a dobra de Y=0
           else if (tub) repete(Math.ceil(N / 2), () => item(base, q.pts, { rot, espelhar: esp, rende: 2 })); // dois panos por camada
-          else if (q.par && !unico) repete(N, () => item(base, q.pts, { rot, espelhar: false, rende: 1 })); // face a face: metade das camadas já sai espelhada
-          else if (q.par) {
+          else if (q.par && !unico && !(impar && esp)) repete(N, () => item(base, q.pts, { rot, espelhar: false, rende: 1 })); // face a face: metade das camadas já sai espelhada
+          else if (q.par) { // único, ou duplo com camadas ímpares (a camada a mais ficaria sem o par)
             const n = gr * Math.ceil(qtd / 2), espelhada = esp ? q.pts.map(([x, y]) => [x, -y]) : q.pts;
             if (!esp) avisos.push({ peca: nome, tam, motivo: 'par sem espelhar no sentido único' });
+            else if (!unico) avisos.push({ peca: nome, tam, motivo: 'camadas ímpares no sentido duplo: pares gerados espelhados' });
             repete(n, () => item(base, q.pts, { rot, espelhar: false, rende: 1 }));
             repete(n, () => item(base, espelhada, { rot, espelhar: false, espelho: esp, rende: 1 }));
           } else repete(N, () => item(base, q.pts, { rot, espelhar: esp, rende: 1 }));
@@ -144,7 +149,10 @@
       const p = (produtos || []).find(x => x.id === it.produtoId);
       if (!p || principalDe(p, ordem) !== aba.materiaId) continue; // a roupa conta só no enfesto do tecido principal; forro etc. não repetem
       const gr = grade[p.ref || p.id] = grade[p.ref || p.id] || {};
-      for (const [t, q] of Object.entries(it.grade || {})) if (nn(q)) gr[t] = (gr[t] || 0) + nn(q);
+      for (const [t, q] of Object.entries(it.grade || {})) {
+        const q0 = pecasTam(p, t)[0]; // peças divididas entre enfestos: a roupa conta só no item que leva a peça 0
+        if (nn(q) && (!it.pecas || (q0 && it.pecas.includes(q0.nome || '0')))) gr[t] = (gr[t] || 0) + nn(q);
+      }
     }
     return { comp, largUtil, posicoes: r.posicoes, itens, pecasTotal: itens.reduce((a, x) => a + x.rende, 0), areaPecas,
       aproveitamento: comp > 0 && largUtil > 0 ? areaPecas / (comp * largUtil) : 0, grade, avisos: itens.avisos };

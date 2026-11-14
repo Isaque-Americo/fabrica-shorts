@@ -373,7 +373,7 @@ const e=curEnf(),lin=e&&document.querySelector(`#res-${CSS.escape(e.id)} [data-l
 if(lin){
 const c=cs[O.enfestos.indexOf(e)];
 lin.innerHTML=c?`Risco ${nf(c.comp/1000)} m · ${nf(c.comp/1000*e.camadas)} m de tecido · aproveitamento ${nf(c.aproveitamento*100,1)}%`+
-  (e.compMax&&c.comp>e.compMax?' · <span class="ruim">passa do comprimento máximo</span>':'')
+  (e.compMax&&c.comp>e.compMax?' · <span class="ruim">passa do comprimento máximo</span>':'')+[...new Set((c.avisos||[]).map(a=>a.motivo))].map(m=>' · '+esc(m)).join('')
   :'<span class="vazio">Sem risco: falta tecido, peças ou grade, ou alguma peça é mais larga que o tecido.</span>';
 }
 $('#res-ordem-c').innerHTML=htmlRes(cs);
@@ -467,14 +467,16 @@ if(a==='props')return abrirProps();
 if(a==='add'){
 const pid=$('#add-prod').value,cor=$('#add-cor').value.trim();if(!pid)return;
 if(e.itens.some(x=>x.produtoId===pid&&x.cor===cor))return toast('Este produto e cor já estão no enfesto.');
-e.itens.push({produtoId:pid,cor,pecas:null,grade:{}});
+e.itens.push({produtoId:pid,cor,pecas:null,grade:{},falta:{}});
 }else if(!it)return;
 else if(a==='mais'||a==='menos')MO.ajustarGrade(it,b.dataset.t,a==='mais'?1:-1);
 else if(a==='rm'){if(!confirm(`Remover ${nomeProd(prod(it.produtoId))}${it.cor?' ('+it.cor+')':''} do enfesto?`))return;e.itens.splice(+b.dataset.i,1)}
 sujou();render();
 });
-// abre numa aba nova: grava antes o rascunho (salvar guarda no localStorage na hora) para o enfesto ver o que está na tela
-corpo.addEventListener('click',ev=>{if(ev.target.closest('a[data-enfesto]')&&estado!=='salvo')salvar()});
+// abre numa aba nova: grava o rascunho aqui mesmo (salvar em andamento não regrava) para o enfesto ver o que está na tela
+corpo.addEventListener('click',ev=>{if(!ev.target.closest('a[data-enfesto]')||estado==='salvo')return;
+const t=Date.now();try{localStorage.setItem(RASC(),JSON.stringify({em:t,o:{...structuredClone(O),salvoEm:t}}))}catch(e){} // sem o resumo: recalcular todos os enfestos atrasaria o clique; o salvar grava
+salvar()});
 corpo.addEventListener('input',ev=>{
 const x=ev.target;if(x.dataset.acao!=='cor')return;
 const it=(curEnf()||{itens:[]}).itens[+x.dataset.i];if(!it)return;it.cor=x.value;sujou();
