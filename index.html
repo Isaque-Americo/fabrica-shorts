@@ -514,7 +514,7 @@ const precoG=p=>+((p&&p.precoG!=null)?p.precoG:(p&&p.preco))||0;
 const precoDe=(p,t)=>SZ.indexOf(t)>=4?precoG(p):(+p.preco||0);
 const pedTotal=o=>(o.itens||[]).reduce((a,i)=>a+i.qtd*i.preco,0);
 const precoAtual=i=>{const p=prod(i.prodId);const np=p?precoDe(p,i.tam):0;return np>0?np:(+i.preco||0)};
-const pedDesatual=o=>['Pendente','Faturado'].includes(o.status)&&(o.itens||[]).some(i=>Math.abs(precoAtual(i)-(+i.preco||0))>=0.005);
+const pedDesatual=o=>['Pendente','Aprovado','Faturado'].includes(o.status)&&(o.itens||[]).some(i=>Math.abs(precoAtual(i)-(+i.preco||0))>=0.005);
 
 (async()=>{
 const {data:{session}}=await sb.auth.getSession();
@@ -1327,7 +1327,7 @@ const r=lista.map(o=>`<tr><td>#${o.numero}<small>${esc((o.data||'').split('-').r
  <td class="n">${(o.itens||[]).reduce((a,i)=>a+i.qtd,0)}</td>
  <td class="n">${brl(pedTotal(o))}${admin&&pedDesatual(o)?'<small class="aviso" title="Preço diferente do cadastro do produto">preço desatualizado</small>':''}</td>
  <td>${selo(st(o))}</td>
- <td>${acoes('pd'+o.id,[['Ver itens',`verPed('${o.id}')`],...(admin?[o.ordemId&&['Abrir ordem de corte',`abrirOrdem('${o.ordemId}')`],...(st(o)==='Pendente'?[['Aprovar',`aprovarPed('${o.id}')`],['Recusar',`setSt('${o.id}','Recusado')`]]:[]),['Trocar representante',`fRepPed('${o.id}')`],{cab:'Mudar status para'},...ST.filter(s=>s!==st(o)&&!(o.ordemId?['Pendente','Recusado']:st(o)==='Pendente'?['Aprovado','Recusado']:[]).includes(s)).map(s=>[s,s==='Aprovado'&&!o.ordemId?`aprovarPed('${o.id}')`:`setSt('${o.id}','${s}')`]),'-',['Excluir pedido',`delPed('${o.id}')`,'del']]:[])])}</td></tr>`).join('');
+ <td>${acoes('pd'+o.id,[['Ver itens',`verPed('${o.id}')`],...(admin?[o.ordemId&&['Abrir ordem de corte',`abrirOrdem('${o.ordemId}')`],...(st(o)==='Pendente'?[['Aprovar',`aprovarPed('${o.id}')`],['Recusar',`setSt('${o.id}','Recusado')`]]:[]),['Trocar representante',`fRepPed('${o.id}')`],{cab:'Mudar status para'},...ST.filter(s=>s!==st(o)&&!(o.ordemId?['Pendente','Recusado']:st(o)==='Pendente'?ST.filter(x=>x!=='Cancelado'):[]).includes(s)).map(s=>[s,s==='Aprovado'&&!o.ordemId?`aprovarPed('${o.id}')`:`setSt('${o.id}','${s}')`]),'-',['Excluir pedido',`delPed('${o.id}')`,'del']]:[])])}</td></tr>`).join('');
 return `<div class="bar">${campoBusca('Buscar por número ou cliente')}<span style="display:flex;gap:8px">${admin&&S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></span></div>
  ${todos.length?chips:''}
  <div class="tw"><table><tr><th>Nº</th><th>Cliente</th><th class="n">Peças</th><th class="n">Total</th><th>Status</th><th></th></tr>${r||`<tr><td colspan="6" class="empty">${todos.length?'Nenhum pedido com status '+esc(pedFiltro)+'.':'Nenhum pedido lançado. Comece pelo botão acima.'}</td></tr>`}</table></div>`;
@@ -1397,7 +1397,7 @@ const ownerId=role==='lojista'?appProfile.user_id:(role==='admin'||role==='repre
 const lojaVinculada=ownerId&&role!=='lojista'?S.lojas.find(x=>x.id===ownerId):null;
 if(ownerId&&role!=='lojista'&&(!lojaVinculada||lojaVinculada.nome!==nomeCliente))throw new Error('A loja selecionada não corresponde ao cliente do pedido.');
 await db.collection('pedidos').add({numero,cliente:nomeCliente,data:f.data,repId,repNome,itens,status:'Pendente'},ownerId);
-if(fl.length)setTimeout(()=>aviso('Pedido salvo. Itens enviados para a aba Fabricar: '+txtFalta(fl)+'.'),200);
+if(fl.length)setTimeout(()=>aviso('Pedido salvo. Sem estoque: '+txtFalta(fl)+'. Depois de aprovado, o pedido entra em A fabricar.'),200);
 });
 }
 
@@ -1594,7 +1594,7 @@ const corpo=fabVista==='enfesto'?enfesto
 return `<div class="cards"><div class="c"><small>Peças a fabricar</small><b>${total}</b></div><div class="c"><small>Pedidos com itens a fabricar</small><b>${com.length}</b></div></div>
  <div class="chips">${VISTAS.map(([k,l])=>`<button class="${k===fabVista?'on':''}" onclick="setFabVista('${k}')">${l}</button>`).join('')}</div>
  ${corpo}
- <p style="color:var(--mut)">Considera pedidos Pendente ou Faturado. O estoque (por cor e tamanho) é reservado primeiro para os pedidos mais antigos. Os pedidos não alteram o estoque: quando a produção ficar pronta, lance a entrada na aba Estoque.</p>`;
+ <p style="color:var(--mut)">Considera pedidos Aprovado ou Faturado, sem descontar o estoque: é só informativo, cada pedido aprovado já tem a sua ordem de corte. Os pedidos não alteram o estoque: quando a produção ficar pronta, lance a entrada na aba Estoque.</p>`;
 }
 function faltas(itens){
 const base=demanda(),add={};
@@ -1613,7 +1613,7 @@ function checaFalta(){
 if(appProfile?.role!=='admin')return;
 const box=$('#falta');if(!box)return;
 const fl=faltas(lerItens($('#dlg')));
-box.innerHTML=fl.length?'<div class="alert">⚠ Sem estoque suficiente: '+esc(txtFalta(fl))+'. Esses itens irão para a aba Fabricar. Você pode salvar mesmo assim.</div>':'';
+box.innerHTML=fl.length?'<div class="alert">⚠ Sem estoque suficiente: '+esc(txtFalta(fl))+'. Depois de aprovado, o pedido entra em A fabricar. Você pode salvar mesmo assim.</div>':'';
 }
 function achaProd(ref){const d=String(ref||'').replace(/\D/g,'');return d?S.produtos.find(p=>String(p.ref).replace(/\D/g,'')===d):null}
 const REFINP=`<div class="r2" style="margin-top:8px"><input id="refman" inputmode="numeric" placeholder="Digite a referência (ex.: 5060)" oninput="this.value=this.value.replace(/[^0-9]/g,'')" onkeydown="if(event.key==='Enter'){event.preventDefault();aplicaRef()}"><button type="button" class="pri" onclick="aplicaRef()">Aplicar</button></div>`;
@@ -1680,9 +1680,9 @@ await db.doc('pedidos/'+id).update({repId:rp?rp.id:'',repNome:rp?rp.nome:rn});
 
 async function atualizarPrecos(){
 const L=S.pedidos.filter(pedDesatual);
-if(!L.length){aviso('Os pedidos Pendente e Faturado já estão com os preços atuais dos produtos.');return}
+if(!L.length){aviso('Os pedidos Pendente, Aprovado e Faturado já estão com os preços atuais dos produtos.');return}
 const dif=L.reduce((a,o)=>a+(o.itens||[]).reduce((b,i)=>b+i.qtd*precoAtual(i),0)-pedTotal(o),0);
-if(!await confirma(`Atualizar ${L.length} pedido(s) Pendente/Faturado com os preços atuais dos produtos? Pedidos Enviado, Entregue e Cancelado não mudam. Diferença no total: ${dif>=0?'+':''}${brl(dif)}.`))return;
+if(!await confirma(`Atualizar ${L.length} pedido(s) Pendente/Aprovado/Faturado com os preços atuais dos produtos? Pedidos Recusado, Enviado, Entregue e Cancelado não mudam. Diferença no total: ${dif>=0?'+':''}${brl(dif)}.`))return;
 try{
 for(const o of L)await db.doc('pedidos/'+o.id).update({itens:o.itens.map(i=>({...i,preco:precoAtual(i)}))});
 aviso(L.length+' pedido(s) atualizado(s).');
@@ -1697,8 +1697,9 @@ const sem=MoldeOrdem.semMolde(ped,S.produtos);
 if(sem.length){aviso('Sem molde: '+sem.join(', ')+'. Cadastre o molde antes de aprovar.');return}
 const falhou='A ordem foi criada mas o pedido não foi marcado; tente Aprovar de novo';
 const marcar=async ordemId=>{await db.doc('pedidos/'+id).update({status:'Aprovado',ordemId});abrirOrdem(ordemId)};
+const achaOrdem=async()=>{await sessaoOk();const r=await sb.from('docs').select('id').eq('col','ordens').eq('data->>pedidoId',id).limit(1);if(r.error)throw r.error;return r.data[0]};
 let ex;
-try{await sessaoOk();const r=await sb.from('docs').select('id').eq('col','ordens').eq('data->>pedidoId',id).limit(1);if(r.error)throw r.error;ex=r.data[0]}
+try{ex=await achaOrdem()}
 catch(e){aviso(e.message||'Erro ao procurar a ordem de corte');return}
 // ordem já existe (aprovação anterior que não marcou o pedido): só marca
 if(ex){try{await marcar(ex.id)}catch(e){aviso(falhou)}return}
@@ -1706,16 +1707,16 @@ const ps=[...new Set(ped.itens.map(i=>i.prodId))].map(prod).filter(Boolean),porT
 ps.forEach(p=>(porTec[p.tecidoId||'']=porTec[p.tecidoId||'']||[]).push(p));
 const det=Object.entries(porTec).map(([t,L])=>`<h4>${esc(mat(t)?.nome||'Sem tecido')}</h4>${L.map(p=>`<label>${esc(p.ref)} · ${esc(p.nome)}<select name="g_${p.id}">${L.map((_,i)=>`<option value="${i+1}">Enfesto ${i+1}</option>`).join('')}</select></label>`).join('')}`).join('');
 const radio=(v,l,on)=>`<label style="display:flex;align-items:center;gap:8px"><input type="radio" name="modo" value="${v}" style="width:auto;margin:0"${on?' checked':''} onchange="$('#apdet').hidden=this.value!=='det'">${l}</label>`;
-modal('Aprovar pedido #'+o.numero,radio('auto','Enfesto automático',1)+radio('det','Enfesto detalhado')+`<div id="apdet" hidden>${det}</div>`,async(f,form)=>{
+modal('Aprovar pedido #'+esc(o.numero),radio('auto','Enfesto automático',1)+radio('det','Enfesto detalhado')+`<div id="apdet" hidden>${det}</div>`,async(f,form)=>{
 const bt=form.querySelector('button.pri');bt.disabled=true;
 try{
 const grupos=f.modo==='det'?Object.fromEntries(ps.map(p=>[p.id,+f['g_'+p.id]||1])):undefined;
 const doc=MoldeOrdem.dePedido(ped,{produtos:S.produtos,grupos,compMax:Math.round(enfMesa*1000)});
 doc.criadaEm=new Date().toISOString();
-await sessaoOk();
-const r=await sb.from('docs').insert({col:'ordens',data:doc}).select('id').single();
-if(r.error)throw r.error;
-try{await marcar(r.data.id)}catch(e){setTimeout(()=>aviso(falhou),200)}
+// procura de novo: uma aprovação cuja resposta se perdeu pode já ter criado a ordem
+let oid=(await achaOrdem())?.id;
+if(!oid){const r=await sb.from('docs').insert({col:'ordens',data:doc}).select('id').single();if(r.error)throw r.error;oid=r.data.id}
+try{await marcar(oid)}catch(e){setTimeout(()=>aviso(falhou),200)}
 }finally{bt.disabled=false}
 });
 $('#dlg button.pri').textContent='Aprovar';
@@ -1761,7 +1762,7 @@ return resumo+lin;
 }).join('');
 return `<div class="bar"><h2>Estoque por cor e tamanho</h2></div>
  <div class="tw"><table class="keep"><tr><th>Produto</th><th>Cor</th>${SZ.map(s=>`<th class="n">${s}</th>`).join('')}<th class="n">Total</th><th></th></tr>${rows||'<tr><td colspan="12" class="empty">Cadastre produtos para controlar o estoque.</td></tr>'}</table></div>
- <p style="color:var(--mut)">Cada linha mostra o total por tamanho; clique em “N cores” para abrir a divisão por cor. Os pedidos não alteram o estoque. Use “Entrada / ajuste” para lançar produção pronta (valores positivos) ou saídas e perdas (negativos). Para mudar as quantidades de uma vez, use Editar na aba Produtos. O que falta aparece na aba Fabricar.</p>`;
+ <p style="color:var(--mut)">Cada linha mostra o total por tamanho; clique em “N cores” para abrir a divisão por cor. Os pedidos não alteram o estoque. Use “Entrada / ajuste” para lançar produção pronta (valores positivos) ou saídas e perdas (negativos). Para mudar as quantidades de uma vez, use Editar na aba Produtos. A demanda dos pedidos aprovados aparece na aba A fabricar.</p>`;
 }
 function fEntrada(id){
 const p=prod(id);
