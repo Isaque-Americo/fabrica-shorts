@@ -338,7 +338,8 @@ doc(p){
 const [k,id]=p.split('/');
 return {
 async set(d){await sessaoOk();ok(await sb.from('docs').update({data:d}).eq('id',id));await load(k)},
-async update(d){await sessaoOk();const cur=(cache[k]||[]).find(r=>r.id===id);ok(await sb.from('docs').update({data:{...(cur?cur.data:{}),...d}}).eq('id',id));await load(k)},
+// se: filtro extra opcional (ex.: só grava se o pedido ainda não tem ordem); devolve quantas linhas mudaram
+async update(d,se){await sessaoOk();const cur=(cache[k]||[]).find(r=>r.id===id);let q=sb.from('docs').update({data:{...(cur?cur.data:{}),...d}}).eq('id',id);if(se)q=se(q).select('id');const r=ok(await q);await load(k);return (r.data||[]).length},
 async delete(){await sessaoOk();ok(await sb.from('docs').delete().eq('id',id));await load(k)}
 };
 }
@@ -1325,7 +1326,7 @@ if(pedFiltro!=='todos'&&!ST.includes(pedFiltro))pedFiltro='todos';
 const st=o=>o.status||'Pendente';
 const lista=pedFiltro==='todos'?todos:todos.filter(o=>st(o)===pedFiltro);
 const chips=`<div class="chips"><button class="${pedFiltro==='todos'?'on':''}" onclick="setPedFiltro('todos')">Todos · ${todos.length}</button>${ST.map(s=>{const n=todos.filter(o=>st(o)===s).length;return n?`<button class="${pedFiltro===s?'on':''}" onclick="setPedFiltro('${s}')">${s} · ${n}</button>`:''}).join('')}</div>`;
-const r=lista.map(o=>`<tr><td>#${o.numero}<small>${esc((o.data||'').split('-').reverse().join('/'))}</small>${o.prazo?`<small>Prazo ${esc(o.prazo.split('-').reverse().join('/'))}</small>`:''}</td>
+const r=lista.map(o=>`<tr><td>#${o.numero}<small>${esc((o.data||'').split('-').reverse().join('/'))}</small>${o.prazo?`<small>Prazo ${esc(String(o.prazo).split('-').reverse().join('/'))}</small>`:''}</td>
  <td>${esc(o.cliente)}<small>${esc(rep(o.repId)?.nome||o.repNome||'sem representante')}${admin&&!rep(o.repId)?' · sem cadastro':''}</small></td>
  <td class="n">${(o.itens||[]).reduce((a,i)=>a+i.qtd,0)}</td>
  <td class="n">${brl(pedTotal(o))}${admin&&pedDesatual(o)?'<small class="aviso" title="Preço diferente do cadastro do produto">preço desatualizado</small>':''}</td>
@@ -1359,7 +1360,7 @@ checaFalta();
 }
 // pedido em edição (só admin): a grade ganha o preço unitário de cada cor/tamanho
 let pedEdit=null;
-const pedPreco=(p,c,t)=>{const i=(pedEdit?.itens||[]).find(i=>i.prodId===p.id&&i.cor===c&&i.tam===t);return i?i.preco:precoDe(p,t)};
+const pedPreco=(p,c,t)=>{const i=(pedEdit?.itens||[]).find(i=>i.prodId===p.id&&i.cor===c&&i.tam===t);return String(i?(i.preco??0):precoDe(p,t))};// string: preço 0 aparece como 0 (linhaCor esconde valores falsy)
 const gw=(p,cores,get)=>grade(cores,get)+(pedEdit&&p?'<small class="mut">Preço unitário (R$)</small>'+grade(cores,(c,t)=>pedPreco(p,c,t)).replace(/class="qi"/g,'class="pc" step="0.01"'):'');
 function pendentes(root){let n=0;root.querySelectorAll('.blk').forEach(b=>{if(!prod(b.querySelector('.selp').value)&&[...b.querySelectorAll('input.qi')].some(i=>+i.value>0))n++});return n}
 function addItem(){$('#itens').insertAdjacentHTML('beforeend',bloco());checaFalta()}
@@ -1400,7 +1401,8 @@ if(pendentes(form))throw new Error('Escolha a referência do produto nos blocos 
 const itens=lerItens(form);
 if(!itens.length)throw new Error('Informe a quantidade de ao menos um item.');
 if(!PAG[f.pag])throw new Error('Escolha a forma de pagamento.');
-await db.doc('pedidos/'+id).update({cliente:cur.ownerId?cur.cliente:f.cliente,data:f.data,itens,pag:f.pag,desc:descPag(f.pag,pedSub({itens})),prazo:f.prazo||undefined});
+const n=await db.doc('pedidos/'+id).update({cliente:cur.ownerId?cur.cliente:f.cliente,data:f.data,itens,pag:f.pag,desc:descPag(f.pag,pedSub({itens})),prazo:f.prazo||undefined},q=>q.is('data->>ordemId',null));
+if(!n)throw new Error('O pedido foi aprovado enquanto você editava; recarregue.');
 });
 checaFalta();
 return;
@@ -1742,7 +1744,8 @@ const ped={...o,itens:(o.itens||[]).filter(i=>+i.qtd>0)};
 const sem=MoldeOrdem.semMolde(ped,S.produtos);
 if(sem.length){aviso('Sem molde: '+sem.join(', ')+'. Cadastre o molde antes de aprovar.');return}
 const falhou='A ordem foi criada mas o pedido não foi marcado; tente Aprovar de novo';
-const marcar=async ordemId=>{await db.doc('pedidos/'+id).update({status:'Aprovado',ordemId});abrirOrdem(ordemId)};
+// desc vem do cliente (lojista grava pela API): recalcula a partir de pag antes de aprovar
+const marcar=async ordemId=>{await db.doc('pedidos/'+id).update({status:'Aprovado',ordemId,desc:descPag(o.pag,pedSub(o))});abrirOrdem(ordemId)};
 const achaOrdem=async()=>{await sessaoOk();const r=await sb.from('docs').select('id').eq('col','ordens').eq('data->>pedidoId',id).limit(1);if(r.error)throw r.error;return r.data[0]};
 let ex;
 try{ex=await achaOrdem()}
@@ -1783,7 +1786,7 @@ await db.doc('pedidos/'+id).delete();
 function verPed(id){
 const o=S.pedidos.find(x=>x.id===id);
 const d=$('#dlg');
-d.innerHTML=`<h3>Pedido #${o.numero} · ${esc(o.cliente)}</h3><div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Qtd</th><th class="n">Unit.</th><th class="n">Subtotal</th></tr>${o.itens.map(i=>`<tr><td>${esc(i.desc)}</td><td>${esc(i.cor||'—')}</td><td>${i.tam}</td><td class="n">${i.qtd}</td><td class="n">${brl(i.preco)}</td><td class="n">${brl(i.qtd*i.preco)}</td></tr>`).join('')}</table></div><p>Forma de pagamento: ${esc(PAG[o.pag]||'não informado')}<br>Prazo de entrega: ${o.prazo?esc(o.prazo.split('-').reverse().join('/')):'não informado'}</p><p>${+o.desc?`Subtotal: ${brl(pedSub(o))} · Desconto: −${brl(+o.desc)}<br>`:''}<b>Total: ${brl(pedTotal(o))}</b></p><div class="row end"><button class="pri" onclick="dlg.close()">Fechar</button></div>`;
+d.innerHTML=`<h3>Pedido #${o.numero} · ${esc(o.cliente)}</h3><div class="tw"><table><tr><th>Produto</th><th>Cor</th><th>Tam.</th><th class="n">Qtd</th><th class="n">Unit.</th><th class="n">Subtotal</th></tr>${o.itens.map(i=>`<tr><td>${esc(i.desc)}</td><td>${esc(i.cor||'—')}</td><td>${esc(i.tam)}</td><td class="n">${i.qtd}</td><td class="n">${brl(i.preco)}</td><td class="n">${brl(i.qtd*i.preco)}</td></tr>`).join('')}</table></div><p>Forma de pagamento: ${esc(PAG[o.pag]||'não informado')}<br>Prazo de entrega: ${o.prazo?esc(String(o.prazo).split('-').reverse().join('/')):'não informado'}</p><p>${+o.desc?`Subtotal: ${brl(pedSub(o))} · Desconto: −${brl(+o.desc)}<br>`:''}<b>Total: ${brl(pedTotal(o))}</b></p><div class="row end"><button class="pri" onclick="dlg.close()">Fechar</button></div>`;
 d.showModal();
 }
 
@@ -1889,6 +1892,8 @@ const t=[['aviamento 20/10un x2 + tecido 10x2m',a.mp,24],
 ['pedido antigo sem desc',pedTotal({itens:[{qtd:2,preco:10}]}),20],
 ['Pix: 5% de 1000 = 50',descPag('pix',1000),50],
 ['Pix arredonda a 2 casas',descPag('pix',33.33),1.67],
+['aprovacao recalcula desc do pix (3 x 33,33)',descPag('pix',pedSub({itens:[{qtd:3,preco:33.33}]})),5],
+['preco 0 na edicao aparece como 0',(()=>{pedEdit={itens:[{prodId:'x',cor:'Preto',tam:'P',preco:0}]};const r=pedPreco({id:'x',preco:9},'Preto','P')==='0'&&pedPreco({id:'x',preco:9},'Preto','M')==='9';pedEdit=null;return r})(),true],
 ['outras formas sem desconto',descPag('boleto',1000)+descPag('transferencia',1000)+descPag('cheque',1000)+descPag(undefined,1000),0],
 ['processos entram no total',+custoFicha({tecidoId:'t1',cons:2,ficha:{itens:[],mo:1,fixo:0,processos:[{min:2,custoMin:0.5}]}},false).total.toFixed(4),22],
 ...(()=>{
