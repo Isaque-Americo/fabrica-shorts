@@ -28,7 +28,7 @@
     };
     for (let cy = 0; cy < ch; cy++) for (let cx = 0; cx < cw; cx++) if (dentro((cx + .5) * ENC_RES, (cy + .5) * ENC_RES)) m[cy * cw + cx] = 1;
     // conservador: só o centro deixa até meia célula da peça fora das células e a vizinha encosta por cima;
-    // marca também as células tocadas pelos vértices e pelo contorno (amostras a cada ENC_RES/4 no máximo),
+    // marca também toda célula que o contorno atravessa (supercover: nem o canto raspado escapa),
     // cada amostra um fio (1e-6 mm) para dentro da peça e da aresta: contorno sobre a linha da grade cai na célula de dentro
     const toca = (x, y) => { m[Math.min(ch - 1, Math.max(0, Math.floor(y / ENC_RES))) * cw + Math.min(cw - 1, Math.max(0, Math.floor(x / ENC_RES)))] = 1; };
     const sent = p.reduce((s, [x, y], i) => { const [x2, y2] = p[(i + 1) % p.length]; return s + x * y2 - x2 * y; }, 0) > 0 ? 1 : -1;
@@ -36,7 +36,13 @@
       const [xa, ya] = p[j], [xb, yb] = p[i], l = Math.hypot(xb - xa, yb - ya), n = Math.max(1, Math.ceil(l / (ENC_RES / 4)));
       if (!l) continue;
       const nx = -(yb - ya) / l * sent * 1e-6, ny = (xb - xa) / l * sent * 1e-6;
-      for (let k = 0, e = 1e-6 / l; k <= n; k++) { const t = e + (1 - 2 * e) * k / n; toca(xa + (xb - xa) * t + nx, ya + (yb - ya) * t + ny); }
+      // supercover (Amanatides-Woo): toda célula que o segmento atravessa
+      const e = 1e-6 / l, ux = (xb - xa) * e, uy = (yb - ya) * e; let x = xa + ux + nx, y = ya + uy + ny; const X = xb - ux + nx, Y = yb - uy + ny, dx = X - x, dy = Y - y;
+      let cx = Math.floor(x / ENC_RES), cy = Math.floor(y / ENC_RES); const ex = Math.floor(X / ENC_RES), ey = Math.floor(Y / ENC_RES);
+      const sx = dx > 0 ? 1 : -1, sy = dy > 0 ? 1 : -1, tdx = dx ? Math.abs(ENC_RES / dx) : 1 / 0, tdy = dy ? Math.abs(ENC_RES / dy) : 1 / 0;
+      let tx = dx ? ((dx > 0 ? cx + 1 : cx) * ENC_RES - x) / dx : 1 / 0, ty = dy ? ((dy > 0 ? cy + 1 : cy) * ENC_RES - y) / dy : 1 / 0;
+      toca(x, y);
+      for (let g = 0; (cx !== ex || cy !== ey) && g < 1e5; g++) { if (Math.abs(tx - ty) < 1e-9) { toca((cx + sx + .5) * ENC_RES, (cy + .5) * ENC_RES); toca((cx + .5) * ENC_RES, (cy + sy + .5) * ENC_RES); cx += sx; tx += tdx; cy += sy; ty += tdy } else if (tx < ty) { cx += sx; tx += tdx } else { cy += sy; ty += tdy } toca((cx + .5) * ENC_RES, (cy + .5) * ENC_RES); }
     }
     return { cw, ch, m };
   }

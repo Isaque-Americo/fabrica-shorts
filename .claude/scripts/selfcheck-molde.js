@@ -603,6 +603,7 @@ const dividido = fn(() => {
 testes.push(
   ['C1 dois 210x290 em 300 mm: segundo depois da borda real, sem sobrepor', semSobrepor([{ pts: r210, o: {} }, { pts: r210, o: {} }], 300), [440, [0, 220], false]],
   ['C1 raster cobre a borda fora do centro da celula', E.rasterPol(r210, 0).cw, 11],
+  ['C1 canto raspado entre amostras (x+y=43 corta 3 mm da celula 1,1) fica marcado', (r => r.m[1 * r.cw + 1])(E.rasterPol([[0, 0], [43, 0], [0, 43]], 0)), 1],
   ['C1 pecas irregulares giradas/espelhadas/escaladas: poligonos reais sem sobrepor', (r => r && r[2])(semSobrepor(mistos, 1000)), false],
   ['I5 1000x200 girada 90: X = 200*1,1 e Y = 1000*1,05; sem giro X = 1000*1,1', [bb(p1000[1]), bb(p1000[0])], [[0, 0, 220, 1050], [0, 0, 1100, 210]], 1e-9],
   ['I5 raster da variante 90 com a escala certa', (v => [v.cw, v.ch])(E.variantes([[0, 0], [1000, 0], [1000, 200], [0, 200]], { rot: 'livre', escala: { x: 1.1, y: 1.05 } })[1]), [11, 53]],
