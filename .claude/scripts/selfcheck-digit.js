@@ -16,7 +16,15 @@ const q = D.aplicarH(Hq, { x: 250, y: 250 }), r = D.aplicarH(Hv, { x: 250, y: 25
 const cob = D.cobertura([A], esp);
 const inv = D.aplicarH(D.inversa(Hv), D.aplicarH(Hv, { x: 300, y: 200 }));
 
+// retângulo de 4 cantos: A1 cima-esq, A2 cima-dir, B2 baixo-dir, B1 baixo-esq
+const fr = (w, h) => [['A1', 0, 0], ['A2', w, 0], ['B2', w, h], ['B1', 0, h]].map(([rot, x, y]) => { const p = D.aplicarH(Hv, { x, y }); return { rot, x: p.x, y: p.y }; });
+const Hr = D.cantosRet(fr(800, 500), 800, 500), pr = D.aplicarH(Hr, { x: 400, y: 250 }), pv = D.aplicarH(Hv, { x: 400, y: 250 });
+
 const testes = [
+  ['cantosRet mapeia o centro', Math.hypot(pr.x - pv.x, pr.y - pv.y) < 1e-6, true],
+  ['cantosRet falta um canto', D.cantosRet(fr(800, 500).slice(0, 3), 800, 500), null],
+  ['desvioDiag exata', D.desvioDiag(800, 500, Math.hypot(800, 500)) < 1e-9, true],
+  ['desvioDiag 10 mm', Math.abs(D.desvioDiag(800, 500, Math.hypot(800, 500) + 10) - 10) < 1e-9, true],
   ['rotMm B3', D.rotMm('B3', esp), { x: 1000, y: 500 }],
   ['rotMm minúscula', D.rotMm('a1', esp), { x: 0, y: 0 }],
   ['rotMm inválido', D.rotMm('1A', esp), null],

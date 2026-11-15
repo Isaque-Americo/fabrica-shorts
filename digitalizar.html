@@ -78,7 +78,15 @@ input.cz-in{position:absolute;width:44px;height:24px;min-height:24px;padding:0 4
     <form id="nova" class="card" hidden>
       <label for="n-nome">Nome</label><input type="text" id="n-nome" required maxlength="80">
       <label for="n-tam">Tamanho (opcional)</label><input type="text" id="n-tam" maxlength="20">
-      <label for="n-esp">Espaçamento entre as cruzes (cm)</label><input type="number" id="n-esp" value="50" min="1" step="any" required>
+      <label for="n-modo">Como medir</label>
+      <select id="n-modo"><option value="ret">Retângulo de 4 cantos (uma foto)</option><option value="grade">Grade de cruzes (molde grande, por partes)</option></select>
+      <div id="n-ret">
+        <p class="vazio">Marque 4 cantos com fita no chão, maiores que o molde, e meça com a trena de centro a centro da fita.</p>
+        <label for="n-rw">Largura (cm)</label><input type="number" id="n-rw" min="1" step="any">
+        <label for="n-rh">Altura (cm)</label><input type="number" id="n-rh" min="1" step="any">
+        <label for="n-rd">Diagonal (cm), de um canto ao oposto</label><input type="number" id="n-rd" min="1" step="any">
+      </div>
+      <div id="n-grade" hidden><label for="n-esp">Espaçamento entre as cruzes (cm)</label><input type="number" id="n-esp" value="50" min="1" step="any"></div>
       <div class="acoes"><button class="btn pri" type="submit">Criar</button><button class="btn" type="button" id="n-cancela">Cancelar</button></div>
     </form>
     <button class="btn pri" id="n-abre" hidden>Nova digitalização</button>
@@ -103,7 +111,7 @@ input.cz-in{position:absolute;width:44px;height:24px;min-height:24px;padding:0 4
   </main>
 </div>
 <div id="m-v" hidden>
-  <header class="topo"><button class="btn peq" id="m-volta">← Fotos</button><button class="btn peq" id="m-menos" aria-label="Diminuir">−</button><button class="btn peq" id="m-mais" aria-label="Ampliar">+</button><span class="vazio">Clique em cada cruz e confira o rótulo. Letra = linha (A em cima), número = coluna (1 à esquerda): <b>A1 A2</b> em cima, <b>B1 B2</b> embaixo. Arraste para ajustar.</span></header>
+  <header class="topo"><button class="btn peq" id="m-volta">← Fotos</button><button class="btn peq" id="m-menos" aria-label="Diminuir">−</button><button class="btn peq" id="m-mais" aria-label="Ampliar">+</button><span class="vazio" id="m-dica"></span></header>
   <main>
     <div id="m-lista"></div>
     <div>
@@ -203,7 +211,7 @@ async apagarArqs(l){await sessaoOk();if(l.length)ok(await bk().remove(l))}
 let cont=false,CT=null,mont=false,MA=null,Z=0.25,sal=Promise.resolve(); // montar: tela aberta, arq da foto, zoom, fila de gravação
 let PODE=false,PODE_PROD=false,tela=null,DIG=null,fila=[],rodando=false; // fila: toda a fila do IndexedDB, de todas as digitalizações
 const urls=new Map(); // arq -> {u, exp}: url (assinada por 1 h ou do blob) já resolvida; renova com 50 min
-const dado=d=>({nome:'',tam:'',esp:500,fotos:[],folha:null,...d});
+const dado=d=>({nome:'',tam:'',esp:500,ret:null,fotos:[],folha:null,...d}); // ret: {w,h,diag} em mm (modo 4 cantos); null = grade
 
 async function render(){
 $('#lista-v').hidden=tela!==null;$('#dig-v').hidden=tela===null||mont||cont;$('#m-v').hidden=!(mont&&tela!==null);$('#c-v').hidden=!(cont&&tela!==null);
@@ -215,7 +223,7 @@ $('#d-contorno').hidden=!d.folha;
 $('#d-apagar').hidden=!PODE||!(d.fotos.length||d.folha);
 $('#d-montar').hidden=!PODE||!d.fotos.length;
 $('#d-nome').textContent=d.nome||'(sem nome)';
-$('#d-info').textContent=[d.tam&&'Tamanho '+d.tam,'Espaçamento '+d.esp/10+' cm',d.fotos.length+' foto(s)'].filter(Boolean).join(' · ');
+$('#d-info').textContent=[d.tam&&'Tamanho '+d.tam,d.ret?`Retângulo ${d.ret.w/10} × ${d.ret.h/10} cm`:'Espaçamento '+d.esp/10+' cm',d.fotos.length+' foto(s)'].filter(Boolean).join(' · ');
 $('#d-acoes').hidden=$('#d-solta').hidden=!PODE;
 const un=s=>`<div class="foto">${s}</div>`,daqui=fila.filter(i=>i.digId===tela);
 const x=(a,arq,n)=>PODE?`<button class="fx" data-a="${a}" data-arq="${esc(arq)}" aria-label="Apagar ${n}">×</button>`:'';
@@ -295,7 +303,19 @@ if(!r.ok){urls.delete(arq);throw new Error(`Não foi possível baixar a imagem (
 return r.blob();
 }
 const fotoAt=()=>dado(DIG).fotos.find(f=>f.arq===MA);
+// modo retângulo: cantos A1 cima-esq, A2 cima-dir, B2 baixo-dir, B1 baixo-esq (mostrados como 1 a 4)
+const CANTOS=[['A1','1','de cima, à esquerda'],['A2','2','de cima, à direita'],['B2','3','de baixo, à direita'],['B1','4','de baixo, à esquerda']];
+const rotVis=rot=>dado(DIG).ret?(CANTOS.find(c=>c[0]===String(rot).toUpperCase())||[,rot])[1]:rot;
+const proximoCanto=f=>CANTOS.find(c=>!f.cruzes.some(x=>x.rot.toUpperCase()===c[0]));
 function estado(f,esp){ // ok: entra na montagem; c: cor
+const ret=dado(DIG).ret;
+if(ret){
+const falta=proximoCanto(f);
+if(falta)return {t:`marque o canto ${falta[1]} (${falta[2]})`,c:'bad',ok:false};
+if(!MoldeDigit.cantosRet(f.cruzes,ret.w,ret.h))return {t:'cantos em linha reta — confira',c:'bad',ok:false};
+const dd=MoldeDigit.desvioDiag(ret.w,ret.h,ret.diag);
+return dd>2?{t:`a diagonal medida difere ${fmt(dd)} mm do esperado — confira a fita e a trena`,c:'warn',ok:true}:{t:'4 cantos marcados, diagonal confere',c:'good',ok:true};
+}
 const m=MoldeDigit.validarCruzes(f.cruzes,esp);
 if(m)return {t:m,c:'bad',ok:false};
 const {erro,n}=MoldeDigit.conferir(f.cruzes,esp);
@@ -307,6 +327,8 @@ function renderMontar(){
 const d=dado(DIG);
 $('#m-depois').hidden=!d.folha;
 if(!d.fotos.some(f=>f.arq===MA))MA=d.fotos[0]&&d.fotos[0].arq;
+const fa=fotoAt(),pc=d.ret&&fa&&proximoCanto(fa);
+$('#m-dica').innerHTML=d.ret?(pc?`Clique no <b>canto ${pc[1]}</b> (${pc[2]}) do retângulo de fita.`:'4 cantos marcados. Arraste para ajustar.'):'Clique em cada cruz e confira o rótulo. Letra = linha (A em cima), número = coluna (1 à esquerda): <b>A1 A2</b> em cima, <b>B1 B2</b> embaixo. Arraste para ajustar.';
 $('#m-lista').innerHTML=d.fotos.map((f,n)=>{const s=estado(f,d.esp);return `<button class="foto sel${f.arq===MA?' on':''}" data-a="mfoto" data-arq="${esc(f.arq)}">Foto ${n+1} · ${f.cruzes.length} cruz(es)<br><span class="${s.c}">${esc(s.t)}</span></button>`}).join('');
 desenhar();
 if(d.folha&&$('#m-folha').hidden)urlDe(d.folha.arq).then(u=>{$('#m-folha-img').src=u;$('#m-folha-img').hidden=false}).catch(()=>{});
@@ -321,7 +343,7 @@ pl.innerHTML='<img alt="Foto" draggable="false">';im=pl.firstChild;im.dataset.ar
 urlDe(f.arq).then(u=>{if(im.dataset.arq===f.arq)im.src=u}).catch(e=>toast(ptErro(e)));
 }
 pl.querySelectorAll('.cz,.cz-in').forEach(x=>x.remove());
-pl.insertAdjacentHTML('beforeend',f.cruzes.map((c,k)=>`<div class="cz" style="left:${c.x*Z}px;top:${c.y*Z}px"><i data-k="${k}"></i><b>${esc(c.rot)}</b>${PODE?`<button data-a="mdel" data-k="${k}" aria-label="Apagar ${esc(c.rot)}">×</button>`:''}</div>`).join(''));
+pl.insertAdjacentHTML('beforeend',f.cruzes.map((c,k)=>`<div class="cz" style="left:${c.x*Z}px;top:${c.y*Z}px"><i data-k="${k}"></i><b>${esc(rotVis(c.rot))}</b>${PODE?`<button data-a="mdel" data-k="${k}" aria-label="Apagar ${esc(rotVis(c.rot))}">×</button>`:''}</div>`).join(''));
 }
 // re-lê o doc antes de gravar (outro aparelho pode ter acrescentado fotos); gravações em série
 function persistir(){
@@ -335,6 +357,10 @@ const pl=e.currentTarget,f=fotoAt();
 if(!PODE||!f||e.target.closest('.cz,.cz-in'))return;
 pl.querySelectorAll('.cz-in').forEach(x=>x.remove());
 const r=pl.getBoundingClientRect(),x=(e.clientX-r.left)/Z,y=(e.clientY-r.top)/Z;
+if(dado(DIG).ret){ // modo retângulo: o clique já é o próximo canto, sem digitar rótulo
+const pc=proximoCanto(f);if(!pc)return toast('Os 4 cantos já estão marcados. Arraste para ajustar ou apague um com ×.');
+f.cruzes.push({rot:pc[0],x:Math.round(x*10)/10,y:Math.round(y*10)/10});return mudou();
+}
 pl.insertAdjacentHTML('beforeend',`<input type="text" class="cz-in" maxlength="6" aria-label="Rótulo da cruz" style="left:${x*Z}px;top:${y*Z}px">`);
 const inp=pl.querySelector('.cz-in');inp.value=sugerir(f);inp.focus();inp.select();
 inp.onblur=()=>inp.remove();
@@ -364,12 +390,13 @@ $('#m-mais').onclick=()=>zoom(1.25);$('#m-menos').onclick=()=>zoom(0.8);
 async function montarFolha(){
 const M=MoldeDigit,d=dado(DIG),prog=t=>$('#m-prog').textContent=t,esp=d.esp;
 const est=d.fotos.map(f=>estado(f,esp)),fs=d.fotos.filter((f,k)=>est[k].ok);
-const cs=fs.map(f=>new Map(M.celulas(f.cruzes,esp).map(c=>[c.i+','+c.j,c])));
+const ret=d.ret,ex=ret?ret.w:esp,ey=ret?ret.h:esp; // lado da célula em x e y; no retângulo é uma célula só, w×h
+const cs=fs.map(f=>ret?new Map([['0,0',{H:M.cantosRet(f.cruzes,ret.w,ret.h)}]]):new Map(M.celulas(f.cruzes,esp).map(c=>[c.i+','+c.j,c])));
 const cob=new Set();cs.forEach(m=>m.forEach((c,k)=>cob.add(k)));
-if(!cob.size){toast('Nenhuma foto tem um quadrado completo de 4 cruzes marcadas.');return}
+if(!cob.size){toast(ret?'Nenhuma foto tem os 4 cantos marcados.':'Nenhuma foto tem um quadrado completo de 4 cruzes marcadas.');return}
 const cel=[...cob].map(k=>k.split(',').map(Number));
 const i0=Math.min(...cel.map(c=>c[0])),j0=Math.min(...cel.map(c=>c[1])),i1=Math.max(...cel.map(c=>c[0]))+1,j1=Math.max(...cel.map(c=>c[1]))+1;
-const x0=i0*esp,y0=j0*esp,r=M.escalaFolha((i1-i0)*esp,(j1-j0)*esp),W=Math.ceil((i1-i0)*esp/r),Hh=Math.ceil((j1-j0)*esp/r);
+const x0=i0*ex,y0=j0*ey,r=M.escalaFolha((i1-i0)*ex,(j1-j0)*ey),W=Math.ceil((i1-i0)*ex/r),Hh=Math.ceil((j1-j0)*ey/r);
 const imgs=[];
 for(const [n,f] of fs.entries()){
 prog(`Carregando foto ${n+1} de ${fs.length}…`);
@@ -381,12 +408,12 @@ const out=new ImageData(W,Hh),o32=new Uint32Array(out.data.buffer);o32.fill(0xFF
 for(const [n,[i,j]] of cel.entries()){
 if(n%4===0){prog(`Montando… ${Math.round(100*n/cel.length)}%`);await new Promise(ok=>setTimeout(ok))}
 // mesma regra de MoldeDigit.melhorFoto (mais perto do centro da foto), com as células já calculadas, uma vez por célula
-const p={x:(i+0.5)*esp,y:(j+0.5)*esp};let k=-1,md=Infinity;
+const p={x:(i+0.5)*ex,y:(j+0.5)*ey};let k=-1,md=Infinity;
 fs.forEach((f,q)=>{const c=cs[q].get(i+','+j);if(!c)return;const u=M.aplicarH(c.H,p),dd=Math.hypot(u.x-f.w/2,u.y-f.h/2)/Math.max(f.w,f.h);if(dd<md){md=dd;k=q}});
 if(k<0)continue;
 const h=cs[k].get(i+','+j).H,im=imgs[k],sw=im.width,sh=im.height,sd=im.data;
 // convenção: o pixel px da folha vale o mm do seu centro, x0+(px+0.5)*r; cada pixel cai em exatamente uma célula
-const xa=Math.max(0,Math.ceil((i*esp-x0)/r-0.5)),xb=Math.min(W,Math.ceil(((i+1)*esp-x0)/r-0.5)),ya=Math.max(0,Math.ceil((j*esp-y0)/r-0.5)),yb=Math.min(Hh,Math.ceil(((j+1)*esp-y0)/r-0.5));
+const xa=Math.max(0,Math.ceil((i*ex-x0)/r-0.5)),xb=Math.min(W,Math.ceil(((i+1)*ex-x0)/r-0.5)),ya=Math.max(0,Math.ceil((j*ey-y0)/r-0.5)),yb=Math.min(Hh,Math.ceil(((j+1)*ey-y0)/r-0.5));
 for(let py=ya;py<yb;py++)for(let px=xa;px<xb;px++){
 const X=x0+(px+0.5)*r,Y=y0+(py+0.5)*r,w=h[6]*X+h[7]*Y+h[8];
 const u=(h[0]*X+h[1]*Y+h[2])/w-0.5,v=(h[3]*X+h[4]*Y+h[5])/w-0.5;
@@ -401,7 +428,7 @@ const cv=$('#m-folha');cv.width=W;cv.height=Hh;cv.getContext('2d').putImageData(
 const blob=await new Promise(ok=>cv.toBlob(ok,'image/jpeg',0.9));
 if(!blob)throw new Error('Não foi possível gerar a folha.');
 const g=cv.getContext('2d');g.strokeStyle='#dc2626';g.lineWidth=Math.max(2,W/500);
-for(const [i,j] of cel)g.strokeRect((i*esp-x0)/r,(j*esp-y0)/r,esp/r,esp/r); // só no que se vê; o JPEG gravado não leva o contorno
+for(const [i,j] of cel)g.strokeRect((i*ex-x0)/r,(j*ey-y0)/r,ex/r,ey/r); // só no que se vê; o JPEG gravado não leva o contorno
 cv.hidden=false;$('#m-folha-img').hidden=true;
 prog('Gravando a folha…');
 const arq=tela+'/folha.jpg';
@@ -488,7 +515,7 @@ CT.seed=[sx,sy];
 CT.mask=MoldeDigit.pintar(CT.img.data,CT.w,CT.h,sx,sy,+$('#c-tol').value);
 const d=dado(DIG),f=d.folha,b=MoldeDigit.borda(CT.mask,CT.w,CT.h);
 CT.bordaMm=b.map(p=>({x:f.x0+(p.x+0.5)*f.mmPx,y:f.y0+(p.y+0.5)*f.mmPx})); // pixel (x,y) vale o mm do seu centro
-const cob=MoldeDigit.cobertura(d.fotos.filter(x=>estado(x,d.esp).ok),d.esp);
+const cob=d.ret?new Set(['0,0']):MoldeDigit.cobertura(d.fotos.filter(x=>estado(x,d.esp).ok),d.esp); // retângulo: a folha toda é uma célula de lado esp=max(w,h)
 CT.foraPx=MoldeDigit.bordaFora(b,CT.w,CT.h,f.x0,f.y0,f.mmPx,cob,d.esp);
 suavizar();
 }
@@ -644,14 +671,21 @@ if(b.dataset.a==='fdel')apagarFoto(b.dataset.arq);
 if(b.dataset.a==='qdel')apagarDaFila(b.dataset.arq);
 if(b.dataset.a==='retry'){const i=fila.find(x=>x.arq===b.dataset.arq);if(i){i.estado='enviando';render();processar()}}
 });
+$('#n-modo').onchange=()=>{const r=$('#n-modo').value==='ret';$('#n-ret').hidden=!r;$('#n-grade').hidden=r};
 $('#n-abre').onclick=()=>{$('#nova').hidden=false;$('#n-abre').hidden=true;$('#n-nome').focus()};
 $('#n-cancela').onclick=()=>{$('#nova').hidden=true;$('#n-abre').hidden=!PODE};
 $('#nova').onsubmit=async e=>{
 e.preventDefault();
-const esp=Math.round(parseFloat($('#n-esp').value)*10),nome=$('#n-nome').value.trim();
+const nome=$('#n-nome').value.trim(),cm=id=>Math.round(parseFloat($(id).value)*10);
+let esp,ret=null;
+if($('#n-modo').value==='ret'){
+ret={w:cm('#n-rw'),h:cm('#n-rh'),diag:cm('#n-rd')};
+if(!(ret.w>0&&ret.h>0&&ret.diag>0)){toast('Preencha largura, altura e diagonal.');return}
+esp=Math.max(ret.w,ret.h); // o contorno usa esp como lado da célula única que cobre a folha
+}else esp=cm('#n-esp');
 if(!nome||!(esp>0))return;
 try{
-const id=await B.criar({nome,tam:$('#n-tam').value.trim(),esp,fotos:[],folha:null,criadaEm:new Date().toISOString(),v:1});
+const id=await B.criar({nome,tam:$('#n-tam').value.trim(),esp,ret,fotos:[],folha:null,criadaEm:new Date().toISOString(),v:1});
 $('#nova').reset();$('#nova').hidden=true;
 await abrir(id);
 }catch(x){toast(ptErro(x))}

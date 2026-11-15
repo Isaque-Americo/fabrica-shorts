@@ -64,6 +64,16 @@
     return celulas(cruzes, esp).length ? null : 'As cruzes não formam um quadrado da grade. A letra é a linha e o número a coluna: A1 A2 em cima, B1 B2 embaixo.';
   }
 
+  // retângulo de 4 cantos (A1 cima-esq, A2 cima-dir, B2 baixo-dir, B1 baixo-esq), w×h em mm; H leva mm -> px da foto
+  function cantosRet(cruzes, w, h) {
+    const q = ['A1', 'A2', 'B2', 'B1'].map(r => cruzes.find(c => c.rot.toUpperCase() === r));
+    if (q.some(c => !c)) return null;
+    return homografia([{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }], q);
+  }
+
+  // quanto a diagonal medida com a trena foge do retângulo ideal (mm): fita fora de esquadro ou medida errada
+  const desvioDiag = (w, h, diag) => Math.abs(diag - Math.hypot(w, h));
+
   // próximo rótulo: o canto que falta na célula mais completa (lendo linha a linha)
   function sugerirRot(cruzes, esp) {
     const m = indice(cruzes, esp);
@@ -286,7 +296,7 @@
     return { ang, tx: (P1.x + P2.x) / 2 - r.x - f.x0, ty: (P1.y + P2.y) / 2 - r.y - f.y0 };
   }
 
-  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, sugerirRot, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, pintar, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
+  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, sugerirRot, cantosRet, desvioDiag, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, pintar, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
   g.MoldeDigit = MoldeDigit;
   if (typeof module !== 'undefined') module.exports = MoldeDigit;
 })(typeof window !== 'undefined' ? window : globalThis);
