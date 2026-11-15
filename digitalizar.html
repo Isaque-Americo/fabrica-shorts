@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Digitalizar molde</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="molde/digit.js"></script>
+<script src="acesso.js"></script>
+<style>
+:root{--bg:#f4f4f3;--card:#ffffff;--tx:#18181b;--mut:#71717a;--bd:#e4e4e7;--ac:#c2410c;--fill:#f97316;--acx:#0e0e0f;--ok:#16a34a;--bad:#dc2626;--hd:#18181b;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--bad:#f87171;--hd:#f4f4f5;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--bad:#f87171;--hd:#f4f4f5;color-scheme:dark}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+a{color:var(--ac)}
+a:focus-visible,button:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+#aviso{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
+#aviso .c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:24px;max-width:420px}
+.topo{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--bd)}
+.topo a{text-decoration:none;font-size:14px}
+main{max-width:1100px;margin:0 auto;padding:16px}
+h2{margin:0 0 12px;font:700 26px 'Barlow Condensed',Inter,sans-serif;text-transform:uppercase;letter-spacing:.3px}
+.vazio{color:var(--mut);font-size:13px}
+#toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
+</style>
+</head>
+<body>
+<div id="aviso"><div class="c" id="aviso-c">Carregando…</div></div>
+<div id="lista-v" hidden>
+  <header class="topo"><a href="index.html">← App</a></header>
+  <main>
+    <h2>Digitalizar molde</h2>
+    <div id="lista"></div>
+  </main>
+</div>
+<div id="toast" role="status"></div>
+<script>
+const SB_URL='https://kgikdyqyoaqrhsshpmcw.supabase.co',SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI';
+const IS_DEV=location.hostname==='localhost'||location.hostname==='127.0.0.1';
+const Q=new URLSearchParams(location.search);
+// ?local=1 só em localhost: sem Supabase, tudo no localStorage (para testar a tela sem login)
+const LOCAL=IS_DEV&&Q.get('local')==='1';
+const sb=LOCAL?null:supabase.createClient(SB_URL,SB_KEY);
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
+
+function ptErro(e){
+const m=String((e&&e.message)||e||'');
+if(/failed to fetch|networkerror|network request|load failed|sem conexão/i.test(m))return 'Sem conexão com o servidor.';
+if(/session|jwt|refresh token|sessão/i.test(m))return 'Sua sessão expirou. Entre novamente no app.';
+if(/row-level security|permission denied|not authorized|sem permissão/i.test(m))return 'Sem permissão para salvar.';
+return m||'Erro ao salvar.';
+}
+function toast(t){const d=$('#toast');d.textContent=t;d.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>d.style.display='none',3500)}
+
+// ---- armazenamento: Supabase (docs, col 'digitalizacoes') ou local; as próximas tarefas completam ----
+const B=LOCAL?{
+async lista(){return []}
+}:(()=>{
+const ok=r=>{if(r.error)throw r.error;return r.data};
+async function sessaoOk(){const {data:{session}}=await sb.auth.getSession();if(!session)throw new Error('Sua sessão expirou.')}
+return {
+async lista(){await sessaoOk();return ok(await sb.from('docs').select('id,data').eq('col','digitalizacoes').order('created_at'))}
+};
+})();
+
+function bloquear(msg,entrar){
+$('#lista-v').hidden=true;$('#aviso').hidden=false;
+const c=$('#aviso-c');c.textContent=msg;
+if(entrar){const a=document.createElement('a');a.href='index.html';a.textContent='Entrar';a.style.cssText='display:block;margin-top:14px';c.append(a)}
+}
+
+async function iniciar(){
+try{
+let perfil=null;
+if(!LOCAL){
+const {data:{session}}=await sb.auth.getSession();
+const {data:{user}}=session?await sb.auth.getUser():{data:{}};
+if(!session||!user)return bloquear('Entre no app para digitalizar moldes.',true);
+({data:perfil}=await sb.from('user_profiles').select('role,is_principal,permissoes').eq('user_id',user.id).maybeSingle());
+if(!Acesso.pode(perfil,'moldes','ver'))return bloquear('Só administradores com acesso a moldes digitalizam moldes.');
+}
+const itens=await B.lista();
+$('#lista').innerHTML=itens.length?itens.map(r=>`<p>${esc(r.data&&r.data.nome||r.id)}</p>`).join(''):'<p class="vazio">Nenhuma digitalização ainda.</p>';
+$('#aviso').hidden=true;$('#lista-v').hidden=false;
+}catch(e){console.error(e);bloquear('Não foi possível abrir a página. '+ptErro(e))}
+}
+iniciar();
+</script>
+</body>
+</html>
