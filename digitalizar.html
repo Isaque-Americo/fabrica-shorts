@@ -111,6 +111,7 @@ input.cz-in{position:absolute;width:44px;height:24px;min-height:24px;padding:0 4
       <div class="acoes"><button class="btn pri" id="m-monta">Montar folha</button></div>
       <p class="vazio" id="m-prog" role="status"></p>
       <p id="m-aviso" style="color:var(--warn)"></p>
+      <div class="acoes" id="m-depois" hidden><button class="btn pri" id="m-auto">Contorno automático</button><button class="btn" id="m-mao">Levar para o molde e contornar à mão</button></div>
       <canvas id="m-folha" hidden></canvas><img id="m-folha-img" alt="Folha montada" style="max-width:100%" hidden>
     </div>
   </main>
@@ -304,6 +305,7 @@ return erro>2?{t:`erro ${fmt(erro)} mm — refaça ou confira as cruzes`,c:'warn
 }
 function renderMontar(){
 const d=dado(DIG);
+$('#m-depois').hidden=!d.folha;
 if(!d.fotos.some(f=>f.arq===MA))MA=d.fotos[0]&&d.fotos[0].arq;
 $('#m-lista').innerHTML=d.fotos.map((f,n)=>{const s=estado(f,d.esp);return `<button class="foto sel${f.arq===MA?' on':''}" data-a="mfoto" data-arq="${esc(f.arq)}">Foto ${n+1} · ${f.cruzes.length} cruz(es)<br><span class="${s.c}">${esc(s.t)}</span></button>`}).join('');
 desenhar();
@@ -409,7 +411,15 @@ const d2=dado(await B.dig(tela));d2.folha={arq,mmPx:r,x0,y0,w:W,h:Hh,avisos:ruin
 DIG.folha=d2.folha;urls.delete(arq);
 $('#m-aviso').textContent=ruins.length?'Atenção: '+ruins.join('; ')+'.':'';
 prog(`Folha montada: ${W}×${Hh} px, ${fmt(r)} mm por pixel, ${cel.length} quadrado(s).`);
+$('#m-depois').hidden=false;
 }
+// atalhos depois de montar: sem voltar à tela da digitalização
+$('#m-auto').onclick=async()=>{mont=false;await abrirContorno();if(cont){$('#c-modo').value='a';mudouMolde()}};
+$('#m-mao').onclick=async()=>{
+mont=false;await abrirContorno();if(!cont)return;
+$('#c-modo').value='c';mudouMolde(); // só a folha de fundo: o contorno é feito à mão no editor
+$('#c-levar').scrollIntoView({block:'center'});
+};
 $('#m-monta').onclick=async()=>{
 const b=$('#m-monta');b.disabled=true;
 try{await sal;await montarFolha()}catch(e){console.error(e);toast(ptErro(e));$('#m-prog').textContent=''}
