@@ -46,6 +46,7 @@ dialog h3{margin:0 0 12px}
 #zoom-v{min-width:56px}
 #ferramentas{grid-area:ferr;display:flex;flex-direction:column;gap:4px;padding:8px;background:var(--card);border-right:1px solid var(--bd);min-width:52px}
 #tela{grid-area:tela;width:100%;height:100%;display:block;background:var(--bg);touch-action:none}
+#tela.mao{cursor:grab}#tela.mao:active{cursor:grabbing}
 #painel{grid-area:painel;background:var(--card);border-left:1px solid var(--bd);padding:12px;overflow:auto}
 .vazio{color:var(--mut);font-size:13px}
 #refs{max-height:50vh;overflow:auto;margin:8px 0;border:1px solid var(--bd);border-radius:8px}
@@ -712,7 +713,7 @@ const G=window.MoldeGeo,MD=window.MoldeDesenho,tela=$('#tela');
 const dist=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y),lerp=(a,b,k)=>({x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k});
 const esc=s=>String(s).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';'),n2=v=>+v.toFixed(2);
 const caminho=(pts,z)=>'M'+pts.map(p=>n2(p.x)+' '+n2(p.y)).join('L')+(z?'Z':'');
-const FERRS=[['sel','↖','Selecionar','V'],['ponto','•','Ponto','P'],['reta','╱','Reta','L'],['ret','▭','Retângulo','R'],['circ','◯','Círculo','C'],['curva','∿','Curva','B'],['lapis','✎','Lápis','F'],['texto','T','Texto','T'],['grad','⇲','Graduar ponto','G']];
+const FERRS=[['sel','↖','Selecionar','V'],['mao','✋','Mover a tela','H'],['ponto','•','Ponto','P'],['reta','╱','Reta','L'],['ret','▭','Retângulo','R'],['circ','◯','Círculo','C'],['curva','∿','Curva','B'],['lapis','✎','Lápis','F'],['texto','T','Texto','T'],['grad','⇲','Graduar ponto','G']];
 const EDICOES=[['apagar','✕','Apagar (Delete)'],['cortar','✂','Cortar no cruzamento'],['estender','⇥','Estender até o próximo traço'],['arredondar','◠','Arredondar canto entre duas retas'],['girar','⟲','Girar'],['espelhar','⇋','Espelhar pela última reta selecionada'],['medir','↔','Medir os traços selecionados']];
 
 function tracoSeguro(t,m=M){try{const p=MM.tracoPts(m,t);return p&&p.every(Boolean)?p:null}catch(e){return null}}
@@ -806,6 +807,7 @@ alterou();
 function criarRet(B){const r=MD.retangulo(M,op.A,B);op=null;if(r.erro){toast(r.erro);desenhar();return}alterou()}
 function criarCirc(r){if(!(r>0))return toast('Raio inválido.');M.tracos.push({id:MD.uid(M,'t'),tipo:'circulo',c:MD.ponto(M,op.C),r});op=null;alterou()}
 const T={
+mao:{dica:'Arraste para mover a tela. Roda do mouse ou − / + para ampliar. (Também: botão do meio ou barra de espaço + arrastar, em qualquer ferramenta.)'},
 sel:{dica:'Clique para selecionar (Shift soma). Arraste no vazio para selecionar por caixa, sobre um traço para mover, sobre um ponto para mudá-lo de lugar.',
 down(p,e){const fk=fioSob(p);if(fk){op={tipo:'fio',k:fk};return}const a=alcaSob(p);op=a?{tipo:'alca',...a}:{tipo:'talvez',ini:p,ult:p,pid:pontoSob(p),id:achar(p),shift:e.shiftKey}},
 move(p,e){
@@ -866,7 +868,7 @@ desenhar();desenharGrad()}}
 };
 
 function escolher(f){
-ferr=f;op=null;modoPeca=null;fecharMedida();if(M)preencherProps();if(f==='grad')aba('grad');
+ferr=f;op=null;modoPeca=null;fecharMedida();if(M)preencherProps();if(f==='grad')aba('grad');tela.classList.toggle('mao',f==='mao');
 document.querySelectorAll('#ferramentas [data-f]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===f));
 $('#dica').textContent=M?dicaAgora():T[f].dica;if(M)desenhar();
 }
@@ -1215,7 +1217,7 @@ $('#m-add').onclick=()=>{M.medidas.push({id:'md'+(1+Math.max(0,...M.medidas.map(
 let ultCli={x:0,y:0};
 tela.addEventListener('pointerdown',e=>{
 if(!M)return;
-if(e.button===1||(e.button===0&&espaco)){pan={x:e.clientX,y:e.clientY,vx,vy};tela.setPointerCapture(e.pointerId);e.preventDefault();return}
+if(e.button===1||(e.button===0&&(espaco||ferr==='mao'))){pan={x:e.clientX,y:e.clientY,vx,vy};tela.setPointerCapture(e.pointerId);e.preventDefault();return}
 if(e.button===2){fimGrad();op=null;desenhar();return}
 if(e.button!==0||!PODE)return;
 if(alin){cliqueAlin(mm(e));e.preventDefault();return}
