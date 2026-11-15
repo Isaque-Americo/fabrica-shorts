@@ -98,7 +98,6 @@ function toast(t){const d=$('#toast');d.textContent=t;d.style.display='block';cl
 const abrirDb=(nome,store)=>{let p;return ()=>p||(p=new Promise((ok,er)=>{const r=indexedDB.open(nome,1);r.onupgradeneeded=()=>r.result.createObjectStore(store,{keyPath:'arq'});r.onsuccess=()=>ok(r.result);r.onerror=()=>er(r.error)}))};
 const idb=(abrir,store)=>async(modo,f)=>{const db=await abrir();return new Promise((ok,er)=>{const t=db.transaction(store,modo),rq=f(t.objectStore(store));t.oncomplete=()=>ok(rq.result);t.onerror=t.onabort=()=>er(t.error)})};
 const FILA=idb(abrirDb('digitalizar','fila'),'fila');
-const filaDe=async digId=>(await FILA('readonly',s=>s.getAll())).filter(i=>i.digId===digId);
 
 // ---- armazenamento: Supabase (docs col 'digitalizacoes' + bucket privado) ou local (localStorage + IndexedDB) ----
 const B=LOCAL?(()=>{
@@ -135,7 +134,7 @@ async apagarArqs(l){await sessaoOk();if(l.length)ok(await bk().remove(l))}
 })();
 
 // ---- estado e telas (tela: null = lista; id = uma digitalização) ----
-let PODE=false,tela=null,DIG=null,fila=[],rodando=false;
+let PODE=false,tela=null,DIG=null,fila=[],rodando=false; // fila: toda a fila do IndexedDB, de todas as digitalizações
 const urls=new Map(); // arq -> url (assinada ou do blob) já resolvida
 const dado=d=>({nome:'',tam:'',esp:500,fotos:[],folha:null,...d});
 
@@ -146,32 +145,33 @@ const d=dado(DIG);
 $('#d-nome').textContent=d.nome||'(sem nome)';
 $('#d-info').textContent=[d.tam&&'Tamanho '+d.tam,'Espaçamento '+d.esp/10+' cm',d.fotos.length+' foto(s)'].filter(Boolean).join(' · ');
 $('#d-acoes').hidden=$('#d-solta').hidden=!PODE;
-const un=s=>`<div class="foto">${s}</div>`;
-$('#d-fotos').innerHTML=fila.map(i=>un(`<img data-q="${esc(i.arq)}" alt="">`+(i.estado==='falhou'?`<span class="bad">Falhou: ${esc(i.erro)}</span> <button class="btn peq" data-a="retry" data-arq="${esc(i.arq)}">Tentar de novo</button>`:'Enviando…'))).join('')
+const un=s=>`<div class="foto">${s}</div>`,daqui=fila.filter(i=>i.digId===tela);
+$('#d-fotos').innerHTML=daqui.map(i=>un(`<img data-q="${esc(i.arq)}" alt="">`+(i.estado==='falhou'?`<span class="bad">Falhou: ${esc(i.erro)}</span> <button class="btn peq" data-a="retry" data-arq="${esc(i.arq)}">Tentar de novo</button>`:'Enviando…'))).join('')
 +d.fotos.map((f,n)=>un(`<img data-f="${esc(f.arq)}" alt="Foto ${n+1}"><span class="good">Enviada</span>`)).join('')
 ||'<p class="vazio">Nenhuma foto ainda.</p>';
 for(const im of document.querySelectorAll('#d-fotos img')){
 const q=im.dataset.q,arq=q||im.dataset.f;
-if(q){im.src=fila.find(i=>i.arq===q).url;continue}
+if(q){const i=fila.find(i=>i.arq===q);im.src=i.url||(i.url=URL.createObjectURL(i.blob));continue}
 if(urls.has(arq))im.src=urls.get(arq);
 else B.urlFoto(arq).then(u=>{urls.set(arq,u);im.src=u}).catch(()=>{im.alt='Sem conexão'});
 }
 }
+const pend=id=>{const n=fila.filter(i=>i.digId===id).length;return n?` · <b class="bad">${n} foto(s) aguardando envio</b>`:''};
 async function renderLista(){
 $('#n-abre').hidden=!PODE||!$('#nova').hidden;
 const itens=await B.lista();
-$('#lista').innerHTML=itens.length?itens.map(r=>{const d=dado(r.data);return `<button class="card item" data-a="abrir" data-id="${esc(r.id)}"><b>${esc(d.nome||r.id)}</b><span>${d.tam?'Tamanho '+esc(d.tam)+' · ':''}${d.fotos.length} foto(s) · folha montada: ${d.folha?'sim':'não'}</span></button>`}).join(''):'<p class="vazio">Nenhuma digitalização ainda.</p>';
+$('#lista').innerHTML=itens.length?itens.map(r=>{const d=dado(r.data);return `<button class="card item" data-a="abrir" data-id="${esc(r.id)}"><b>${esc(d.nome||r.id)}</b><span>${d.tam?'Tamanho '+esc(d.tam)+' · ':''}${d.fotos.length} foto(s) · folha montada: ${d.folha?'sim':'não'}${pend(r.id)}</span></button>`}).join(''):'<p class="vazio">Nenhuma digitalização ainda.</p>';
 }
 async function abrir(id){
 const d=await B.dig(id);
 if(!d){toast('Digitalização não encontrada.');return}
 DIG=d;tela=id;location.hash=id;
-fila=(await filaDe(id)).map(i=>({...i,url:URL.createObjectURL(i.blob),estado:'enviando'}));
 await render();processar();
 }
-async function irLista(){tela=null;DIG=null;fila=[];history.replaceState(null,'',location.pathname+location.search);try{await render()}catch(e){toast(ptErro(e))}}
+async function irLista(){tela=null;DIG=null;soltarUrls();history.replaceState(null,'',location.pathname+location.search);try{await render()}catch(e){toast(ptErro(e))}}
 
 // ---- fotos: reduzir, guardar na fila, subir, acrescentar em fotos ----
+function soltarUrls(){for(const i of fila)if(i.url){URL.revokeObjectURL(i.url);i.url=null}}
 async function reduzir(file){
 const bm=await createImageBitmap(file,{imageOrientation:'from-image'}); // endireita a foto pelo EXIF
 const k=Math.min(1,3000/Math.max(bm.width,bm.height)),w=Math.round(bm.width*k),h=Math.round(bm.height*k);
@@ -187,7 +187,7 @@ for(const f of [...files].filter(f=>f.type.startsWith('image/'))){
 try{
 const {blob,w,h}=await reduzir(f),arq=id+'/'+crypto.randomUUID()+'.jpg';
 await FILA('readwrite',s=>s.put({digId:id,arq,blob,w,h})); // primeiro na fila: nada se perde se o envio falhar
-if(tela===id){fila.push({digId:id,arq,blob,w,h,url:URL.createObjectURL(blob),estado:'enviando'});await render()}
+fila.push({digId:id,arq,blob,w,h,estado:'enviando'});if(tela===id)await render();
 }catch(e){console.error(e);toast('Foto não aceita: '+ptErro(e))}
 }
 processar();
@@ -198,15 +198,16 @@ if(rodando)return;rodando=true;
 try{
 for(let i;(i=fila.find(x=>x.estado==='enviando'));){
 try{
+if(!await B.dig(i.digId))throw new Error('Digitalização não encontrada.'); // não cria doc fantasma
 await B.subir(i.arq,i.blob);
 const d=dado(await B.dig(i.digId));
 if(!d.fotos.some(f=>f.arq===i.arq)){d.fotos.push({arq:i.arq,w:i.w,h:i.h,cruzes:[]});await B.gravar(i.digId,d)}
 await FILA('readwrite',s=>s.delete(i.arq));
-urls.set(i.arq,i.url);
+if(i.url)URL.revokeObjectURL(i.url);
 fila=fila.filter(x=>x!==i);
 if(tela===i.digId)DIG=d;
 }catch(e){i.estado='falhou';i.erro=ptErro(e)}
-if(tela===i.digId)await render();
+if(tela===i.digId||tela===null)try{await render()}catch(e){}
 }
 }finally{rodando=false}
 }
@@ -254,10 +255,12 @@ if(!session||!user)return bloquear('Entre no app para digitalizar moldes.',true)
 if(!Acesso.pode(perfil,'moldes','ver'))return bloquear('Só administradores com acesso a moldes digitalizam moldes.');
 }
 PODE=LOCAL||Acesso.pode(perfil,'moldes','mexer');
+fila=(await FILA("readonly",s=>s.getAll())).map(i=>({...i,estado:"enviando"}));
 const h=decodeURIComponent(location.hash.slice(1));
 $('#aviso').hidden=true;
 if(h){try{await abrir(h)}catch(e){toast(ptErro(e))}}
 if(tela===null)await render();
+processar(); // toda a fila pendente, de qualquer digitalização
 }catch(e){console.error(e);bloquear('Não foi possível abrir a página. '+ptErro(e))}
 }
 iniciar();
