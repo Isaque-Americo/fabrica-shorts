@@ -59,7 +59,28 @@
       if (vistos.has(k)) return 'Rótulo repetido: ' + k + '.';
       vistos.add(k);
     }
-    return cruzes.length < 4 ? 'Marque pelo menos 4 cruzes na foto.' : null;
+    if (cruzes.length < 4) return 'Marque pelo menos 4 cruzes na foto.';
+    // 4 cruzes numa linha só não formam célula: nada para emendar
+    return celulas(cruzes, esp).length ? null : 'As cruzes não formam um quadrado da grade. A letra é a linha e o número a coluna: A1 A2 em cima, B1 B2 embaixo.';
+  }
+
+  // próximo rótulo: o canto que falta na célula mais completa (lendo linha a linha)
+  function sugerirRot(cruzes, esp) {
+    const m = indice(cruzes, esp);
+    if (!m.size) return 'A1';
+    const rot = (i, j) => String.fromCharCode(65 + j) + (i + 1);
+    let melhor = null;
+    for (const k of m.keys()) {
+      const [ci, cj] = k.split(',').map(Number);
+      for (const [i, j] of [[ci - 1, cj - 1], [ci, cj - 1], [ci - 1, cj], [ci, cj]]) {
+        if (i < 0 || j < 0 || j > 25) continue;
+        const cantos = [[i, j], [i + 1, j], [i, j + 1], [i + 1, j + 1]], falta = cantos.filter(([x, y]) => !m.has(x + ',' + y));
+        if (!falta.length) continue;
+        const n = 4 - falta.length, [fx, fy] = falta[0];
+        if (!melhor || n > melhor.n || (n === melhor.n && (fy < melhor.y || (fy === melhor.y && fx < melhor.x)))) melhor = { n, x: fx, y: fy };
+      }
+    }
+    return rot(melhor.x, melhor.y);
   }
 
   // cruzes por "coluna,linha" da grade
@@ -86,14 +107,16 @@
   function conferir(cruzes, esp) {
     const ok = cruzes.filter(c => rotMm(c.rot, esp)), n = ok.length;
     if (n < 5) return { erro: null, n };
-    let erro = 0;
+    let erro = 0, feitas = 0;
     for (let k = 0; k < n; k++) {
       const resto = ok.filter((_, i) => i !== k), H = homografia(resto, resto.map(c => rotMm(c.rot, esp)));
-      if (!H) return { erro: Infinity, n };
+      if (!H) continue; // sobrou 3 em linha (ex.: quadrado + 1 sem um canto): esta rodada não confere nada
       const p = aplicarH(H, ok[k]), alvo = rotMm(ok[k].rot, esp);
       erro = Math.max(erro, Math.hypot(p.x - alvo.x, p.y - alvo.y));
+      feitas++;
     }
-    return { erro, n };
+    // nenhuma rodada possível: cruzes todas em linha, ajuste impossível
+    return { erro: feitas ? erro : Infinity, n };
   }
 
   function cobertura(fotos, esp) {
@@ -263,7 +286,7 @@
     return { ang, tx: (P1.x + P2.x) / 2 - r.x - f.x0, ty: (P1.y + P2.y) / 2 - r.y - f.y0 };
   }
 
-  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, pintar, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
+  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, sugerirRot, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, pintar, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
   g.MoldeDigit = MoldeDigit;
   if (typeof module !== 'undefined') module.exports = MoldeDigit;
 })(typeof window !== 'undefined' ? window : globalThis);

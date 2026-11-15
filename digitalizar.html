@@ -102,7 +102,7 @@ input[type=range]{width:100%}
   </main>
 </div>
 <div id="m-v" hidden>
-  <header class="topo"><button class="btn peq" id="m-volta">← Fotos</button><button class="btn peq" id="m-menos" aria-label="Diminuir">−</button><button class="btn peq" id="m-mais" aria-label="Ampliar">+</button><span class="vazio">Clique na cruz da foto e digite o rótulo (ex.: B2). Arraste para ajustar.</span></header>
+  <header class="topo"><button class="btn peq" id="m-volta">← Fotos</button><button class="btn peq" id="m-menos" aria-label="Diminuir">−</button><button class="btn peq" id="m-mais" aria-label="Ampliar">+</button><span class="vazio">Clique em cada cruz e confira o rótulo. Letra = linha (A em cima), número = coluna (1 à esquerda): <b>A1 A2</b> em cima, <b>B1 B2</b> embaixo. Arraste para ajustar.</span></header>
   <main>
     <div id="m-lista"></div>
     <div>
@@ -325,10 +325,7 @@ const arq=MA,cz=fotoAt().cruzes.map(c=>({...c}));
 sal=sal.then(async()=>{const d=dado(await B.dig(tela)),f=d.fotos.find(x=>x.arq===arq);if(!f)return;f.cruzes=cz;await B.gravar(tela,d)}).catch(e=>toast(ptErro(e)));
 }
 function mudou(){persistir();renderMontar()}
-function sugerir(f){
-const m=/^([A-Za-z]+)(\d+)$/.exec(f.cruzes.length?f.cruzes[f.cruzes.length-1].rot:'');
-return m?m[1].toUpperCase()+(+m[2]+1):'A1';
-}
+const sugerir=f=>MoldeDigit.sugerirRot(f.cruzes,dado(DIG).esp);
 $('#m-pl').addEventListener('click',e=>{
 const pl=e.currentTarget,f=fotoAt();
 if(!PODE||!f||e.target.closest('.cz,.cz-in'))return;
