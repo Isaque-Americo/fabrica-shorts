@@ -37,6 +37,31 @@ const testes = [
   ['melhorFoto fora', D.melhorFoto([A], { x: 100, y: 700 }, esp), null],
 ];
 
+// contorno automático: retângulo 120x90 com ruído e círculo r50; borda = pixels de dentro (cantos 40..159 x 30..119)
+const img = fn => { const d = new Uint8ClampedArray(200 * 150 * 4); for (let y = 0; y < 150; y++) for (let x = 0; x < 200; x++) { const v = fn(x, y), o = (y * 200 + x) * 4; d[o] = d[o + 1] = d[o + 2] = v; d[o + 3] = 255; } return d; };
+const ruido = [[50, 40], [70, 100], [120, 50], [140, 110], [90, 35], [60, 80]];
+const imRet = img((x, y) => ruido.some(([a, b]) => a === x && b === y) ? 10 : x >= 40 && x <= 159 && y >= 30 && y <= 119 ? 255 : 40);
+const imCir = img((x, y) => Math.hypot(x - 100, y - 75) <= 50 ? 255 : 40);
+const mRet = D.pintar(imRet, 200, 150, 100, 75, 60);
+const bRet = D.borda(mRet, 200, 150), sRet = D.simplificar(bRet, 1.5);
+const cantos = [[40, 30], [159, 30], [159, 119], [40, 119]];
+const mol = D.paraMolde(D.simplificar(D.borda(D.pintar(imCir, 200, 150, 100, 75, 60), 200, 150), 0.8));
+let dev = 0;
+mol.seg.forEach((s, k) => {
+  if (s.tipo !== 'curva') return;
+  const a = mol.pts[k], b = mol.pts[(k + 1) % mol.pts.length];
+  for (let i = 0; i <= 10; i++) { const t = i / 10, u = 1 - t, f = c => u * u * u * a[c] + 3 * u * u * t * s.c1[c] + 3 * u * t * t * s.c2[c] + t * t * t * b[c]; dev = Math.max(dev, Math.abs(Math.hypot(f('x') - 100, f('y') - 75) - 50)); }
+});
+testes.push(
+  ['pintar soma', mRet.reduce((a, b) => a + b, 0), 120 * 90],
+  ['borda fechada sem repetir', bRet.length > 4 && (bRet[0].x !== bRet[bRet.length - 1].x || bRet[0].y !== bRet[bRet.length - 1].y), true],
+  ['simplificar 4 cantos', sRet.length, 4],
+  ['simplificar cantos', cantos.every(([x, y]) => sRet.some(p => Math.hypot(p.x - x, p.y - y) <= 1)), true],
+  ['paraMolde retângulo', D.paraMolde(sRet).seg.map(s => s.tipo), ['linha', 'linha', 'linha', 'linha']],
+  ['paraMolde círculo curvas', mol.seg.length > 4 && mol.seg.every(s => s.tipo === 'curva'), true],
+  ['paraMolde círculo raio', dev <= 1.5, true],
+);
+
 const perto = (a, b) => typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) <= 1e-9
   : a && b && typeof a === 'object' ? Object.keys(b).length === Object.keys(a).length && Object.keys(b).every(k => perto(a[k], b[k])) : a === b;
 let falhas = 0;

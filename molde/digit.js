@@ -116,7 +116,125 @@
     return mel;
   }
 
-  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, celulas, conferir, cobertura, foraDaCobertura, melhorFoto };
+  // ---- contorno automático (px; tudo iterativo, a folha pode ter vários megapixels) ----
+
+  // máscara 0/1 da região 4-conectada de cor ≤ tol (RGB) da média 5×5 na semente; furos internos viram 1
+  function pintar(rgba, w, h, sx, sy, tol) {
+    const n = w * h, mask = new Uint8Array(n), pilha = new Int32Array(n);
+    let r = 0, gg = 0, b = 0, c = 0;
+    for (let y = Math.max(0, sy - 2); y <= Math.min(h - 1, sy + 2); y++) for (let x = Math.max(0, sx - 2); x <= Math.min(w - 1, sx + 2); x++) {
+      const o = (y * w + x) * 4; r += rgba[o]; gg += rgba[o + 1]; b += rgba[o + 2]; c++;
+    }
+    r /= c; gg /= c; b /= c;
+    const perto = i => Math.hypot(rgba[i * 4] - r, rgba[i * 4 + 1] - gg, rgba[i * 4 + 2] - b) <= tol;
+    // inunda a partir de s sobre pixels com ok(i) e ainda sem marca em m; marca com 1
+    const inundar = (m, s, ok) => {
+      let t = 0; m[s] = 1; pilha[t++] = s;
+      while (t) {
+        const i = pilha[--t], x = i % w;
+        if (x > 0 && !m[i - 1] && ok(i - 1)) { m[i - 1] = 1; pilha[t++] = i - 1; }
+        if (x < w - 1 && !m[i + 1] && ok(i + 1)) { m[i + 1] = 1; pilha[t++] = i + 1; }
+        if (i >= w && !m[i - w] && ok(i - w)) { m[i - w] = 1; pilha[t++] = i - w; }
+        if (i < n - w && !m[i + w] && ok(i + w)) { m[i + w] = 1; pilha[t++] = i + w; }
+      }
+    };
+    if (sx < 0 || sy < 0 || sx >= w || sy >= h || !perto(sy * w + sx)) return mask;
+    inundar(mask, sy * w + sx, perto);
+    // fundo = o que alcança a borda sem passar pela região; o resto é furo
+    const fundo = new Uint8Array(n), livre = i => !mask[i];
+    const borda = i => { if (!fundo[i] && !mask[i]) inundar(fundo, i, livre); };
+    for (let x = 0; x < w; x++) { borda(x); borda((h - 1) * w + x); }
+    for (let y = 0; y < h; y++) { borda(y * w); borda(y * w + w - 1); }
+    for (let i = 0; i < n; i++) if (!fundo[i]) mask[i] = 1;
+    return mask;
+  }
+
+  // contorno externo (Moore): pixels de dentro da região, em sentido horário na tela, sem repetir o primeiro
+  const VIZ = [[-1, 0], [-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1]]; // O, NO, N, NE, L, SE, S, SO
+  function borda(mask, w, h) {
+    const dentro = (x, y) => x >= 0 && y >= 0 && x < w && y < h && mask[y * w + x] === 1;
+    let s = mask.indexOf(1);
+    if (s < 0) return [];
+    const sx = s % w, sy = (s - sx) / w, pts = [{ x: sx, y: sy }];
+    // próximo ponto a partir de (x,y) com o vizinho de entrada na direção d (fundo); acha o 1º dentro girando
+    const passo = (x, y, d) => {
+      for (let i = 1; i <= 8; i++) {
+        const k = (d + i) % 8, nx = x + VIZ[k][0], ny = y + VIZ[k][1];
+        if (dentro(nx, ny)) {
+          const kb = (d + i - 1) % 8, bx = x + VIZ[kb][0] - nx, by = y + VIZ[kb][1] - ny;
+          return { x: nx, y: ny, d: VIZ.findIndex(v => v[0] === bx && v[1] === by) };
+        }
+      }
+      return null;
+    };
+    let cur = passo(sx, sy, 0);
+    if (!cur) return pts;
+    const seg = { x: cur.x, y: cur.y };
+    for (let guarda = 0; guarda < 4 * w * h; guarda++) {
+      if (cur.x === sx && cur.y === sy) { // volta ao início: fecha se o próximo passo repete o primeiro
+        const nx = passo(cur.x, cur.y, cur.d);
+        if (nx.x === seg.x && nx.y === seg.y) break;
+        pts.push({ x: cur.x, y: cur.y }); cur = nx; continue;
+      }
+      pts.push({ x: cur.x, y: cur.y });
+      cur = passo(cur.x, cur.y, cur.d);
+    }
+    // o início pode ter sido empurrado de novo ao revisitar; remove repetição do primeiro
+    while (pts.length > 1 && pts[pts.length - 1].x === sx && pts[pts.length - 1].y === sy) pts.pop();
+    return pts;
+  }
+
+  const dSeg = (p, a, b) => {
+    const dx = b.x - a.x, dy = b.y - a.y, l = dx * dx + dy * dy;
+    const t = l ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l)) : 0;
+    return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+  };
+
+  // Douglas-Peucker em polígono fechado; âncoras: ponto mais longe do 1º e o mais longe dele (aproxima o par mais distante)
+  function simplificar(pts, tol) {
+    const n = pts.length;
+    if (n < 4) return pts.slice();
+    const longe = k => { let m = 0, md = -1; pts.forEach((p, i) => { const d = Math.hypot(p.x - pts[k].x, p.y - pts[k].y); if (d > md) { md = d; m = i; } }); return m; };
+    let i0 = longe(longe(0)), i1 = longe(i0);
+    if (i0 > i1) [i0, i1] = [i1, i0];
+    const fica = new Uint8Array(n); fica[i0] = fica[i1] = 1;
+    const pilha = [[i0, i1], [i1, i0 + n]]; // trechos (a, b) com b > a, índices módulo n
+    while (pilha.length) {
+      const [a, b] = pilha.pop();
+      let m = -1, md = tol;
+      for (let i = a + 1; i < b; i++) { const d = dSeg(pts[i % n], pts[a % n], pts[b % n]); if (d > md) { md = d; m = i; } }
+      if (m >= 0) { fica[m % n] = 1; pilha.push([a, m], [m, b]); }
+    }
+    return pts.filter((_, i) => fica[i]);
+  }
+
+  // vértices -> traços: giro > quina graus = quina; entre quinas fica linha, no resto curva Catmull-Rom (alças a 1/3)
+  function paraMolde(pts, opts = { quina: 35 }) {
+    const n = pts.length, lim = opts.quina;
+    const P = k => pts[((k % n) + n) % n];
+    // vizinho no sentido s a ≥ 2 px (ignora a ponta de 1 px da escadinha de pixels)
+    const viz = (k, s) => { let j = k + s; for (let i = 0; i < n / 2 && Math.hypot(P(j).x - P(k).x, P(j).y - P(k).y) < 2; i++) j += s; return P(j); };
+    const giro = k => {
+      const a = viz(k, -1), b = P(k), c = viz(k, 1);
+      let d = Math.abs(Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(b.y - a.y, b.x - a.x)) * 180 / Math.PI;
+      return d > 180 ? 360 - d : d;
+    };
+    const quina = pts.map((_, k) => giro(k) > lim);
+    // alça saindo de P(k) rumo a P(j): 1/3 da corda, na tangente pelos vizinhos (ou na corda, se for quina)
+    const alca = (k, j) => {
+      const p = P(k), q = P(j), L = Math.hypot(q.x - p.x, q.y - p.y) / 3;
+      let tx = q.x - p.x, ty = q.y - p.y;
+      if (!quina[((k % n) + n) % n]) { const a = viz(k, -1), c = viz(k, 1); tx = c.x - a.x; ty = c.y - a.y; if (j < k) { tx = -tx; ty = -ty; } }
+      const m = Math.hypot(tx, ty) || 1;
+      return { x: p.x + tx / m * L, y: p.y + ty / m * L };
+    };
+    const seg = pts.map((_, k) => quina[k] && quina[(k + 1) % n]
+      ? { tipo: 'linha' }
+      : { tipo: 'curva', c1: alca(k, k + 1), c2: alca(k + 1, k) });
+    return { pts: pts.map(p => ({ x: p.x, y: p.y })), seg };
+  }
+
+  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, celulas, conferir, cobertura, foraDaCobertura, melhorFoto, pintar, borda, simplificar, paraMolde };
   g.MoldeDigit = MoldeDigit;
   if (typeof module !== 'undefined') module.exports = MoldeDigit;
 })(typeof window !== 'undefined' ? window : globalThis);
