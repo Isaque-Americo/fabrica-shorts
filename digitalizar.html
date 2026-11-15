@@ -56,13 +56,13 @@ input[type=range]{width:100%}
 .sel{display:block;width:100%;text-align:left;cursor:pointer;margin-bottom:8px;font:inherit;font-size:13px;color:var(--tx)}
 .sel.on{border-color:var(--ac);border-width:2px}
 #m-vis{overflow:auto;max-height:75vh;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
-#m-pl{position:relative;cursor:crosshair}
+#m-pl{position:relative;cursor:crosshair;margin:34px 28px 28px} /* folga: rótulo e × de cruz na borda da foto não ficam cortados */
 #m-pl img{display:block;width:100%;height:100%;user-select:none;-webkit-user-drag:none}
 .cz{position:absolute;width:0;height:0}
-.cz i{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border:2px solid var(--fill);border-radius:50%;background:rgba(249,115,22,.25);cursor:move;touch-action:none}
-.cz b{position:absolute;left:0;top:-34px;transform:translateX(-50%);background:var(--hd);color:var(--bg);padding:0 5px;border-radius:4px;font-size:12px;pointer-events:none}
-.cz button{position:absolute;left:11px;top:-26px;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:var(--bad);color:#fff;cursor:pointer;line-height:20px}
-.cz-in{position:absolute;width:70px;min-height:32px!important;transform:translate(-50%,10px);z-index:2}
+.cz i{position:absolute;left:-8px;top:-8px;width:16px;height:16px;border:2px solid var(--fill);border-radius:50%;background:rgba(249,115,22,.25);cursor:move;touch-action:none}
+.cz b{position:absolute;left:0;top:-26px;transform:translateX(-50%);background:var(--hd);color:var(--bg);padding:0 4px;border-radius:3px;font-size:11px;line-height:16px;pointer-events:none}
+.cz button{position:absolute;left:10px;top:-24px;width:16px;height:16px;padding:0;border:0;border-radius:50%;background:var(--bad);color:#fff;cursor:pointer;font-size:11px;line-height:16px}
+input.cz-in{position:absolute;width:44px;height:24px;min-height:24px;padding:0 4px;border-radius:4px;font-size:13px;text-align:center;transform:translate(-50%,10px);z-index:2}
 #m-folha{max-width:100%;border:1px solid var(--bd);margin-top:8px}
 #dig-v.arrasta main{outline:2px dashed var(--ac);outline-offset:-6px}
 #toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
