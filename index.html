@@ -14,6 +14,7 @@
 <script src="molde/modelo.js"></script>
 <script src="molde/encaixe.js"></script>
 <script src="molde/ordem.js"></script>
+<script src="acesso.js"></script>
 <style>
 :root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;--sidebar:#212529;--sidebar-active:#007bff;
 color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
@@ -194,6 +195,8 @@ const recoveryRequested=new URLSearchParams(location.search).get('recuperar')===
 const hashParams = new URLSearchParams(location.hash.slice(1));
 const recoveryMode = hashParams.get('type') === 'recovery';
 let appProfile=null;
+// admin: permissões por área (acesso.js); lojista e representante seguem as regras de cada tela
+const pode=(area,acao='mexer')=>Acesso.pode(appProfile,area,acao);
 const PERFIS={admin:'Administrador',lojista:'Lojista',representante:'Representante'};
 const ERROS=[
 [/auth session missing|session.*(not found|expired)|jwt expired|invalid jwt|refresh token/i,'Sua sessão expirou. Entre novamente.'],
@@ -524,7 +527,7 @@ const pedDesatual=o=>['Pendente','Aprovado','Faturado'].includes(o.status)&&(o.i
 const {data:{session}}=await sb.auth.getSession();
 const {data:{user}}=session?await sb.auth.getUser():{data:{}};
 if(!session||!user){if(session)await sb.auth.signOut({scope:'local'});mostraLogin();return}
-const {data:profile,error:profileError}=await sb.from('user_profiles').select('user_id,role,store_name,rep_id,must_change_password,contact_email,contact_whatsapp').eq('user_id',user.id).maybeSingle();
+const {data:profile,error:profileError}=await sb.from('user_profiles').select('user_id,role,store_name,rep_id,must_change_password,contact_email,contact_whatsapp,is_principal,permissoes').eq('user_id',user.id).maybeSingle();
 if(profileError||!profile||!PERFIS[profile.role]||(profile.role==='lojista'&&!profile.store_name)||(profile.role==='representante'&&!profile.rep_id)){
 await sb.auth.signOut({scope:'local'});mostraLogin('Esta conta ainda não tem um perfil de acesso válido. Peça ao administrador para configurá-lo.');return;
 }
@@ -556,7 +559,8 @@ sb.auth.onAuthStateChange(async (e,s)=>{if(e==='PASSWORD_RECOVERY'&&s){history.r
 })();
 
 function render(){
-const tabs=appProfile?.role==='lojista'?TABS_LOJISTA:appProfile?.role==='representante'?TABS_REP:[...TABS_ADMIN,['administradores','Administradores']];
+const tabs=appProfile?.role==='lojista'?TABS_LOJISTA:appProfile?.role==='representante'?TABS_REP:[...TABS_ADMIN.filter(([k])=>pode(Acesso.ABA_AREA[k],'ver')),...(appProfile?.is_principal?[['administradores','Administradores']]:[])];
+if(!tabs.length){$('#sidebar-nav').innerHTML='';$('#page-title').textContent='Sem acesso';const shell=document.getElementById('app-shell');if(shell)shell.style.display='flex';$('#app').innerHTML='<div class="alert">Sem acesso a nenhuma área; fale com o administrador principal.</div>';return}
 if(!tabs.some(([k])=>k===tab))tab=tabs[0][0];
 $('#sidebar-nav').innerHTML=tabs.map(([k,l])=>k==='molde'?`<a href="molde.html?novo=1" target="_blank" rel="noopener"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`:k==='corte'?`<a href="corte.html"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`:`<a href="#" class="${k===tab?'active':''}" onclick="tab='${k}';render();return false;"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`).join('');
 $('#page-title').textContent=tabs.find(t=>t[0]===tab)?.[1]||'Painel';
@@ -572,7 +576,7 @@ if(tab==='administradores'&&!adminAccounts.length&&!adminAccountsLoading&&!admin
 
 let adminAccounts=[],adminAccountsLoading=false,adminAccountsError='';
 function adminAccountsPage(){
-const rows=adminAccounts.map(account=>`<tr><td>${esc(account.email)}</td><td>${esc(account.contact_whatsapp||'—')}</td><td><button class="sm" onclick="editarAdministrador('${esc(account.user_id)}')">Editar</button></td></tr>`).join('');
+const rows=adminAccounts.map(account=>`<tr><td>${esc(account.email)}${account.is_principal?'<small>Administrador principal</small>':''}</td><td>${esc(account.contact_whatsapp||'—')}</td><td><button class="sm" onclick="editarAdministrador('${esc(account.user_id)}')">Editar</button></td></tr>`).join('');
 return `<div class="bar end"><div class="row"><button class="ghost" onclick="carregarAdministradores()">Atualizar</button><button class="pri" onclick="novoAdministrador()">Novo administrador</button></div></div><p class="mut">O e-mail cadastrado também será o login e receberá os convites e as instruções de recuperação de senha.</p>${adminAccountsError?`<div class="alert">${esc(adminAccountsError)}</div>`:''}${adminAccountsLoading?'<p class="mut">Carregando administradores…</p>':''}<div class="tw"><table><tr><th>E-mail de login e contato</th><th>WhatsApp</th><th>Ações</th></tr>${rows||'<tr><td colspan="3">Nenhum administrador carregado.</td></tr>'}</table></div>`;
 }
 async function chamarGerenciadorAdmin(body){
@@ -590,7 +594,7 @@ if(data?.error)throw new Error(data.error);
 return data;
 }
 async function carregarAdministradores(){
-if(appProfile?.role!=='admin'||adminAccountsLoading)return;
+if(!appProfile?.is_principal||adminAccountsLoading)return;
 adminAccountsLoading=true;adminAccountsError='';render();
 try{const data=await chamarGerenciadorAdmin({action:'list'});adminAccounts=data.items||[]}
 catch(error){adminAccountsError=error.message||'Não foi possível carregar os administradores.'}
@@ -609,6 +613,7 @@ return {email,whatsapp};
 }
 function editarPerfilAdmin(){
 if(appProfile?.role!=='admin')return;
+if(!appProfile.is_principal){aviso('Para mudar seu e-mail ou WhatsApp, fale com o administrador principal.');return} // a Edge Function só aceita o principal
 modal('Contato do administrador',`<label>E-mail de contato<input name="contact_email" type="email" required autocomplete="email" value="${esc(appProfile.contact_email||'')}" placeholder="nome@empresa.com"></label><label>WhatsApp<input name="contact_whatsapp" type="tel" required autocomplete="tel" value="${esc(appProfile.contact_whatsapp||'')}" placeholder="+55 32 98838-3046"></label><small class="mut">O WhatsApp será salvo no formato internacional, por exemplo +5532988383046.</small>`,async form=>{
 const {email,whatsapp}=validarContatoAdmin(form.contact_email,form.contact_whatsapp);
 await chamarGerenciadorAdmin({action:'update',user_id:appProfile.user_id,email,contact_whatsapp:whatsapp});
@@ -617,25 +622,41 @@ appProfile.contact_whatsapp=whatsapp;
 });
 $('#dlg form').insertAdjacentHTML('afterbegin','<p class="mut">O e-mail também será usado como login e destino de recuperação de senha.</p>');
 }
+// checklist de áreas: o que as marcadas exigem (Acesso.fechar) aparece marcado e travado
+function checklistHtml(){
+const cx=(k,n)=>`<input type="checkbox" data-a="${k}" data-n="${n}" aria-label="${n==='ver'?'Ver':'Mexer'}" style="width:auto;margin:0" onchange="checklistAplica()">`;
+return `<label>O que este administrador pode fazer</label><div class="tw"><table class="keep" id="chk"><tr><th>Área</th><th>Ver</th><th>Mexer</th></tr>${Acesso.AREAS.map(a=>`<tr><td>${esc(a.nome)}</td><td>${cx(a.k,'ver')}</td><td>${a.soVer?'—':cx(a.k,'mexer')}</td></tr>`).join('')}</table></div><small class="mut">Mexer inclui Ver. Áreas travadas são exigidas por outra marcada. Administradores é sempre só do principal.</small>`;
+}
+function checklistLer(){const p={};document.querySelectorAll('#chk input:checked').forEach(i=>{if(p[i.dataset.a]!=='mexer')p[i.dataset.a]=i.dataset.n});return Acesso.fechar(p)}
+function checklistAplica(perm=checklistLer()){
+const full=Acesso.fechar(perm),trava=new Set();
+for(const [k,n] of Object.entries(full)){
+if(n==='mexer')trava.add(k+':ver');
+for(const [dk,dn] of Object.entries(Acesso.fechar({[k]:n})))if(dk!==k){trava.add(dk+':ver');if(dn==='mexer')trava.add(dk+':mexer')}
+}
+document.querySelectorAll('#chk input').forEach(i=>{const k=i.dataset.a,n=i.dataset.n;i.checked=full[k]==='mexer'||full[k]===n;i.disabled=trava.has(k+':'+n)});
+}
 function novoAdministrador(){
-if(appProfile?.role!=='admin')return;
-modal('Cadastrar administrador',`<p>Um convite para definir senha será enviado ao e-mail. Esse endereço será também o login da nova conta.</p><label>E-mail<input name="email" type="email" required autocomplete="email"></label><label>WhatsApp (opcional)<input name="contact_whatsapp" type="tel" autocomplete="tel" placeholder="+55 32 98838-3046"></label>`,async form=>{
+if(!appProfile?.is_principal)return;
+modal('Cadastrar administrador',`<p>Um convite para definir senha será enviado ao e-mail. Esse endereço será também o login da nova conta.</p><label>E-mail<input name="email" type="email" required autocomplete="email"></label><label>WhatsApp (opcional)<input name="contact_whatsapp" type="tel" autocomplete="tel" placeholder="+55 32 98838-3046"></label>${checklistHtml()}`,async form=>{
 const {email,whatsapp}=validarContatoAdmin(form.email,form.contact_whatsapp);
-await chamarGerenciadorAdmin({action:'create',email,contact_whatsapp:whatsapp});
+await chamarGerenciadorAdmin({action:'create',email,contact_whatsapp:whatsapp,permissoes:checklistLer()});
 await carregarAdministradores();
 setTimeout(()=>aviso('Convite enviado ao novo administrador.'),100);
 });
 }
 function editarAdministrador(userId){
-if(appProfile?.role!=='admin')return;
+if(!appProfile?.is_principal)return;
 const account=adminAccounts.find(item=>item.user_id===userId);
 if(!account)return;
-modal('Editar administrador',`<p>Alterar o e-mail também altera o login e o endereço usado para recuperação de senha.</p><label>E-mail<input name="email" type="email" required autocomplete="email" value="${esc(account.email)}"></label><label>WhatsApp (opcional)<input name="contact_whatsapp" type="tel" autocomplete="tel" value="${esc(account.contact_whatsapp||'')}"></label>`,async form=>{
+const lista=!account.is_principal; // o principal tem acesso total: sem checklist
+modal('Editar administrador',`<p>Alterar o e-mail também altera o login e o endereço usado para recuperação de senha.</p><label>E-mail<input name="email" type="email" required autocomplete="email" value="${esc(account.email)}"></label><label>WhatsApp (opcional)<input name="contact_whatsapp" type="tel" autocomplete="tel" value="${esc(account.contact_whatsapp||'')}"></label>${lista?checklistHtml():''}`,async form=>{
 const {email,whatsapp}=validarContatoAdmin(form.email,form.contact_whatsapp);
-await chamarGerenciadorAdmin({action:'update',user_id:userId,email,contact_whatsapp:whatsapp});
+await chamarGerenciadorAdmin({action:'update',user_id:userId,email,contact_whatsapp:whatsapp,...(lista?{permissoes:checklistLer()}:{})});
 await carregarAdministradores();
 setTimeout(()=>aviso('Dados do administrador atualizados.'),100);
 });
+if(lista)checklistAplica(account.permissoes||{});
 }
 
 // Um botão de ações por linha, no lugar de três. Fica em position:fixed porque
@@ -739,6 +760,7 @@ return `<div class="bar end"><button class="pri" onclick="tab='pedidos';render()
 let prodGrupo=(()=>{try{return localStorage.getItem('prodGrupo')}catch(e){return null}})()||'nenhum';
 function setProdGrupo(v){prodGrupo=v;try{localStorage.setItem('prodGrupo',v)}catch(e){}render()}
 function produtos(){
+const mx=pode('produtos');
 const pct=(c,v)=>{const m=margem(c,v);return m.pct==null?'—':`<span class="${m.lucro<=0?'low':''}" title="${brl(v)} − custo ${brl(c)} − ${nf(m.imp+m.desp+m.com,2)}% de imposto/despesa/comissão (${brl(m.ded)}) = ${brl(m.lucro)} por peça">${Math.round(m.pct)}%</span>`};
 const tecDe=p=>p.tecidoId?(mat(p.tecidoId)?.nome||'Tecido removido do cadastro'):'Sem tecido na ficha';
 const agrupa=prodGrupo==='tecido';
@@ -748,13 +770,13 @@ const r=ordem.map(p=>{
 const c=custoP(p,false),cg=custoP(p,true),pg=precoG(p),baixo=tot(p)<=(+p.min||0);
 let cab='';
 if(agrupa&&tecDe(p)!==grupoAtual){grupoAtual=tecDe(p);cab=`<tr class="grp"><td colspan="7">${esc(grupoAtual)} · ${ordem.filter(x=>tecDe(x)===grupoAtual).length} produto(s)</td></tr>`}
-return cab+`<tr><td>${foto(p,'fmini',true)}</td><td>${esc(p.ref)}</td>
+return cab+`<tr><td>${foto(p,'fmini',mx)}</td><td>${esc(p.ref)}</td>
  <td>${esc(p.nome)}${p.tecidoId?`<small>${esc(mat(p.tecidoId)?.nome||'')} · ${p.ficha?'ficha própria':'ficha padrão'}</small>`:'<small>custo manual</small>'}${temMolde(p)?'':'<small class="aviso">sem molde</small>'}</td>
  <td class="n">${brl(p.preco)}${pg!==+p.preco?`<small>G1–G4 ${brl(pg)}</small>`:''}</td>
  <td class="n">${pct(c,+p.preco)}${cg!==c||pg!==+p.preco?`<small>G1–G4 ${pct(cg,pg)}</small>`:''}</td>
  <td class="n ${baixo?'low':''}">${tot(p)}${baixo?'<small>abaixo do mínimo</small>':''}</td>
- <td>${acoes('pr'+p.id,[['Ver ficha técnica',`verFicha('${p.id}')`],['Editar produto',`fProd('${p.id}')`],'-',['Excluir produto',`del('produtos','${p.id}')`,'del']])}</td></tr>`}).join('');
-return `<div class="bar">${campoBusca('Buscar por referência ou descrição')}<button class="pri" onclick="fProd()">+ Novo produto</button></div>
+ <td>${acoes('pr'+p.id,[['Ver ficha técnica',`verFicha('${p.id}')`],...(mx?[['Editar produto',`fProd('${p.id}')`],'-',['Excluir produto',`del('produtos','${p.id}')`,'del']]:[])])}</td></tr>`}).join('');
+return `<div class="bar">${campoBusca('Buscar por referência ou descrição')}${mx?'<button class="pri" onclick="fProd()">+ Novo produto</button>':''}</div>
  ${S.produtos.length>3?`<div class="chips"><button class="${agrupa?'':'on'}" onclick="setProdGrupo('nenhum')">Por referência</button><button class="${agrupa?'on':''}" onclick="setProdGrupo('tecido')">Agrupar por tecido</button></div>`:''}
  <div class="tw"><table><tr><th></th><th>Ref.</th><th>Descrição</th><th class="n">Preço</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>${r||'<tr><td colspan="7" class="empty">Nenhum produto cadastrado. Comece pelo botão acima.</td></tr>'}</table></div>
  <p style="color:var(--mut)">A margem desconta imposto, despesas e a maior comissão cadastrada (${nf(comMax(),2)}%). Passe o mouse nela para ver a conta, ou abra a ficha técnica para o custo detalhado.</p>`;
@@ -1012,13 +1034,13 @@ return `<tr><td>${esc(m.nome)}${det?`<small>${esc(det)}</small>`:''}</td>
  <td>${esc(m.forn)||'<small>sem fornecedor</small>'}</td>
  <td class="n">${tec?brl(m.preco)+(m.cobr==='mt'?'/m':'/kg'):brl(m.preco)+' / '+((+m.qtdC||1)!==1?nf(m.qtdC,0)+' ':'')+esc(matUn(m))}${tec&&m.cobr==='kg'?(+m.rend?`<small>${nf(m.rend,2)} m/kg</small>`:'<small class="aviso">informe o rendimento</small>'):''}</td>
  <td class="n"><b>${brl4(matCusto(m))}</b>/${esc(matUn(m))}</td>
- <td>${acoes('mt'+m.id,[['Editar',`fMat('${m.id}')`],'-',['Excluir',`del('materiais','${m.id}')`,'del']])}</td></tr>`}).join('');
+ <td>${pode('materia')?acoes('mt'+m.id,[['Editar',`fMat('${m.id}')`],'-',['Excluir',`del('materiais','${m.id}')`,'del']]):''}</td></tr>`}).join('');
 const f=fichaPad();
 const fr=(f.itens||[]).map(i=>{const m=mat(i.matId);if(!m)return '';const cu=matCusto(m);return `<tr><td>${esc(m.nome)}</td><td>${esc(m.cor)}</td><td class="n">${nf(i.qtd)}</td><td>${esc(matUn(m))}</td><td class="n">${brl4(cu)}</td><td class="n">${brl4(cu*(+i.qtd||0))}</td></tr>`}).join('');
 const sub=(f.itens||[]).reduce((a,i)=>a+matCusto(mat(i.matId))*(+i.qtd||0),0);
-return `<div class="bar">${campoBusca('Buscar por nome ou fornecedor')}<button class="pri" onclick="fMat()">+ Nova matéria-prima</button></div>
+return `<div class="bar">${campoBusca('Buscar por nome ou fornecedor')}${pode('materia')?'<button class="pri" onclick="fMat()">+ Nova matéria-prima</button>':''}</div>
   <div class="tw"><table><tr><th>Nome</th><th>Tipo</th><th>Fornecedor</th><th class="n">Preço de compra</th><th class="n">Custo de uso</th><th></th></tr>${r||'<tr><td colspan="6" class="empty">Nenhuma matéria-prima cadastrada. Comece pelo botão acima.</td></tr>'}</table></div>
- <div class="bar"><h2>Ficha técnica padrão</h2><button class="pri" onclick="fFicha()">Editar ficha padrão</button></div>
+ <div class="bar"><h2>Ficha técnica padrão</h2>${pode('config')?'<button class="pri" onclick="fFicha()">Editar ficha padrão</button>':''}</div>
  <p style="color:var(--mut);margin-top:0">Itens iguais em todas as referências. O tecido e o consumo de cada referência são informados no cadastro do produto.</p>
  <div class="tw"><table><tr><th>Item</th><th>Cor</th><th class="n">Qtde</th><th>Un</th><th class="n">Custo un.</th><th class="n">Custo total</th></tr>${fr||'<tr><td colspan="6" class="empty">Nenhum item na ficha padrão.</td></tr>'}
  <tr><th colspan="5">Aviamentos</th><th class="n">${brl4(sub)}</th></tr><tr><td colspan="5">Mão de obra (por peça)</td><td class="n">${brl(f.mo)}</td></tr>${(f.processos||[]).length?`<tr><td colspan="5">Processos (por peça)</td><td class="n">${brl(custoFicha({ficha:f}).proc)}</td></tr>`:''}<tr><td colspan="5">Custo fixo (por peça)</td><td class="n">${brl(f.fixo)}</td></tr>
@@ -1109,12 +1131,12 @@ d.innerHTML=`<form method="dialog"><h3>Ficha técnica · Ref. ${esc(p.ref)} · $
  <tr><td>Imposto, despesas e comissão<small>${ded}% sobre a venda</small></td><td></td>${col('− '+brl(mA.ded),'− '+brl(mB.ded))}</tr>
  <tr><th>Lucro por peça</th><th></th>${temG?`<th class="n ${mA.lucro<=0?'low':''}">${mg(mA)}</th><th class="n ${mB.lucro<=0?'low':''}">${mg(mB)}</th>`:`<th class="n ${mA.lucro<=0?'low':''}">${mg(mA)}</th>`}</tr></table></div>
  <small>${temG?'A coluna G1–G4 só aparece porque esta referência tem consumo ou preço diferente na grade maior. ':'P–GG e G1–G4 dão no mesmo nesta referência, então os valores valem para todos os tamanhos. '}Usa ${p.ficha?'a ficha própria desta referência':'a ficha padrão'}. A comissão é a maior cadastrada em Representantes, ou seja, o pior caso.</small>
- <div class="row end"><button type="button" class="ghost" onclick="dlg.close();fProd('${p.id}')">Editar</button><button class="pri">Fechar</button></div></form>`;
+ <div class="row end">${pode('produtos')?`<button type="button" class="ghost" onclick="dlg.close();fProd('${p.id}')">Editar</button>`:''}<button class="pri">Fechar</button></div></form>`;
 d.showModal();
 }
 function reps(){
-const r=S.reps.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.fone)}</td><td>${esc(x.email)}</td><td>${esc([x.cidade,x.uf].filter(Boolean).join('/'))}</td><td>${esc(x.regiao)}</td><td class="n">${x.com||0}%</td><td><button class="sm" onclick="fRep('${x.id}')">Editar</button><button class="sm del" onclick="del('reps','${x.id}')">Excluir</button></td></tr>`).join('');
-return `<div class="bar end"><button class="pri" onclick="fRep()">+ Novo representante</button></div>
+const r=S.reps.map(x=>`<tr><td>${esc(x.nome)}</td><td>${esc(x.fone)}</td><td>${esc(x.email)}</td><td>${esc([x.cidade,x.uf].filter(Boolean).join('/'))}</td><td>${esc(x.regiao)}</td><td class="n">${x.com||0}%</td><td>${pode('reps')?`<button class="sm" onclick="fRep('${x.id}')">Editar</button><button class="sm del" onclick="del('reps','${x.id}')">Excluir</button>`:''}</td></tr>`).join('');
+return `<div class="bar end">${pode('reps')?'<button class="pri" onclick="fRep()">+ Novo representante</button>':''}</div>
  <div class="tw"><table><tr><th>Nome</th><th>Celular</th><th>E-mail</th><th>Cidade/UF</th><th>Região</th><th class="n">Comissão</th><th></th></tr>${r||'<tr><td colspan="7" class="empty">Nenhum representante cadastrado.</td></tr>'}</table></div>`;
 }
 const REP_CAMPOS=['nome','cpf','fone','email','endereco','bairro','cidade','uf','cep','regiao'];
@@ -1140,18 +1162,19 @@ function preCadastro(username){return S.cadastros.find(x=>x.username===username)
 function dadosCadastro(username){return preCadastro(username)||{}}
 function cadastroSalvo(username){return Boolean(preCadastro(username)?.dadosPreenchidos)}
 function cadastroLojista(){
-const lojas=S.cadastros.filter(x=>x.tipoCadastro==='lojista').map(x=>{const salvo=cadastroSalvo(x.username),contato=[x.email?`<a href="mailto:${esc(x.email)}">${esc(x.email)}</a>`:'',x.telefone?`<a href="tel:${encodeURIComponent(x.telefone)}">${esc(x.telefone)}</a>`:''].filter(Boolean).join('<br>')||'—';return `<tr><td>${esc(x.store_name)}</td><td>${esc(x.username)}</td><td>${esc(x.cnpj||'—')}</td><td>${contato}</td><td>${salvo?'<span class="ok">Dados registrados</span>':'<span class="tag">Pré-cadastro</span>'}</td><td>${badgeAcesso(x.username)}</td><td><button class="sm" onclick="fCadastro('${x.username}')">${salvo?'Editar':'Completar'}</button> ${botoesAcesso(x.username)}</td></tr>`}).join('');
+const lojas=S.cadastros.filter(x=>x.tipoCadastro==='lojista').map(x=>{const salvo=cadastroSalvo(x.username),contato=[x.email?`<a href="mailto:${esc(x.email)}">${esc(x.email)}</a>`:'',x.telefone?`<a href="tel:${encodeURIComponent(x.telefone)}">${esc(x.telefone)}</a>`:''].filter(Boolean).join('<br>')||'—';return `<tr><td>${esc(x.store_name)}</td><td>${esc(x.username)}</td><td>${esc(x.cnpj||'—')}</td><td>${contato}</td><td>${salvo?'<span class="ok">Dados registrados</span>':'<span class="tag">Pré-cadastro</span>'}</td><td>${badgeAcesso(x.username)}</td><td>${pode('cadastros')?`<button class="sm" onclick="fCadastro('${x.username}')">${salvo?'Editar':'Completar'}</button> ${botoesAcesso(x.username)}`:''}</td></tr>`}).join('');
 return `<div class="bar"><h2>Cadastro de lojistas</h2></div><p class="mut">O administrador decide quais cadastros podem acessar o sistema. Ao ativar, a senha inicial será 123456 e a troca será obrigatória no primeiro acesso.</p>${mensagemStatusAcessos()}<div class="tw"><table><tr><th>Loja (cliente nos pedidos)</th><th>Usuário reservado</th><th>CNPJ</th><th>Contato</th><th>Cadastro</th><th>Acesso</th><th>Ações</th></tr>${lojas}</table></div>`;
 }
 function cadastroRepresentante(){
 const x=S.cadastros.find(c=>c.tipoCadastro==='representante');if(!x)return '<div class="empty">Nenhum representante pré-cadastrado.</div>';const d=dadosCadastro(x.username),salvo=cadastroSalvo(x.username),r=S.reps.find(a=>a.id===d.rep_id)||S.reps.find(a=>(a.nome||'').toLowerCase().includes('uberdan'));
-return `<div class="bar"><h2>Cadastro de representante</h2><button class="pri" onclick="fCadastro('${x.username}')">${salvo?'Editar cadastro':'Completar cadastro'}</button></div><div class="c"><small>Usuário reservado</small><b>${esc(x.username)}</b><p>${esc(d.nome||r?.nome||x.nome)}</p><span class="tag">${r?'Representante cadastrado':'Cadastro do representante pendente'}</span><p>Acesso: ${badgeAcesso(x.username)}</p><div class="row end">${botoesAcesso(x.username)}</div></div>${mensagemStatusAcessos()}`;
+return `<div class="bar"><h2>Cadastro de representante</h2>${pode('cadastros')?`<button class="pri" onclick="fCadastro('${x.username}')">${salvo?'Editar cadastro':'Completar cadastro'}</button>`:''}</div><div class="c"><small>Usuário reservado</small><b>${esc(x.username)}</b><p>${esc(d.nome||r?.nome||x.nome)}</p><span class="tag">${r?'Representante cadastrado':'Cadastro do representante pendente'}</span><p>Acesso: ${badgeAcesso(x.username)}</p><div class="row end">${pode('cadastros')?botoesAcesso(x.username):''}</div></div>${mensagemStatusAcessos()}`;
 }
 let cadastroAba='lojista';
 let statusAcessos={};
 let statusAcessosCarregado=false,statusAcessosCarregando=false,statusAcessosErro='';
 function statusAcesso(username){return statusAcessos[username]?.status||'pendente'}
 function badgeAcesso(username){
+if(!pode('cadastros'))return '—'; // a situação vem da gerenciar-acesso, que exige Mexer em Cadastros
 const status=statusAcesso(username);
 if(status==='ativo')return '<span class="ok">Ativa</span>';
 if(status==='recusado')return '<span class="tag">Não aprovada</span>';
@@ -1208,7 +1231,7 @@ else aviso('Acesso desativado.');
 }
 document.addEventListener('click',e=>{const target=e.target instanceof Element?e.target:null;const btn=target?.closest('[data-access-action]');if(btn)decidirAcesso(btn.dataset.accessUsername,btn.dataset.accessAction)});
 function cadastros(){
-if(!statusAcessosCarregado&&!statusAcessosCarregando)carregarStatusAcessos();
+if(pode('cadastros')&&!statusAcessosCarregado&&!statusAcessosCarregando)carregarStatusAcessos();
 return `<div class="roles"><button class="${cadastroAba==='lojista'?'pri':'ghost'}" onclick="cadastroAba='lojista';render()">Lojistas</button><button class="${cadastroAba==='representante'?'pri':'ghost'}" onclick="cadastroAba='representante';render()">Representante</button></div>${cadastroAba==='lojista'?cadastroLojista():cadastroRepresentante()}`;
 }
 function fCadastro(username){
@@ -1320,7 +1343,7 @@ finally{form.dataset.cnpjBuscando='0'}
 let pedFiltro=(()=>{try{return localStorage.getItem('pedFiltro')}catch(e){return null}})()||'todos';
 function setPedFiltro(v){pedFiltro=v;try{localStorage.setItem('pedFiltro',v)}catch(e){}render()}
 function pedidos(){
-const admin=appProfile.role==='admin';
+const admin=appProfile.role==='admin',mx=admin&&pode('pedidos'),apr=mx&&pode('moldes'); // aprovar cria a ordem de corte
 const todos=S.pedidos.slice().sort((a,b)=>(b.numero||0)-(a.numero||0));
 if(pedFiltro!=='todos'&&!ST.includes(pedFiltro))pedFiltro='todos';
 const st=o=>o.status||'Pendente';
@@ -1331,8 +1354,8 @@ const r=lista.map(o=>`<tr><td>#${o.numero}<small>${esc((o.data||'').split('-').r
  <td class="n">${(o.itens||[]).reduce((a,i)=>a+i.qtd,0)}</td>
  <td class="n">${brl(pedTotal(o))}${admin&&pedDesatual(o)?'<small class="aviso" title="Preço diferente do cadastro do produto">preço desatualizado</small>':''}</td>
  <td>${selo(st(o))}</td>
- <td>${acoes('pd'+o.id,[['Ver itens',`verPed('${o.id}')`],...(admin?[o.ordemId&&['Abrir ordem de corte',`abrirOrdem('${o.ordemId}')`],!o.ordemId&&['Pendente','Recusado'].includes(st(o))&&['Editar pedido',`fPed('${o.id}')`],...(st(o)==='Pendente'?[['Aprovar',`aprovarPed('${o.id}')`],['Recusar',`setSt('${o.id}','Recusado')`]]:[]),['Trocar representante',`fRepPed('${o.id}')`],{cab:'Mudar status para'},...ST.filter(s=>s!==st(o)&&!(o.ordemId?['Pendente','Recusado']:st(o)==='Pendente'?ST.filter(x=>x!=='Cancelado'):st(o)==='Recusado'?['Faturado','Enviado','Entregue']:[]).includes(s)).map(s=>[s,s==='Aprovado'&&!o.ordemId?`aprovarPed('${o.id}')`:`setSt('${o.id}','${s}')`]),'-',['Excluir pedido',`delPed('${o.id}')`,'del']]:[])])}</td></tr>`).join('');
-return `<div class="bar">${campoBusca('Buscar por número ou cliente')}<span style="display:flex;gap:8px">${admin&&S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}<button class="pri" onclick="fPed()">+ Novo pedido</button></span></div>
+ <td>${acoes('pd'+o.id,[['Ver itens',`verPed('${o.id}')`],...(admin&&o.ordemId&&pode('moldes','ver')?[['Abrir ordem de corte',`abrirOrdem('${o.ordemId}')`]]:[]),...(mx?[!o.ordemId&&['Pendente','Recusado'].includes(st(o))&&['Editar pedido',`fPed('${o.id}')`],...(st(o)==='Pendente'?[apr&&['Aprovar',`aprovarPed('${o.id}')`],['Recusar',`setSt('${o.id}','Recusado')`]]:[]),['Trocar representante',`fRepPed('${o.id}')`],{cab:'Mudar status para'},...ST.filter(s=>s!==st(o)&&(apr||o.ordemId||s!=='Aprovado')&&!(o.ordemId?['Pendente','Recusado']:st(o)==='Pendente'?ST.filter(x=>x!=='Cancelado'):st(o)==='Recusado'?['Faturado','Enviado','Entregue']:[]).includes(s)).map(s=>[s,s==='Aprovado'&&!o.ordemId?`aprovarPed('${o.id}')`:`setSt('${o.id}','${s}')`]),'-',['Excluir pedido',`delPed('${o.id}')`,'del']]:[])])}</td></tr>`).join('');
+return `<div class="bar">${campoBusca('Buscar por número ou cliente')}<span style="display:flex;gap:8px">${mx&&S.pedidos.some(pedDesatual)?'<button class="ghost" onclick="atualizarPrecos()">Atualizar preços</button>':''}${!admin||mx?'<button class="pri" onclick="fPed()">+ Novo pedido</button>':''}</span></div>
  ${todos.length?chips:''}
  <div class="tw"><table><tr><th>Nº</th><th>Cliente</th><th class="n">Peças</th><th class="n">Total</th><th>Status</th><th></th></tr>${r||`<tr><td colspan="6" class="empty">${todos.length?'Nenhum pedido com status '+esc(pedFiltro)+'.':'Nenhum pedido lançado. Comece pelo botão acima.'}</td></tr>`}</table></div>`;
 }
@@ -1738,6 +1761,7 @@ aviso(L.length+' pedido(s) atualizado(s).');
 }
 const abrirOrdem=id=>{const u='corte.html?id='+encodeURIComponent(id);if(!window.open(u,'_blank'))location.href=u};
 async function aprovarPed(id){
+if(!pode('pedidos')||!pode('moldes')){aviso('Aprovar exige Mexer em Pedidos e em Moldes e ordens de corte.');return}
 const o=S.pedidos.find(x=>x.id===id);if(!o)return;
 // linha com qtd 0 não bloqueia a aprovação nem entra na ordem
 const ped={...o,itens:(o.itens||[]).filter(i=>+i.qtd>0)};
@@ -1805,7 +1829,7 @@ const resumo=`<tr><td><b>${esc(p.ref)} · ${esc(p.nome)}</b></td>
  <td>${varias?`<button class="sm" data-n="${cores.length}" aria-expanded="false" onclick="abreEst('${p.id}',this)">${cores.length} cores ▾</button>`:`<small>${esc(cores[0]||'—')}</small>`}</td>
  ${SZ.map(s=>{const v=cores.reduce((a,c)=>a+estQ(p,c,s),0);return `<td class="n ${v<=0?'mut':''}"><b>${v}</b></td>`}).join('')}
  <td class="n ${baixo?'low':''}"><b>${tot(p)}</b></td>
- <td>${acoes('es'+p.id,[['Entrada / ajuste',`fEntrada('${p.id}')`],['Editar produto',`fProd('${p.id}')`]])}</td></tr>`;
+ <td>${pode('estoque')||pode('produtos')?acoes('es'+p.id,[pode('estoque')&&['Entrada / ajuste',`fEntrada('${p.id}')`],pode('produtos')&&['Editar produto',`fProd('${p.id}')`]]):''}</td></tr>`;
 const lin=varias?cores.map(c=>`<tr data-est="${p.id}" hidden><td></td><td>${esc(c)}</td>${SZ.map(s=>{const v=estQ(p,c,s);return `<td class="n ${v<=0?'mut':''}">${v}</td>`}).join('')}<td class="n">${SZ.reduce((a,s)=>a+estQ(p,c,s),0)}</td><td></td></tr>`).join(''):'';
 return resumo+lin;
 }).join('');
@@ -1825,7 +1849,8 @@ const v=(+est[c][t]||0)+d;
 if(v<0)throw new Error('O estoque de '+c+' '+t+' ficaria negativo.');
 est[c][t]=v;
 });
-await db.doc('produtos/'+id).update({est});
+if(pode('produtos'))await db.doc('produtos/'+id).update({est});
+else{await sessaoOk();const {error}=await sb.rpc('ajustar_estoque',{prod_id:id,est});if(error)throw error} // só Estoque: a função troca só data.est; a lista volta pelo realtime
 });
 }
 
