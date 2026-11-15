@@ -6,6 +6,7 @@
 <title>Editor de molde</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="molde/digit.js"></script>
 <script src="molde/geo.js"></script>
 <script src="molde/modelo.js"></script>
 <script src="acesso.js"></script>
@@ -100,7 +101,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
 #btn-fantasma[aria-pressed="true"]{background:var(--fill);color:var(--acx)}
 #foto-mini{padding:0;width:34px;height:34px;border:1px solid var(--bd);border-radius:6px;background:none;overflow:hidden;cursor:pointer}
 #foto-mini img{width:100%;height:100%;object-fit:cover;display:block}
-#fantasma{pointer-events:none}#tela .fan{fill:none;stroke-width:1.2px;opacity:.35;vector-effect:non-scaling-stroke}
+#folha,#alin{pointer-events:none}#btn-folha[aria-pressed="true"],#btn-alinhar[aria-pressed="true"]{background:var(--fill);color:var(--acx)}#folha-op{width:80px;vertical-align:middle}#alin circle{fill:none;stroke:var(--acx);stroke-width:2px;vector-effect:non-scaling-stroke}#fantasma{pointer-events:none}#tela .fan{fill:none;stroke-width:1.2px;opacity:.35;vector-effect:non-scaling-stroke}
 .campo{display:flex;flex-direction:column;gap:4px;margin:10px 0;font-size:14px}
 #g-aviso,#mol-avisos{color:var(--bad);font-weight:600;margin:0 0 8px}#mol-avisos{font-size:13px}
 #abas{display:flex;gap:4px;margin-bottom:10px;border-bottom:1px solid var(--bd)}
@@ -146,6 +147,10 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
     <span class="esp"></span>
     <span class="grupo" id="tams" role="group" aria-label="Tamanho exibido"></span>
     <button class="sm" type="button" id="btn-fantasma" aria-pressed="false" title="Mostra os outros tamanhos por baixo">Fantasma</button>
+    <button class="sm" type="button" id="btn-folha" aria-pressed="true" hidden title="Mostra a folha digitalizada deste tamanho por baixo do desenho">Folha</button>
+    <input type="range" id="folha-op" min="0.1" max="1" step="0.05" value="0.5" hidden aria-label="Opacidade da folha" title="Opacidade da folha">
+    <button class="sm" type="button" id="btn-alinhar" hidden title="Clique um ponto do molde e o ponto igual na folha, duas vezes">Alinhar folha</button>
+    <button class="sm" type="button" id="btn-digit" title="Abre a digitalização de moldes em outra aba">Digitalizar</button>
     <button class="sm" type="button" id="btn-grade" title="Grade, tamanho base e foto da ficha técnica">Grade e foto</button>
     <button type="button" id="foto-mini" hidden title="Ver a foto da ficha técnica"><img alt="Foto da ficha técnica"></button>
     <button class="sm" type="button" id="btn-refs" title="Produtos que usam este molde">Referências <span id="refs-n"></span></button>
@@ -163,7 +168,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
   <svg id="tela" role="img" aria-label="Área de desenho do molde" xmlns="http://www.w3.org/2000/svg">
     <defs><pattern id="grade" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M10 0H0V10" fill="none" stroke="var(--bd)" stroke-width="0.4"/></pattern></defs>
     <rect id="fundo" x="-5000" y="-5000" width="10000" height="10000" fill="url(#grade)"/>
-    <g id="fantasma"></g><g id="diagrama"></g><g id="pecas"></g><g id="regua"></g>
+    <g id="folha"></g><g id="fantasma"></g><g id="diagrama"></g><g id="pecas"></g><g id="regua"></g><g id="alin"></g>
   </svg>
   <aside id="painel" aria-label="Painel">
     <p id="mol-avisos" role="status" hidden></p>
@@ -301,6 +306,10 @@ async gravarProduto(id,d){rede();const t=ler('produtos');t[id]=d;gravarK('produt
 // foto: dataURL pequena (o localStorage é curto)
 async subirFoto(file){rede();return (await imgCanvas(file,600)).toDataURL('image/jpeg',.7)},
 async tecidos(){rede();return [{id:'tec-forro',nome:'Forro tactel'},{id:'tec-ribana',nome:'Ribana'}]},
+// folha digitalizada: mesmo IndexedDB que o digitalizar.html grava no modo local
+async urlFolha(arq){const db=await new Promise((ok,er)=>{const r=indexedDB.open('digitalizar-local',1);r.onupgradeneeded=()=>r.result.createObjectStore('blobs',{keyPath:'arq'});r.onsuccess=()=>ok(r.result);r.onerror=()=>er(r.error)});
+const x=await new Promise((ok,er)=>{const q=db.transaction('blobs','readonly').objectStore('blobs').get(arq);q.onsuccess=()=>ok(q.result);q.onerror=()=>er(q.error)});db.close();
+if(!x)throw new Error('Foto não encontrada.');return URL.createObjectURL(x.blob)},
 fotoUrl:f=>/^data:image\//.test(f)?f:''
 };
 })():(()=>{
@@ -328,6 +337,7 @@ const {error}=await sb.storage.from('produtos').upload(nome,blob,{contentType:'i
 if(error)throw new Error('Falha ao enviar a foto: '+error.message);
 return nome;
 },
+async urlFolha(arq){await sessaoOk();return ok(await sb.storage.from('digitalizacoes').createSignedUrl(arq,3600)).signedUrl},
 fotoUrl:f=>f&&!f.startsWith('data:')?SB_URL+'/storage/v1/object/public/produtos/'+encodeURIComponent(f):''
 };
 })();
@@ -347,7 +357,56 @@ const foraBase=()=>!!M&&tamVer!==M.base;
 // gradPt = ponto aberto no painel Gradação
 let gradPt=null;
 const temRegra=id=>!!M.grad[id]&&Object.values(M.grad[id]).some(d=>d.dx||d.dy);
-const dicaAgora=()=>foraBase()?'Edite no tamanho base':modoPeca?MODOS[modoPeca]:T[ferr].dica;
+const dicaAgora=()=>alin?DICA_ALIN[alin.n]:gradArrasto()?'Arraste um ponto até o lugar dele na folha (gradua este tamanho).':foraBase()?'Edite no tamanho base':modoPeca?MODOS[modoPeca]:T[ferr].dica;
+
+// ---- folha de fundo: foto montada em digitalizar.html, por baixo do desenho ----
+// fundos[tam] = {dig,arq,mmPx,x0,y0,w,h,tx,ty,ang,peca}. Transformação (molde/digit.js, folhaParaMolde): gira `ang` graus em
+// volta do canto da folha (x0,y0) e depois soma (tx,ty); em SVG: translate(tx ty) rotate(ang x0 y0).
+const DG=MoldeDigit,DICA_ALIN=['Alinhar 1/4: clique o 1º ponto do molde.','Alinhar 2/4: clique o ponto igual na folha.','Alinhar 3/4: clique o 2º ponto do molde.','Alinhar 4/4: clique o ponto igual na folha.'];
+const folhaImg={}; // arq -> url | false (não carregou) | null (carregando)
+let folhaOn=true,alin=null,imgFolha=null;
+const fundoAtual=()=>M&&M.fundos&&M.fundos[tamVer]||null;
+const fundoVisivel=()=>{const f=fundoAtual();return !!f&&folhaOn&&folhaImg[f.arq]!==false};
+const gradArrasto=()=>foraBase()&&fundoVisivel();
+const fForm=f=>({x0:f.x0,y0:f.y0,tx:f.tx||0,ty:f.ty||0,ang:f.ang||0});
+function folhaFalhou(arq){if(folhaImg[arq]===false)return;folhaImg[arq]=false;toast('Fotos da folha apagadas');desenhar()}
+function desenharFolha(){
+const f=fundoAtual();
+for(const id of ['btn-folha','folha-op','btn-alinhar'])$('#'+id).hidden=!f;
+$('#btn-folha').setAttribute('aria-pressed',folhaOn);$('#btn-alinhar').setAttribute('aria-pressed',!!alin);
+const u=f&&folhaOn?folhaImg[f.arq]:false;
+if(f&&folhaOn&&u===undefined){const arq=f.arq;folhaImg[arq]=null;B.urlFolha(arq).then(x=>{folhaImg[arq]=x;desenhar()},()=>folhaFalhou(arq))}
+if(!u){if(imgFolha)imgFolha.remove(),imgFolha=null}
+else{
+if(!imgFolha){imgFolha=document.createElementNS('http://www.w3.org/2000/svg','image');imgFolha.setAttribute('preserveAspectRatio','none');imgFolha.addEventListener('error',()=>folhaFalhou(imgFolha&&imgFolha.dataset.arq));$('#folha').append(imgFolha)}
+const q=fForm(f);
+if(imgFolha.getAttribute('href')!==u)imgFolha.setAttribute('href',u);
+imgFolha.dataset.arq=f.arq;
+imgFolha.setAttribute('x',f.x0);imgFolha.setAttribute('y',f.y0);imgFolha.setAttribute('width',f.w*f.mmPx);imgFolha.setAttribute('height',f.h*f.mmPx);
+imgFolha.setAttribute('transform',`translate(${q.tx} ${q.ty}) rotate(${q.ang} ${q.x0} ${q.y0})`);
+imgFolha.setAttribute('opacity',$('#folha-op').value);
+}
+// marcas do alinhamento em curso
+$('#alin').innerHTML=alin?alin.v.map((p,i)=>`<circle cx="${p.x}" cy="${p.y}" r="${(i%2?7:5)/zoom}" style="${i%2?'stroke-dasharray:3 2':''}"/>`).join(''):'';
+if(alin)$('#dica').textContent=DICA_ALIN[alin.n];
+}
+function cliqueAlin(p){
+if(alin.n%2===0){const id=pontoSob(p);if(!id)return toast('Clique num ponto do molde.');alin.v.push({...V.pontos[id]})}
+else alin.v.push(p);
+alin.n++;
+if(alin.n<4){desenhar();return}
+const [P1,S1,P2,S2]=alin.v,f=fundoAtual(),L=fForm(f),r=DG.alinharFolha(L,DG.moldeParaFolha(L,S1),DG.moldeParaFolha(L,S2),P1,P2);
+alin=null;
+if(!r){toast('Os dois pares precisam ter pontos diferentes.');preencherProps();desenhar();return}
+Object.assign(f,r);alterou();preencherProps();
+}
+function arrastaGrad(p){
+const b=M.pontos[op.pid];
+if(!op.mov){if(dist(p,op.ini)*zoom<3)return;op.mov=true}
+const g=M.grad[op.pid]||(M.grad[op.pid]={}),r=v=>Math.round(v*100)/100;
+for(const t of MM.tamanhos(M))g[t]=g[t]||{dx:0,dy:0};
+g[tamVer]={dx:r(p.x-b.x),dy:r(p.y-b.y)};
+}
 const RASC=()=>'molde:'+molId;
 
 function bloquear(msg,entrar){
@@ -373,6 +432,7 @@ document.title=(M.nome||'Molde')+' · Editor de molde';
 const tams=MM.tamanhos(M);if(!tams.includes(tamVer))tamVer=M.base;
 V=tamVer===M.base?M:MM.noTamanho(M,tamVer);
 desenharTams(tams);
+desenharFolha();
 desenharDiagrama(w,h,tams);
 desenharPecas();
 }
@@ -586,7 +646,7 @@ tams.forEach((t,i)=>{
 const b=document.createElement('button');b.type='button';b.className='sm'+(t===M.base?' base':'');b.textContent=t;
 b.style.setProperty('--c',`var(--t${i%8})`);b.setAttribute('aria-pressed',t===tamVer);
 b.title=t===M.base?'Tamanho base (edição)':'Ver o tamanho '+t;if(t===M.base)b.setAttribute('aria-label',t+' (base)');
-b.onclick=()=>{tamVer=t;op=null;modoPeca=null;desenhar();preencherProps()};
+b.onclick=()=>{tamVer=t;op=null;alin=null;modoPeca=null;desenhar();preencherProps()};
 box.append(b);
 });
 if(foco)[...box.children].find(b=>b.textContent===foco)?.focus();
@@ -622,6 +682,10 @@ $('#zoom-v').onclick=()=>zoomMeio(1/zoom);
 $('#btn-refs').onclick=abrirRefs;
 $('#btn-grade').onclick=()=>abrirGrade('');
 $('#btn-fantasma').onclick=()=>{fantasma=!fantasma;desenhar()};
+$('#btn-folha').onclick=()=>{folhaOn=!folhaOn;if(!folhaOn)alin=null;preencherProps();desenhar()};
+$('#folha-op').oninput=()=>desenhar();
+$('#btn-alinhar').onclick=()=>{if(!PODE)return toast('Sem permissão para editar.');if(alin)alin=null;else{folhaOn=true;op=null;modoPeca=null;alin={n:0,v:[]}}preencherProps();desenhar()};
+$('#btn-digit').onclick=()=>window.open('digitalizar.html'+(LOCAL?'?local=1':''),'_blank');
 $('#foto-mini').onclick=()=>{$('#foto-g').src=B.fotoUrl(M.foto);$('#dlg-foto').showModal()};
 $('#refs-ok').onclick=()=>$('#dlg-refs').close();
 $('#ref-busca').addEventListener('input',e=>{const t=e.target.value.toLowerCase();document.querySelectorAll('#refs label').forEach(l=>l.hidden=!l.dataset.busca.includes(t))});
@@ -703,7 +767,7 @@ $('#regua').innerHTML=s;
 }
 
 // o que está sob o cursor (raio de 6 px)
-function pontoSob(p){let mel=null,md=6/zoom;for(const [id,q] of Object.entries(M.pontos))if(dist(p,q)<=md){md=dist(p,q);mel=id}return mel}
+function pontoSob(p){let mel=null,md=6/zoom;for(const [id,q] of Object.entries((V||M).pontos))if(dist(p,q)<=md){md=dist(p,q);mel=id}return mel}
 function achar(p){
 const r=6/zoom,u=MD.usados(M),pt=pontoSob(p);
 if(pt&&!u.has(pt))return pt;
@@ -1145,6 +1209,8 @@ if(!M)return;
 if(e.button===1||(e.button===0&&espaco)){pan={x:e.clientX,y:e.clientY,vx,vy};tela.setPointerCapture(e.pointerId);e.preventDefault();return}
 if(e.button===2){op=null;desenhar();return}
 if(e.button!==0||!PODE)return;
+if(alin){cliqueAlin(mm(e));e.preventDefault();return}
+if(gradArrasto()){const p=mm(e),id=pontoSob(p);if(id){tela.setPointerCapture(e.pointerId);op={tipo:'gpt',pid:id,ini:p}}else toast('Arraste um ponto do molde até a folha.');return}
 if(foraBase()){toast('Edite no tamanho base');return}
 if(modoPeca){e.preventDefault();return}
 tela.setPointerCapture(e.pointerId);
@@ -1154,11 +1220,12 @@ tela.addEventListener('pointermove',e=>{
 if(!M)return;ultCli={x:e.clientX,y:e.clientY};
 if(pan){vx=pan.vx-(e.clientX-pan.x)/zoom;vy=pan.vy-(e.clientY-pan.y)/zoom;desenhar();return}
 const p=mm(e);
-if(foraBase()||!PODE)return;
+if(op&&op.tipo==='gpt'){arrastaGrad(p);desenhar();return}
+if(alin||foraBase()||!PODE)return;
 rato=ferr==='sel'||ferr==='grad'?null:grudar(p);
 T[ferr].move&&T[ferr].move(p,e);desenhar();
 });
-tela.addEventListener('pointerup',e=>{if(!M)return;if(pan){pan=null;return}if(e.button!==0||foraBase()||!PODE)return;if(modoPeca)cliquePeca(mm(e),e);else if(T[ferr].up)T[ferr].up(mm(e),e)});
+tela.addEventListener('pointerup',e=>{if(!M)return;if(pan){pan=null;return}if(op&&op.tipo==='gpt'){const m=op.mov;op=null;if(m)alterou();return}if(e.button!==0||alin||foraBase()||!PODE)return;if(modoPeca)cliquePeca(mm(e),e);else if(T[ferr].up)T[ferr].up(mm(e),e)});
 tela.addEventListener('pointerleave',()=>{if(rato){rato=null;desenhar()}});
 tela.addEventListener('contextmenu',e=>e.preventDefault());
 tela.addEventListener('wheel',e=>{if(!M)return;e.preventDefault();zoomEm(e.clientX,e.clientY,Math.pow(1.0015,-e.deltaY))},{passive:false});
@@ -1171,7 +1238,7 @@ if(!PODE&&e.key!==' ')return;
 const k=e.key;
 if(foraBase()&&k!==' '&&k!=='Escape')return;
 if(op&&T[ferr].digitado&&/^[0-9,.\-]$/.test(k)){e.preventDefault();abrirMedida(k,ultCli.x,ultCli.y);return}
-if(k==='Escape'){op=null;modoPeca=null;preencherProps();desenhar();return}
+if(k==='Escape'){alin=null;op=null;modoPeca=null;preencherProps();desenhar();return}
 if(k==='Delete'||k==='Backspace'){e.preventDefault();if(sel.size)edicao('apagar');return}
 if(k===' '){if(!e.target.closest('button,a')){espaco=true;e.preventDefault()}return}
 const l=k.toLowerCase();

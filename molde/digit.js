@@ -241,7 +241,22 @@
     return { pts: pts.map(p => ({ x: p.x, y: p.y })), seg };
   }
 
-  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, celulas, conferir, cobertura, foraDaCobertura, melhorFoto, escalaFolha, pintar, borda, simplificar, paraMolde };
+  // Folha de fundo: f = {x0,y0,tx,ty,ang}. Ponto local s (mm, sem ajuste) vai para R(ang)(s - o) + o + t,
+  // com o = (x0,y0) (canto da folha), ang em graus (positivo = horário na tela, y para baixo), t = (tx,ty).
+  const rot = (v, a) => { const r = a * Math.PI / 180, c = Math.cos(r), s = Math.sin(r); return { x: v.x * c - v.y * s, y: v.x * s + v.y * c }; };
+  function folhaParaMolde(f, s) { const r = rot({ x: s.x - f.x0, y: s.y - f.y0 }, f.ang); return { x: r.x + f.x0 + f.tx, y: r.y + f.y0 + f.ty }; }
+  function moldeParaFolha(f, p) { const r = rot({ x: p.x - f.x0 - f.tx, y: p.y - f.y0 - f.ty }, -f.ang); return { x: r.x + f.x0, y: r.y + f.y0 }; }
+  // 2 pares: S1,S2 = pontos clicados na folha (coordenadas locais); P1,P2 = pontos do molde. Giro + deslocamento, sem escala:
+  // o giro vem dos vetores S1S2 -> P1P2; o deslocamento põe o meio de S no meio de P. null se S1 = S2 ou P1 = P2.
+  function alinharFolha(f, S1, S2, P1, P2) {
+    const vs = { x: S2.x - S1.x, y: S2.y - S1.y }, vp = { x: P2.x - P1.x, y: P2.y - P1.y };
+    if (Math.hypot(vs.x, vs.y) < 1e-6 || Math.hypot(vp.x, vp.y) < 1e-6) return null;
+    const ang = (Math.atan2(vp.y, vp.x) - Math.atan2(vs.y, vs.x)) * 180 / Math.PI;
+    const r = rot({ x: (S1.x + S2.x) / 2 - f.x0, y: (S1.y + S2.y) / 2 - f.y0 }, ang);
+    return { ang, tx: (P1.x + P2.x) / 2 - r.x - f.x0, ty: (P1.y + P2.y) / 2 - r.y - f.y0 };
+  }
+
+  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, celulas, conferir, cobertura, foraDaCobertura, melhorFoto, escalaFolha, pintar, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
   g.MoldeDigit = MoldeDigit;
   if (typeof module !== 'undefined') module.exports = MoldeDigit;
 })(typeof window !== 'undefined' ? window : globalThis);

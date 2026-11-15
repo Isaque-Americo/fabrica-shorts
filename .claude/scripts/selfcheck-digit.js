@@ -79,7 +79,22 @@ testes.push(
   ['paraMolde círculo raio', dev <= 1.5, true],
 );
 
-const perto = (a, b) => typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) <= 1e-9
+{ // folha de fundo: alinhar com 2 pares
+  const f = { x0: 10, y0: -5, tx: 0, ty: 0, ang: 0 }, S1 = { x: 20, y: 0 }, S2 = { x: 120, y: 0 };
+  const verd = { x0: 10, y0: -5, tx: 30, ty: -12, ang: 25 };
+  const P1 = D.folhaParaMolde(verd, S1), P2 = D.folhaParaMolde(verd, S2);
+  const r = D.alinharFolha(f, S1, S2, P1, P2), g = { ...f, ...r };
+  testes.push(
+    ['alinhar ang', r.ang, 25],
+    ['alinhar S1->P1', D.folhaParaMolde(g, S1), P1],
+    ['alinhar S2->P2', D.folhaParaMolde(g, S2), P2],
+    ['alinhar tx/ty', [r.tx, r.ty], [30, -12]],
+    ['ida e volta', D.moldeParaFolha(verd, D.folhaParaMolde(verd, { x: 33, y: 44 })), { x: 33, y: 44 }],
+    ['alinhar pontos iguais', D.alinharFolha(f, S1, S1, P1, P2), null],
+  );
+}
+
+const perto =(a, b) => typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) <= 1e-9
   : a && b && typeof a === 'object' ? Object.keys(b).length === Object.keys(a).length && Object.keys(b).every(k => perto(a[k], b[k])) : a === b;
 let falhas = 0;
 for (const [nome, obtido, esperado] of testes) {
