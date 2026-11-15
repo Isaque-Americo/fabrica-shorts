@@ -32,6 +32,7 @@ h2{margin:0 0 12px;font:700 26px 'Barlow Condensed',Inter,sans-serif;text-transf
 .btn.peq{min-height:40px;width:auto;font-size:14px;padding:0 12px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px;margin-bottom:10px}
 .item{display:block;width:100%;text-align:left;cursor:pointer;color:var(--tx);font:inherit}
+.ln{position:relative}.ln .fx{top:8px;right:8px}
 .item b{display:block;font-size:16px;overflow-wrap:anywhere}
 .item span{color:var(--mut);font-size:13px}
 label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
@@ -40,7 +41,7 @@ input[type=text],input[type=number]{width:100%;min-height:44px;padding:8px 10px;
 @media (min-width:600px){.acoes{grid-template-columns:1fr 1fr}}
 .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
 .foto{position:relative;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:4px;font-size:12px;color:var(--mut);min-width:0}
-.foto .fx{position:absolute;top:-8px;right:-8px;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:var(--bad);color:#fff;font-size:16px;line-height:28px;cursor:pointer}
+.fx{position:absolute;top:-8px;right:-8px;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:var(--bad);color:#fff;font-size:16px;line-height:28px;cursor:pointer}
 .foto img{display:block;width:100%;height:110px;object-fit:contain;background:var(--bg);border-radius:4px}
 .foto .bad{color:var(--bad)}.foto .good{color:var(--ok)}.foto .warn{color:var(--warn)}
 #m-v main,#c-v main{max-width:none;display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:start}
@@ -240,7 +241,7 @@ const pend=id=>{const n=fila.filter(i=>i.digId===id).length;return n?` · <b cla
 async function renderLista(){
 $('#n-abre').hidden=!PODE||!$('#nova').hidden;
 const itens=await B.lista();
-$('#lista').innerHTML=itens.length?itens.map(r=>{const d=dado(r.data);return `<button class="card item" data-a="abrir" data-id="${esc(r.id)}"><b>${esc(d.nome||r.id)}</b><span>${d.tam?'Tamanho '+esc(d.tam)+' · ':''}${d.fotos.length} foto(s) · folha montada: ${d.folha?'sim':'não'}${pend(r.id)}</span></button>`}).join(''):'<p class="vazio">Nenhuma digitalização ainda.</p>';
+$('#lista').innerHTML=itens.length?itens.map(r=>{const d=dado(r.data);return `<div class="ln"><button class="card item" data-a="abrir" data-id="${esc(r.id)}"><b>${esc(d.nome||r.id)}</b><span>${d.tam?'Tamanho '+esc(d.tam)+' · ':''}${d.fotos.length} foto(s) · folha montada: ${d.folha?'sim':'não'}${pend(r.id)}</span></button>${PODE?`<button class="fx" data-a="ddel" data-id="${esc(r.id)}" aria-label="Apagar ${esc(d.nome||r.id)}">×</button>`:''}</div>`}).join(''):'<p class="vazio">Nenhuma digitalização ainda.</p>';
 }
 async function abrir(id){
 const d=await B.dig(id);
@@ -615,11 +616,8 @@ finally{b.disabled=false}
 $('#c-leva').onclick=levar;
 
 // "Apagar fotos": fotos e folha saem do storage e do doc; o que já está nos moldes (peças, gradação) fica
-async function apagarFotos(){
-if(!PODE||!tela)return;
-if(!confirm('Apagar as fotos e a folha desta digitalização? (a folha de fundo some do molde; peças e gradação ficam)'))return;
-const id=tela;
-try{
+// tira da fila e do storage tudo de uma digitalização; devolve o doc já sem fotos/folha (ainda não gravado)
+async function limparArquivos(id){
 const q=fila.filter(i=>i.digId===id);
 fila=fila.filter(i=>i.digId!==id);
 for(const i of q){if(i.url)URL.revokeObjectURL(i.url);await FILA('readwrite',s=>s.delete(i.arq))}
@@ -628,12 +626,30 @@ const d=dado(await B.dig(id)),arqs=d.fotos.map(f=>f.arq);
 if(d.folha)arqs.push(d.folha.arq);
 await B.apagarArqs(arqs); // primeiro o storage: se falhar, o doc fica igual e dá para tentar de novo
 d.fotos=[];d.folha=null;
-await B.gravar(id,d);
 for(const a of arqs)urls.delete(a);
+return d;
+}
+async function apagarFotos(){
+if(!PODE||!tela)return;
+if(!confirm('Apagar as fotos e a folha desta digitalização? (a folha de fundo some do molde; peças e gradação ficam)'))return;
+const id=tela;
+try{
+const d=await limparArquivos(id);
+await B.gravar(id,d);
 DIG=d;MA=null;await render();toast('Fotos apagadas.');
 }catch(e){console.error(e);toast(ptErro(e))}
 }
 $('#d-apagar').onclick=apagarFotos;
+// a digitalização inteira, pela lista: fotos, folha e o registro
+async function apagarDig(id,nome){
+if(!PODE)return;
+if(!confirm(`Apagar a digitalização "${nome}" com as fotos e a folha? (a folha de fundo some do molde; peças e gradação ficam)`))return;
+try{
+await limparArquivos(id);
+await B.apagar(id);
+await render();toast('Digitalização apagada.');
+}catch(e){console.error(e);toast(ptErro(e))}
+}
 // uma foto enviada: storage primeiro (se falhar, o doc fica igual); a folha já montada continua até montar de novo
 async function apagarFoto(arq){
 if(!PODE||!tela)return;
@@ -668,6 +684,7 @@ if(b.dataset.a==='mfoto'){MA=b.dataset.arq;renderMontar()}
 if(b.dataset.a==='mdel'){const f=fotoAt();f.cruzes.splice(+b.dataset.k,1);mudou()}
 if(b.dataset.a==='abrir')abrir(b.dataset.id).catch(x=>toast(ptErro(x)));
 if(b.dataset.a==='fdel')apagarFoto(b.dataset.arq);
+if(b.dataset.a==='ddel')apagarDig(b.dataset.id,b.getAttribute('aria-label').replace(/^Apagar /,''));
 if(b.dataset.a==='qdel')apagarDaFila(b.dataset.arq);
 if(b.dataset.a==='retry'){const i=fila.find(x=>x.arq===b.dataset.arq);if(i){i.estado='enviando';render();processar()}}
 });
