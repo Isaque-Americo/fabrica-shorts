@@ -94,6 +94,19 @@ testes.push(
   );
 }
 
+{ // bordaFora: folha 20x10 px, 1 mm/px, x0=y0=0, esp 10 -> células 0,0 e 1,0; só 0,0 coberta
+  const W = 20, H = 10, cb = new Set(['0,0']);
+  const mk = (xa, xb, ya, yb) => { const m = new Uint8Array(W * H); for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) m[y * W + x] = 1; return D.borda(m, W, H); };
+  const fora = (b, cob) => D.bordaFora(b, W, H, 0, 0, 1, cob, 10);
+  const cbTudo = new Set(['0,0', '1,0']);
+  testes.push(
+    ['bordaFora encosta na borda da imagem', fora(mk(0, 4, 2, 6), cbTudo).some(Boolean), true],
+    ['bordaFora vizinha de célula sem foto', fora(mk(3, 9, 2, 6), cb).some(Boolean), true],
+    ['bordaFora vizinha só no x=9', fora(mk(3, 9, 2, 6), cb).filter(Boolean).length, mk(3, 9, 2, 6).filter(p => p.x === 9).length],
+    ['bordaFora dentro e longe da borda', fora(mk(2, 7, 2, 7), cb).some(Boolean), false],
+  );
+}
+
 const perto =(a, b) => typeof a === 'number' && typeof b === 'number' ? Math.abs(a - b) <= 1e-9
   : a && b && typeof a === 'object' ? Object.keys(b).length === Object.keys(a).length && Object.keys(b).every(k => perto(a[k], b[k])) : a === b;
 let falhas = 0;

@@ -103,6 +103,13 @@
   }
   const chave = (p, esp) => Math.floor(p.x / esp) + ',' + Math.floor(p.y / esp);
   const foraDaCobertura = (pts, cob, esp) => pts.map(p => !cob.has(chave(p, esp)));
+  // pixels de borda (px da folha) cortados: na beirada da imagem ou com ele/um vizinho 4-conexo em célula sem foto
+  // (o papel pode continuar além do que foi fotografado e o contorno sai reto ali)
+  function bordaFora(pxPts, W, H, x0, y0, mmPx, cob, esp) {
+    const sem = (x, y) => !cob.has(chave({ x: x0 + (x + 0.5) * mmPx, y: y0 + (y + 0.5) * mmPx }, esp));
+    return pxPts.map(({ x, y }) => x <= 0 || y <= 0 || x >= W - 1 || y >= H - 1
+      || sem(x, y) || sem(x - 1, y) || sem(x + 1, y) || sem(x, y - 1) || sem(x, y + 1));
+  }
 
   // foto que deixa p mais perto do centro (distância / max(w,h)), entre as que cobrem a célula de p
   function melhorFoto(fotos, p, esp) {
@@ -256,7 +263,7 @@
     return { ang, tx: (P1.x + P2.x) / 2 - r.x - f.x0, ty: (P1.y + P2.y) / 2 - r.y - f.y0 };
   }
 
-  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, celulas, conferir, cobertura, foraDaCobertura, melhorFoto, escalaFolha, pintar, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
+  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, pintar, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
   g.MoldeDigit = MoldeDigit;
   if (typeof module !== 'undefined') module.exports = MoldeDigit;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -199,8 +199,8 @@ async apagarArqs(l){await sessaoOk();if(l.length)ok(await bk().remove(l))}
 
 // ---- estado e telas (tela: null = lista; id = uma digitalização) ----
 let cont=false,CT=null,mont=false,MA=null,Z=0.25,sal=Promise.resolve(); // montar: tela aberta, arq da foto, zoom, fila de gravação
-let PODE=false,tela=null,DIG=null,fila=[],rodando=false; // fila: toda a fila do IndexedDB, de todas as digitalizações
-const urls=new Map(); // arq -> url (assinada ou do blob) já resolvida
+let PODE=false,PODE_PROD=false,tela=null,DIG=null,fila=[],rodando=false; // fila: toda a fila do IndexedDB, de todas as digitalizações
+const urls=new Map(); // arq -> {u, exp}: url (assinada por 1 h ou do blob) já resolvida; renova com 50 min
 const dado=d=>({nome:'',tam:'',esp:500,fotos:[],folha:null,...d});
 
 async function render(){
@@ -222,8 +222,7 @@ $('#d-fotos').innerHTML=daqui.map(i=>un(`<img data-q="${esc(i.arq)}" alt="">`+(i
 for(const im of document.querySelectorAll('#d-fotos img')){
 const q=im.dataset.q,arq=q||im.dataset.f;
 if(q){const i=fila.find(i=>i.arq===q);im.src=i.url||(i.url=URL.createObjectURL(i.blob));continue}
-if(urls.has(arq))im.src=urls.get(arq);
-else B.urlFoto(arq).then(u=>{urls.set(arq,u);im.src=u}).catch(()=>{im.alt='Sem conexão'});
+urlDe(arq).then(u=>{im.src=u}).catch(()=>{im.alt='Sem conexão'});
 }
 }
 const pend=id=>{const n=fila.filter(i=>i.digId===id).length;return n?` · <b class="bad">${n} foto(s) aguardando envio</b>`:''};
@@ -286,7 +285,12 @@ addEventListener('online',()=>{fila.forEach(i=>i.estado='enviando');processar()}
 
 // ---- montar: marcar cruzes nas fotos e montar a folha (coordenadas em px da foto guardada, não da tela) ----
 const fmt=n=>n.toFixed(1).replace('.',',');
-const urlDe=arq=>urls.has(arq)?Promise.resolve(urls.get(arq)):B.urlFoto(arq).then(u=>(urls.set(arq,u),u));
+function urlDe(arq){const c=urls.get(arq);return c&&c.exp>Date.now()?Promise.resolve(c.u):B.urlFoto(arq).then(u=>(urls.set(arq,{u,exp:Date.now()+50*60e3}),u))}
+async function baixar(arq){
+const r=await fetch(await urlDe(arq));
+if(!r.ok){urls.delete(arq);throw new Error(`Não foi possível baixar a imagem (erro ${r.status}). Tente de novo.`)}
+return r.blob();
+}
 const fotoAt=()=>dado(DIG).fotos.find(f=>f.arq===MA);
 function estado(f,esp){ // ok: entra na montagem; c: cor
 const m=MoldeDigit.validarCruzes(f.cruzes,esp);
@@ -368,7 +372,7 @@ const x0=i0*esp,y0=j0*esp,r=M.escalaFolha((i1-i0)*esp,(j1-j0)*esp),W=Math.ceil((
 const imgs=[];
 for(const [n,f] of fs.entries()){
 prog(`Carregando foto ${n+1} de ${fs.length}…`);
-const bm=await createImageBitmap(await (await fetch(await urlDe(f.arq))).blob());
+const bm=await createImageBitmap(await baixar(f.arq));
 const bw=bm.width,bh=bm.height,c=new OffscreenCanvas(bw,bh).getContext('2d',{willReadFrequently:true});c.drawImage(bm,0,0);bm.close();
 imgs.push(c.getImageData(0,0,bw,bh));
 }
@@ -378,6 +382,7 @@ if(n%4===0){prog(`Montando… ${Math.round(100*n/cel.length)}%`);await new Promi
 // mesma regra de MoldeDigit.melhorFoto (mais perto do centro da foto), com as células já calculadas, uma vez por célula
 const p={x:(i+0.5)*esp,y:(j+0.5)*esp};let k=-1,md=Infinity;
 fs.forEach((f,q)=>{const c=cs[q].get(i+','+j);if(!c)return;const u=M.aplicarH(c.H,p),dd=Math.hypot(u.x-f.w/2,u.y-f.h/2)/Math.max(f.w,f.h);if(dd<md){md=dd;k=q}});
+if(k<0)continue;
 const h=cs[k].get(i+','+j).H,im=imgs[k],sw=im.width,sh=im.height,sd=im.data;
 // convenção: o pixel px da folha vale o mm do seu centro, x0+(px+0.5)*r; cada pixel cai em exatamente uma célula
 const xa=Math.max(0,Math.ceil((i*esp-x0)/r-0.5)),xb=Math.min(W,Math.ceil(((i+1)*esp-x0)/r-0.5)),ya=Math.max(0,Math.ceil((j*esp-y0)/r-0.5)),yb=Math.min(Hh,Math.ceil(((j+1)*esp-y0)/r-0.5));
@@ -400,9 +405,9 @@ cv.hidden=false;$('#m-folha-img').hidden=true;
 prog('Gravando a folha…');
 const arq=tela+'/folha.jpg';
 await B.subir(arq,blob);
-const d2=dado(await B.dig(tela));d2.folha={arq,mmPx:r,x0,y0,w:W,h:Hh};await B.gravar(tela,d2);
+const ruins=d.fotos.map((f,k)=>[k,est[k]]).filter(([k,s])=>s.ok&&s.c==='warn').map(([k,s])=>`Foto ${k+1}: ${s.t}`);
+const d2=dado(await B.dig(tela));d2.folha={arq,mmPx:r,x0,y0,w:W,h:Hh,avisos:ruins};await B.gravar(tela,d2);
 DIG.folha=d2.folha;urls.delete(arq);
-const ruins=d.fotos.map((f,k)=>[k,est[k]]).filter(([k,s])=>s.ok&&s.c==='warn').map(([k,s])=>`Foto ${k+1} (${s.t})`);
 $('#m-aviso').textContent=ruins.length?'Atenção: '+ruins.join('; ')+'.':'';
 prog(`Folha montada: ${W}×${Hh} px, ${fmt(r)} mm por pixel, ${cel.length} quadrado(s).`);
 }
@@ -440,7 +445,8 @@ const cor=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim
 async function abrirContorno(){
 const d=dado(DIG),f=d.folha;if(!f)return;
 try{
-const bm=await createImageBitmap(await (await fetch(await urlDe(f.arq))).blob()); // fetch -> blob: o canvas não fica contaminado
+$('#c-tam').value=d.tam||''; // não herda o tamanho digitado em outra digitalização
+const bm=await createImageBitmap(await baixar(f.arq)); // fetch -> blob: o canvas não fica contaminado
 const cv=$('#c-cv'),ov=$('#c-ov');cv.width=ov.width=bm.width;cv.height=ov.height=bm.height;
 const g=cv.getContext('2d',{willReadFrequently:true});g.drawImage(bm,0,0);bm.close();
 const mn=Math.max(0.3,f.mmPx),s=$('#c-suav');
@@ -471,8 +477,10 @@ if(!$('#c-tam').value)$('#c-tam').value=dado(DIG).tam||'';
 function pintarContorno(sx,sy){
 CT.seed=[sx,sy];
 CT.mask=MoldeDigit.pintar(CT.img.data,CT.w,CT.h,sx,sy,+$('#c-tol').value);
-const f=dado(DIG).folha,b=MoldeDigit.borda(CT.mask,CT.w,CT.h);
+const d=dado(DIG),f=d.folha,b=MoldeDigit.borda(CT.mask,CT.w,CT.h);
 CT.bordaMm=b.map(p=>({x:f.x0+(p.x+0.5)*f.mmPx,y:f.y0+(p.y+0.5)*f.mmPx})); // pixel (x,y) vale o mm do seu centro
+const cob=MoldeDigit.cobertura(d.fotos.filter(x=>estado(x,d.esp).ok),d.esp);
+CT.foraPx=MoldeDigit.bordaFora(b,CT.w,CT.h,f.x0,f.y0,f.mmPx,cob,d.esp);
 suavizar();
 }
 function suavizar(){
@@ -483,12 +491,14 @@ if(CT.bordaMm.length<3){CT.res=null;CT.fora=[];$('#c-info').textContent='Região
 else{
 const pts=MoldeDigit.simplificar(CT.bordaMm,suav);
 CT.res=MoldeDigit.paraMolde(pts,{quina:35,passo:f.mmPx}); // passo = 1 px em mm: sem ele a curva vira escadinha
-const cob=MoldeDigit.cobertura(d.fotos.filter(x=>estado(x,d.esp).ok),d.esp);
-CT.fora=MoldeDigit.foraDaCobertura(CT.res.pts,cob,d.esp);
+// trecho k (vértice k até k+1) fica fora se algum pixel de borda entre os dois ficou fora (simplificar devolve os mesmos objetos);
+// só os do meio: o canto de um lado cortado não pinta os lados vizinhos; trecho sem meio usa as duas pontas
+const ix=new Map(CT.bordaMm.map((p,i)=>[p,i])),id=pts.map(p=>ix.get(p)),N=CT.bordaMm.length;
+CT.fora=id.map((a,k)=>{const b=id[(k+1)%id.length];if((a+1)%N===b)return CT.foraPx[a]&&CT.foraPx[b];for(let i=(a+1)%N;i!==b;i=(i+1)%N)if(CT.foraPx[i])return true;return false});
 const lados=CT.res.seg.filter(s=>s.tipo==='linha').length,cur=CT.res.seg.length-lados;
 $('#c-info').textContent=`Contorno com ${CT.res.pts.length} pontos (${lados} retas, ${cur} curvas).`;
 }
-$('#c-aviso').textContent=CT.fora.some(Boolean)?'Faltou foto ou cruz aqui: os trechos em laranja ficam fora dos quadrados com 4 cruzes.':'';
+$('#c-aviso').textContent=CT.fora.some(Boolean)?'Faltou foto ou cruz aqui: os trechos em laranja encostam na beirada da folha ou em quadrado sem 4 cruzes — o papel pode continuar além da foto.':'';
 desenharContorno();
 }
 function desenharContorno(){
@@ -499,7 +509,7 @@ const {pts,seg}=CT.res,n=pts.length,X=p=>(p.x-f.x0)/f.mmPx-0.5,Y=p=>(p.y-f.y0)/f
 g.lineWidth=Math.max(2,ov.width/400);
 pts.forEach((a,k)=>{
 const b=pts[(k+1)%n],s=seg[k];
-g.strokeStyle=cor(CT.fora[k]||CT.fora[(k+1)%n]?'--warn':'--ac');
+g.strokeStyle=cor(CT.fora[k]?'--warn':'--ac');
 g.beginPath();g.moveTo(X(a),Y(a));
 if(s.tipo==='curva')g.bezierCurveTo(X(s.c1),Y(s.c1),X(s.c2),Y(s.c2),X(b),Y(b));else g.lineTo(X(b),Y(b));
 g.stroke();
@@ -522,9 +532,10 @@ $('#c-volta').onclick=()=>{cont=false;CT=null;render()};
 // peça fechada a partir do contorno (pontos e traços entram no molde como se fossem desenhados); devolve a peça
 function pecaDoContorno(m,res,nome){
 const r2=p=>({x:Math.round(p.x*100)/100,y:Math.round(p.y*100)/100});
-const n=res.pts.length,ids=res.pts.map(p=>MD.ponto(m,r2(p))),tr=[];
+// pontos sempre novos: MD.ponto grudaria em ponto do molde que caia no mesmo lugar (folhas na mesma escala coincidem)
+const n=res.pts.length,ids=res.pts.map(p=>{const id=MM.uid(m,'p');m.pontos[id]=r2(p);return id}),tr=[];
 res.seg.forEach((s,k)=>{
-const a=ids[k],b=ids[(k+1)%n];if(a===b)return;
+const a=ids[k],b=ids[(k+1)%n];
 const t={id:MM.uid(m,'t'),tipo:s.tipo==='curva'?'curva':'reta',a,b};
 if(s.tipo==='curva'){t.c1=r2(s.c1);t.c2=r2(s.c2)}
 m.tracos.push(t);tr.push(t.id);
@@ -538,13 +549,17 @@ async function levar(){
 if(!PODE||!CT)return;
 const d=dado(DIG),f=d.folha,modo=$('#c-modo').value,mid=$('#c-molde').value,res=modo==='c'?null:CT.res;
 let tam=$('#c-tam').value.trim();
-if(res&&CT.fora.some(Boolean)&&!confirm('Parte do contorno ficou fora dos quadrados com 4 cruzes (faltou foto ou cruz aqui). Levar para o molde mesmo assim?'))return;
+const av=f.avisos||[];
+if(av.length&&!confirm('Fotos com aviso na montagem da folha: '+av.join('; ')+'. Levar para o molde mesmo assim?'))return;
+if(res&&CT.fora.some(Boolean)&&!confirm('Parte do contorno encosta na beirada da folha ou em quadrado sem 4 cruzes (faltou foto ou cruz aqui). Levar para o molde mesmo assim?'))return;
 if(modo!=='c'&&!res&&!confirm('Sem contorno automático: só a folha entra no molde, como fundo. Continuar?'))return;
 const b=$('#c-leva');b.disabled=true;
 try{
 const novo=!mid;
 let m=novo?MM.novo(d.nome||'Molde digitalizado'):(x=>x&&MM.normalizar(x))(await BM.molde(mid)); // re-lê antes de gravar
 if(!m){toast('Molde não encontrado.');return}
+// mesma regra do editor: molde ligado a produto, ao salvar, grava também no produto
+if(m.produtoIds.length&&!PODE_PROD){toast('Este molde está ligado a produto(s): para levar a folha você precisa também de permissão para mexer em produtos.');return}
 if(novo)m.base=modo==='a'?(d.tam||'M'):tam;
 const alvo=modo==='a'?m.base:tam;
 if(!alvo){toast('Informe o tamanho.');return}
@@ -554,10 +569,12 @@ let pid=null;
 if(modo==='c')pid=$('#c-peca').value||null;
 else if(res){const p=pecaDoContorno(m,res,d.nome);if(modo==='b')p.tam=alvo;pid=p.id}
 m.fundos[alvo]={dig:tela,arq:f.arq,mmPx:f.mmPx,x0:f.x0,y0:f.y0,w:f.w,h:f.h,tx:0,ty:0,ang:0,peca:pid};
+m.salvoEm=Date.now(); // rascunho local mais velho que isto não pergunta "Recuperar?"
 const id=novo?await BM.criar(m):(await BM.gravar(mid,m),mid);
-location.href='molde.html?id='+encodeURIComponent(id)+(LOCAL?'&local=1':'');
+// sync=1: o editor salva uma vez ao abrir e o salvar dele (ligarProdutos) leva as peças aos produtos ligados
+location.href='molde.html?id='+encodeURIComponent(id)+(m.produtoIds.length?'&sync=1':'')+(LOCAL?'&local=1':'');
 }catch(e){console.error(e);toast(ptErro(e))}
-b.disabled=false;
+finally{b.disabled=false}
 }
 $('#c-leva').onclick=levar;
 
@@ -573,9 +590,9 @@ for(const i of q){if(i.url)URL.revokeObjectURL(i.url);await FILA('readwrite',s=>
 await sal;
 const d=dado(await B.dig(id)),arqs=d.fotos.map(f=>f.arq);
 if(d.folha)arqs.push(d.folha.arq);
+await B.apagarArqs(arqs); // primeiro o storage: se falhar, o doc fica igual e dá para tentar de novo
 d.fotos=[];d.folha=null;
 await B.gravar(id,d);
-await B.apagarArqs(arqs);
 for(const a of arqs)urls.delete(a);
 DIG=d;MA=null;await render();toast('Fotos apagadas.');
 }catch(e){console.error(e);toast(ptErro(e))}
@@ -626,6 +643,7 @@ if(!session||!user)return bloquear('Entre no app para digitalizar moldes.',true)
 if(!Acesso.pode(perfil,'moldes','ver'))return bloquear('Só administradores com acesso a moldes digitalizam moldes.');
 }
 PODE=LOCAL||Acesso.pode(perfil,'moldes','mexer');
+PODE_PROD=LOCAL||Acesso.pode(perfil,'produtos','mexer');
 fila=(await FILA("readonly",s=>s.getAll())).map(i=>({...i,estado:"enviando"}));
 const h=decodeURIComponent(location.hash.slice(1));
 $('#aviso').hidden=true;
