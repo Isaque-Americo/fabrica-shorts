@@ -1,3 +1,5 @@
+import { createClient } from 'npm:@supabase/supabase-js@2.45.4';
+
 const cors = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -14,6 +16,26 @@ Deno.serve(async (req) => {
   try {
     const key = Deno.env.get('GEMINI_API_KEY');
     if (!key) return resp({ error: 'Chave da IA não configurada.' }, 500);
+    const authorization = req.headers.get('authorization') || '';
+    if (!authorization.startsWith('Bearer ')) return resp({ error: 'Sessão necessária.' }, 401);
+    // cliente com o JWT de quem chama: a RLS só mostra o próprio perfil e pode_eu avalia o próprio auth.uid()
+    const comoUsuario = createClient(Deno.env.get('SUPABASE_URL') || '', Deno.env.get('SUPABASE_ANON_KEY') || '', {
+      global: { headers: { Authorization: authorization } },
+      auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+    });
+    const { data: sessao } = await comoUsuario.auth.getUser(authorization.slice(7));
+    if (!sessao?.user) return resp({ error: 'Sessão inválida ou expirada.' }, 401);
+    const { data: perfil, error: perfilError } = await comoUsuario.from('user_profiles').select('role').maybeSingle();
+    if (perfilError) return resp({ error: 'Não foi possível validar a permissão.' }, 500);
+    const role = perfil?.role;
+    // lojista e representante usam "Ler arquivo" no Novo pedido: continuam como hoje
+    if (role === 'admin') {
+      const { data: pode, error: podeError } = await comoUsuario.rpc('pode_eu', { area: 'pedidos', acao: 'mexer' });
+      if (podeError) return resp({ error: 'Não foi possível validar a permissão.' }, 500);
+      if (pode !== true) return resp({ error: 'Você não tem permissão para mexer em Pedidos.' }, 403);
+    } else if (role !== 'lojista' && role !== 'representante') {
+      return resp({ error: 'Sessão sem perfil de acesso.' }, 403);
+    }
     const { prompt, images } = await req.json();
     if (!prompt) return resp({ error: 'Pedido vazio.' }, 400);
     const parts: unknown[] = [{ text: String(prompt).slice(0, 40000) }];

@@ -14,6 +14,7 @@ const json = (body: unknown, status = 200) =>
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || ''
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || ''
 const admin = createClient(supabaseUrl, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
 })
@@ -89,7 +90,7 @@ function itemFor(row: Row, status: string, temporaryPasswordSet = false) {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS })
   if (req.method !== 'POST') return json({ error: 'Método não permitido.' }, 405)
-  if (!supabaseUrl || !serviceKey) return json({ error: 'A função não está configurada no servidor.' }, 500)
+  if (!supabaseUrl || !serviceKey || !anonKey) return json({ error: 'A função não está configurada no servidor.' }, 500)
 
   const origin = req.headers.get('origin')
   if (origin && origin !== ORIGIN) return json({ error: 'Origem não autorizada.' }, 403)
@@ -102,10 +103,14 @@ Deno.serve(async (req) => {
     const { data: authData, error: authError } = await admin.auth.getUser(token)
     if (authError || !authData.user) return json({ error: 'Sessão inválida ou expirada.' }, 401)
 
-    const { data: caller, error: callerError } = await admin.from('user_profiles')
-      .select('role').eq('user_id', authData.user.id).maybeSingle()
-    if (callerError) return json({ error: 'Não foi possível validar o perfil administrador.' }, 500)
-    if (caller?.role !== 'admin') return json({ error: 'Somente o administrador pode gerenciar acessos.' }, 403)
+    // pode_eu avalia o auth.uid() do JWT de quem chama (principal sempre passa)
+    const comoUsuario = createClient(supabaseUrl, anonKey, {
+      global: { headers: { Authorization: authorization } },
+      auth: { autoRefreshToken: false, persistSession: false, detectSessionInUrl: false },
+    })
+    const { data: podeMexer, error: podeError } = await comoUsuario.rpc('pode_eu', { area: 'cadastros', acao: 'mexer' })
+    if (podeError) return json({ error: 'Não foi possível validar o perfil administrador.' }, 500)
+    if (podeMexer !== true) return json({ error: 'Você não tem permissão para mexer em Cadastros.' }, 403)
 
     const body = await req.json().catch(() => ({}))
     const action = str(body.action)

@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.45.4'
+import { validarPermissoes } from '../_shared/permissoes.mjs'
 
 const APP_ORIGIN = 'https://isaque-americo.github.io'
 const APP_URL = `${APP_ORIGIN}/fabrica-shorts/`
@@ -22,6 +23,8 @@ type AdminProfile = {
   role: string
   contact_email: string | null
   contact_whatsapp: string | null
+  is_principal: boolean
+  permissoes: Record<string, string> | null
 }
 
 const validEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
@@ -49,16 +52,21 @@ Deno.serve(async (req) => {
     if (authError || !authData.user) return json({ error: 'Sessão inválida ou expirada.' }, 401)
 
     const { data: caller, error: callerError } = await admin.from('user_profiles')
-      .select('role').eq('user_id', authData.user.id).maybeSingle()
+      .select('role,is_principal').eq('user_id', authData.user.id).maybeSingle()
     if (callerError) return json({ error: 'Não foi possível validar o perfil administrador.' }, 500)
-    if (caller?.role !== 'admin') return json({ error: 'Somente administradores podem gerenciar contas.' }, 403)
+    if (caller?.role !== 'admin' || caller?.is_principal !== true) {
+      return json({ error: 'Somente o administrador principal pode gerenciar administradores.' }, 403)
+    }
 
-    const body = await req.json().catch(() => ({}))
+    const parsed = await req.json().catch(() => ({}))
+    const body = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
     const action = typeof body.action === 'string' ? body.action : ''
+    // o principal só muda por migração: nunca aceitar is_principal do corpo
+    if ('is_principal' in body) return json({ error: 'Não é possível alterar o administrador principal por aqui.' }, 400)
 
     if (action === 'list') {
       const [{ data: profiles, error: profilesError }, { data: users, error: usersError }] = await Promise.all([
-        admin.from('user_profiles').select('user_id,role,contact_email,contact_whatsapp').eq('role', 'admin'),
+        admin.from('user_profiles').select('user_id,role,contact_email,contact_whatsapp,is_principal,permissoes').eq('role', 'admin'),
         admin.auth.admin.listUsers({ page: 1, perPage: 1000 }),
       ])
       if (profilesError || usersError) return json({ error: 'Não foi possível carregar os administradores.' }, 500)
@@ -68,6 +76,8 @@ Deno.serve(async (req) => {
         email: usersById.get(profile.user_id)?.email || profile.contact_email || '',
         contact_email: profile.contact_email || '',
         contact_whatsapp: profile.contact_whatsapp || '',
+        is_principal: profile.is_principal === true,
+        permissoes: profile.permissoes ?? null,
       }))
       return json({ items })
     }
@@ -78,6 +88,11 @@ Deno.serve(async (req) => {
     if (email.endsWith('@fabrica.interno')) return json({ error: 'Use um e-mail real que possa receber mensagens.' }, 400)
     if (!validPhone(phone)) return json({ error: 'Informe o WhatsApp no formato internacional, por exemplo +5532988383046.' }, 400)
 
+    // ausente = não mexe (update) / sem acesso (create); presente = valida e fecha as dependências
+    const temPermissoes = body.permissoes !== undefined
+    const perm = temPermissoes ? validarPermissoes(body.permissoes) : { valor: null }
+    if (perm.erro) return json({ error: perm.erro }, 400)
+
     if (action === 'create') {
       const { data, error } = await admin.auth.admin.inviteUserByEmail(email, { redirectTo: APP_URL })
       if (error || !data.user) return json({ error: error?.message || 'Não foi possível enviar o convite.' }, 400)
@@ -87,6 +102,7 @@ Deno.serve(async (req) => {
         role: 'admin',
         contact_email: email,
         contact_whatsapp: phone || null,
+        permissoes: perm.valor,
       })
       if (profileError) {
         const { error: cleanupError } = await admin.auth.admin.deleteUser(data.user.id)
@@ -94,7 +110,7 @@ Deno.serve(async (req) => {
         return json({ error: 'Não foi possível criar o perfil do administrador.' }, 500)
       }
 
-      return json({ item: { user_id: data.user.id, email, contact_email: email, contact_whatsapp: phone } }, 201)
+      return json({ item: { user_id: data.user.id, email, contact_email: email, contact_whatsapp: phone, is_principal: false, permissoes: perm.valor } }, 201)
     }
 
     if (action === 'update') {
@@ -104,10 +120,13 @@ Deno.serve(async (req) => {
       }
 
       const { data: profile, error: profileReadError } = await admin.from('user_profiles')
-        .select('user_id,role,contact_email,contact_whatsapp')
+        .select('user_id,role,contact_email,contact_whatsapp,is_principal,permissoes')
         .eq('user_id', userId).maybeSingle()
       if (profileReadError) return json({ error: 'Não foi possível consultar o administrador.' }, 500)
       if (!profile || profile.role !== 'admin') return json({ error: 'Administrador não encontrado.' }, 404)
+      if (profile.is_principal && temPermissoes) {
+        return json({ error: 'O administrador principal tem acesso total; as permissões dele não mudam.' }, 400)
+      }
 
       const { data: authUser, error: authReadError } = await admin.auth.admin.getUserById(userId)
       if (authReadError || !authUser.user) return json({ error: 'Não foi possível consultar a conta de autenticação.' }, 500)
@@ -119,7 +138,9 @@ Deno.serve(async (req) => {
       }
 
       const { error: profileUpdateError } = await admin.from('user_profiles')
-        .update({ contact_email: email, contact_whatsapp: phone || null })
+        .update(temPermissoes
+          ? { contact_email: email, contact_whatsapp: phone || null, permissoes: perm.valor }
+          : { contact_email: email, contact_whatsapp: phone || null })
         .eq('user_id', userId)
       if (profileUpdateError) {
         if (oldEmail && oldEmail.toLowerCase() !== email) {
@@ -129,7 +150,8 @@ Deno.serve(async (req) => {
         return json({ error: 'Não foi possível salvar os dados de contato.' }, 500)
       }
 
-      return json({ item: { user_id: userId, email, contact_email: email, contact_whatsapp: phone } })
+      const permissoes = temPermissoes ? perm.valor : (profile.permissoes ?? null)
+      return json({ item: { user_id: userId, email, contact_email: email, contact_whatsapp: phone, is_principal: profile.is_principal === true, permissoes } })
     }
 
     return json({ error: 'Ação desconhecida.' }, 400)
