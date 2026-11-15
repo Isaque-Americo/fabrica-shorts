@@ -16,6 +16,7 @@
     'painel:ver': ['pedidos:ver', 'produtos:ver'],
     'fabricar:ver': ['pedidos:ver', 'produtos:ver'],
     'estoque:ver': ['produtos:ver'],
+    'cadastros:mexer': ['pedidos:mexer', 'reps:ver'], // ativar acesso de representante dá acesso aos pedidos dele
   };
   const ABA_AREA = { painel: 'painel', produtos: 'produtos', materia: 'materia', pedidos: 'pedidos', fabricar: 'fabricar', molde: 'moldes', corte: 'moldes', reps: 'reps', cadastros: 'cadastros', estoque: 'estoque' };
 

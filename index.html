@@ -559,7 +559,7 @@ sb.auth.onAuthStateChange(async (e,s)=>{if(e==='PASSWORD_RECOVERY'&&s){history.r
 })();
 
 function render(){
-const tabs=appProfile?.role==='lojista'?TABS_LOJISTA:appProfile?.role==='representante'?TABS_REP:[...TABS_ADMIN.filter(([k])=>pode(Acesso.ABA_AREA[k],'ver')),...(appProfile?.is_principal?[['administradores','Administradores']]:[])];
+const tabs=appProfile?.role==='lojista'?TABS_LOJISTA:appProfile?.role==='representante'?TABS_REP:[...TABS_ADMIN.filter(([k])=>k==='molde'?pode('moldes')&&pode('produtos'):pode(Acesso.ABA_AREA[k],'ver')),...(appProfile?.is_principal?[['administradores','Administradores']]:[])];
 if(!tabs.length){$('#sidebar-nav').innerHTML='';$('#page-title').textContent='Sem acesso';const shell=document.getElementById('app-shell');if(shell)shell.style.display='flex';$('#app').innerHTML='<div class="alert">Sem acesso a nenhuma área; fale com o administrador principal.</div>';return}
 if(!tabs.some(([k])=>k===tab))tab=tabs[0][0];
 $('#sidebar-nav').innerHTML=tabs.map(([k,l])=>k==='molde'?`<a href="molde.html?novo=1" target="_blank" rel="noopener"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`:k==='corte'?`<a href="corte.html"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`:`<a href="#" class="${k===tab?'active':''}" onclick="tab='${k}';render();return false;"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`).join('');

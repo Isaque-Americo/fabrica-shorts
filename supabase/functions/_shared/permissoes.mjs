@@ -12,6 +12,7 @@ export const DEPS = {
   'painel:ver': ['pedidos:ver', 'produtos:ver'],
   'fabricar:ver': ['pedidos:ver', 'produtos:ver'],
   'estoque:ver': ['produtos:ver'],
+  'cadastros:mexer': ['pedidos:mexer', 'reps:ver'], // ativar acesso de representante dá acesso aos pedidos dele
 }
 
 export function fechar(perm) {

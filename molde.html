@@ -606,7 +606,7 @@ if(!session||!user)return bloquear('Entre no app para editar moldes.',true);
 ({data:perfil}=await sb.from('user_profiles').select('role,is_principal,permissoes').eq('user_id',user.id).maybeSingle());
 if(!Acesso.pode(perfil,'moldes','ver'))return bloquear('Só administradores editam moldes.');
 }
-PODE=LOCAL||Acesso.pode(perfil,'moldes','mexer');
+PODE=LOCAL||(Acesso.pode(perfil,'moldes','mexer')&&Acesso.pode(perfil,'produtos','mexer')); // salvar molde ligado também grava no produto
 await abrir();
 }catch(e){console.error(e);bloquear('Não foi possível abrir o molde. '+ptErro(e))}
 }
