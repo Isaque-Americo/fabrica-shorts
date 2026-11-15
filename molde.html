@@ -4,24 +4,24 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Editor de molde</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="molde/geo.js"></script>
 <script src="molde/modelo.js"></script>
 <script src="acesso.js"></script>
 <script src="molde/desenho.js"></script>
 <style>
-:root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;
+:root{--bg:#f4f4f3;--card:#ffffff;--tx:#18181b;--mut:#71717a;--bd:#e4e4e7;--ac:#c2410c;--fill:#f97316;--acx:#0e0e0f;--ok:#16a34a;--warn:#b45309;--bad:#dc2626;--hd:#18181b;
 --t0:#c92a2a;--t1:#1c6dd0;--t2:#2b8a3e;--t3:#d9480f;--t4:#7048e8;--t5:#8d5b3a;--t6:#c2255c;--t7:#0b7285;
 color-scheme:light}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;--t0:#ff6b6b;--t1:#5aa9ff;--t2:#4ade80;--t3:#ffa94d;--t4:#b794f6;--t5:#d4a373;--t6:#f783ce;--t7:#3bd4e6;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;--t0:#ff6b6b;--t1:#5aa9ff;--t2:#4ade80;--t3:#ffa94d;--t4:#b794f6;--t5:#d4a373;--t6:#f783ce;--t7:#3bd4e6;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#f4f4f5;--t0:#ff6b6b;--t1:#5aa9ff;--t2:#4ade80;--t3:#ffa94d;--t4:#b794f6;--t5:#d4a373;--t6:#f783ce;--t7:#3bd4e6;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#f4f4f5;--t0:#ff6b6b;--t1:#5aa9ff;--t2:#4ade80;--t3:#ffa94d;--t4:#b794f6;--t5:#d4a373;--t6:#f783ce;--t7:#3bd4e6;color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 button.pri,button.ghost,button.sm{font:inherit;border-radius:8px;cursor:pointer;padding:8px 14px;border:1px solid var(--ac)}
-button.pri{background:var(--ac);color:var(--acx)}
+button.pri{background:var(--fill);color:var(--acx);border-color:var(--fill)}
 button.ghost,button.sm{background:none;color:var(--ac)}
 button.sm{padding:4px 10px;font-size:13px}
 button:focus-visible,a:focus-visible,input:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
@@ -54,7 +54,7 @@ dialog h3{margin:0 0 12px}
 #toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:#fff;padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
 #dica{font-size:13px;color:var(--mut);flex-basis:100%;order:9;min-height:1.5em}
 #ferramentas button{font:inherit;font-size:18px;line-height:1;width:38px;height:38px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer}
-#ferramentas button[aria-pressed="true"]{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+#ferramentas button[aria-pressed="true"]{background:var(--fill);color:var(--acx);border-color:var(--fill)}
 #ferramentas hr{width:100%;border:0;border-top:1px solid var(--bd);margin:4px 0}
 #tela .tr{fill:none;stroke:var(--tx);stroke-width:1.5px;vector-effect:non-scaling-stroke}
 #tela .tr.sel{stroke:var(--ac);stroke-width:3px}
@@ -81,7 +81,7 @@ dialog h3{margin:0 0 12px}
 .pc-nome{flex:1;min-width:0;text-align:left;background:none;border:0;color:var(--tx);font:inherit;font-size:13px;cursor:pointer;padding:2px;overflow-wrap:anywhere}
 .pc-nome small{display:block;color:var(--bad);font-weight:600}
 .pc-item .ic{flex:none;width:26px;height:26px;padding:0;border:1px solid var(--bd);border-radius:6px;background:none;color:var(--tx);font-size:14px;cursor:pointer}
-.pc-item .ic[aria-pressed="true"],#props [aria-pressed="true"]{background:var(--ac);color:var(--acx);border-color:var(--ac)}
+.pc-item .ic[aria-pressed="true"],#props [aria-pressed="true"]{background:var(--fill);color:var(--acx);border-color:var(--fill)}
 .pc-ren{flex:1;min-width:0;font-size:13px;padding:2px 4px}
 #props{border:1px solid var(--bd);border-radius:8px;margin:8px 0 0;padding:8px;min-width:0}
 #props legend{font-weight:600;font-size:14px;padding:0 4px}
@@ -96,7 +96,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
 #tams button{border-color:var(--c);color:var(--tx);min-width:34px}
 #tams button[aria-pressed="true"]{background:var(--c);color:var(--card)}
 #tams button.base{font-weight:700;text-decoration:underline}
-#btn-fantasma[aria-pressed="true"]{background:var(--ac);color:var(--acx)}
+#btn-fantasma[aria-pressed="true"]{background:var(--fill);color:var(--acx)}
 #foto-mini{padding:0;width:34px;height:34px;border:1px solid var(--bd);border-radius:6px;background:none;overflow:hidden;cursor:pointer}
 #foto-mini img{width:100%;height:100%;object-fit:cover;display:block}
 #fantasma{pointer-events:none}#tela .fan{fill:none;stroke-width:1.2px;opacity:.35;vector-effect:non-scaling-stroke}

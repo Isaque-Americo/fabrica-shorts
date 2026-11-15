@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Enfesto</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="molde/encaixe.js"></script>
 <script src="molde/ordem.js"></script>
@@ -12,16 +12,16 @@
 <script src="acesso.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
-:root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;
+:root{--bg:#f4f4f3;--card:#ffffff;--tx:#18181b;--mut:#71717a;--bd:#e4e4e7;--ac:#c2410c;--fill:#f97316;--acx:#0e0e0f;--ok:#16a34a;--warn:#b45309;--bad:#dc2626;--hd:#18181b;
 --t0:#c92a2a;--t1:#1c6dd0;--t2:#2b8a3e;--t3:#d9480f;--t4:#7048e8;--t5:#8d5b3a;--t6:#c2255c;--t7:#0b7285;color-scheme:light}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;--t0:#ff6b6b;--t1:#5aa9ff;--t2:#4ade80;--t3:#ffa94d;--t4:#b794f6;--t5:#d4a373;--t6:#f783ce;--t7:#3bd4e6;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;--t0:#ff6b6b;--t1:#5aa9ff;--t2:#4ade80;--t3:#ffa94d;--t4:#b794f6;--t5:#d4a373;--t6:#f783ce;--t7:#3bd4e6;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#f4f4f5;--t0:#ff6b6b;--t1:#5aa9ff;--t2:#4ade80;--t3:#ffa94d;--t4:#b794f6;--t5:#d4a373;--t6:#f783ce;--t7:#3bd4e6;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#f4f4f5;--t0:#ff6b6b;--t1:#5aa9ff;--t2:#4ade80;--t3:#ffa94d;--t4:#b794f6;--t5:#d4a373;--t6:#f783ce;--t7:#3bd4e6;color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{min-height:100%}
 body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 button.pri,button.ghost,button.sm{font:inherit;border-radius:8px;cursor:pointer;padding:8px 14px;border:1px solid var(--ac)}
-button.pri{background:var(--ac);color:var(--acx)}
+button.pri{background:var(--fill);color:var(--acx);border-color:var(--fill)}
 button.ghost,button.sm{background:none;color:var(--ac)}
 button.sm{padding:4px 10px;font-size:13px}
 button:disabled{opacity:.5;cursor:default}
@@ -31,7 +31,7 @@ a{color:var(--ac)}
 #aviso .c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:24px;max-width:460px}
 .topo{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 16px;background:var(--card);border-bottom:1px solid var(--bd)}
 .topo a{text-decoration:none;font-size:14px}
-.topo h1{margin:0;font:600 17px 'Poppins',sans-serif;flex:1;min-width:0;overflow-wrap:anywhere}
+.topo h1{margin:0;font:700 22px 'Barlow Condensed',Inter,sans-serif;text-transform:uppercase;letter-spacing:.3px;flex:1;min-width:0;overflow-wrap:anywhere}
 main{max-width:1400px;margin:0 auto;padding:16px}
 .vazio{color:var(--mut);font-size:13px}
 .nota{font-size:13px;color:var(--mut);margin:0 0 10px}
@@ -84,7 +84,7 @@ dialog small{display:block;margin:-2px 0 2px 24px;color:var(--mut);font-size:12p
 body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 #enf-v,#aviso,#toast,dialog{display:none!important}
 #mini{display:block}
-#mini h2{font:600 14pt 'Poppins',sans-serif;margin:0 0 1mm}
+#mini h2{font:600 14pt Inter,sans-serif;margin:0 0 1mm}
 #mini p{margin:0 0 3mm;font-size:10pt}
 #mini svg{display:block;width:277mm;height:165mm}
 #mini .tecido{fill:none;stroke:#000;stroke-width:.8;vector-effect:non-scaling-stroke}
