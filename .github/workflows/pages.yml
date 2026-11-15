@@ -34,6 +34,7 @@ jobs:
           cp enfesto.html _site/enfesto.html
           cp acesso.js _site/acesso.js
           cp -r molde _site/molde
+          cp -r img _site/img
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
