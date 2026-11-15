@@ -54,13 +54,17 @@ Deno.serve(async (req) => {
     const { data: caller, error: callerError } = await admin.from('user_profiles')
       .select('role,is_principal').eq('user_id', authData.user.id).maybeSingle()
     if (callerError) return json({ error: 'Não foi possível validar o perfil administrador.' }, 500)
-    if (caller?.role !== 'admin' || caller?.is_principal !== true) {
-      return json({ error: 'Somente o administrador principal pode gerenciar administradores.' }, 403)
-    }
+    if (caller?.role !== 'admin') return json({ error: 'Somente administradores podem gerenciar contas.' }, 403)
 
     const parsed = await req.json().catch(() => ({}))
     const body = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {}
     const action = typeof body.action === 'string' ? body.action : ''
+    // admin comum só edita o próprio contato (e-mail/WhatsApp); o resto é do principal
+    const proprioContato = action === 'update' && body.user_id === authData.user.id &&
+      body.permissoes === undefined && !('role' in body) && !('is_principal' in body)
+    if (caller.is_principal !== true && !proprioContato) {
+      return json({ error: 'Somente o administrador principal pode gerenciar administradores.' }, 403)
+    }
     // o principal só muda por migração: nunca aceitar is_principal do corpo
     if ('is_principal' in body) return json({ error: 'Não é possível alterar o administrador principal por aqui.' }, 400)
 

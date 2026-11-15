@@ -19,6 +19,7 @@ const A = require(path.join(raiz, 'acesso.js'));
     ['DEPS igual ao acesso.js', ig(E.DEPS, A.DEPS), true],
     ['AREAS igual ao acesso.js', ig(E.AREAS, A.AREAS.map(a => a.k)), true],
     ...validas.map(p => ['fechar igual ' + JSON.stringify(p), ig(E.validarPermissoes(p).valor, A.fechar(p)) && ig(E.fechar(p), A.fechar(p)), true]),
+    ['produtos:ver fecha materia e config', ig(E.fechar({ produtos: 'ver' }), { produtos: 'ver', materia: 'ver', config: 'ver' }), true],
     ['null -> null', E.validarPermissoes(null).valor, null],
     ['chave desconhecida recusa', !!E.validarPermissoes({ x: 'mexer' }).erro, true],
     ['valor inválido recusa', !!E.validarPermissoes({ pedidos: 'tudo' }).erro, true],

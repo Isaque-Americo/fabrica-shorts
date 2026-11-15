@@ -613,7 +613,6 @@ return {email,whatsapp};
 }
 function editarPerfilAdmin(){
 if(appProfile?.role!=='admin')return;
-if(!appProfile.is_principal){aviso('Para mudar seu e-mail ou WhatsApp, fale com o administrador principal.');return} // a Edge Function só aceita o principal
 modal('Contato do administrador',`<label>E-mail de contato<input name="contact_email" type="email" required autocomplete="email" value="${esc(appProfile.contact_email||'')}" placeholder="nome@empresa.com"></label><label>WhatsApp<input name="contact_whatsapp" type="tel" required autocomplete="tel" value="${esc(appProfile.contact_whatsapp||'')}" placeholder="+55 32 98838-3046"></label><small class="mut">O WhatsApp será salvo no formato internacional, por exemplo +5532988383046.</small>`,async form=>{
 const {email,whatsapp}=validarContatoAdmin(form.contact_email,form.contact_whatsapp);
 await chamarGerenciadorAdmin({action:'update',user_id:appProfile.user_id,email,contact_whatsapp:whatsapp});
@@ -622,19 +621,29 @@ appProfile.contact_whatsapp=whatsapp;
 });
 $('#dlg form').insertAdjacentHTML('afterbegin','<p class="mut">O e-mail também será usado como login e destino de recuperação de senha.</p>');
 }
-// checklist de áreas: o que as marcadas exigem (Acesso.fechar) aparece marcado e travado
-function checklistHtml(){
-const cx=(k,n)=>`<input type="checkbox" data-a="${k}" data-n="${n}" aria-label="${n==='ver'?'Ver':'Mexer'}" style="width:auto;margin:0" onchange="checklistAplica()">`;
-return `<label>O que este administrador pode fazer</label><div class="tw"><table class="keep" id="chk"><tr><th>Área</th><th>Ver</th><th>Mexer</th></tr>${Acesso.AREAS.map(a=>`<tr><td>${esc(a.nome)}</td><td>${cx(a.k,'ver')}</td><td>${a.soVer?'—':cx(a.k,'mexer')}</td></tr>`).join('')}</table></div><small class="mut">Mexer inclui Ver. Áreas travadas são exigidas por outra marcada. Administradores é sempre só do principal.</small>`;
+// checklist de áreas: chkEscolha guarda só o que o principal marcou; o que isso exige (Acesso.fechar)
+// aparece marcado e travado, e sai junto quando a área que exigia é desmarcada
+let chkEscolha={};
+function checklistHtml(perm){
+chkEscolha=checklistMinimo(perm||{});
+const cx=(a,n)=>`<input type="checkbox" data-a="${a.k}" data-n="${n}" aria-label="${n==='ver'?'Ver':'Mexer'} ${esc(a.nome)}" style="width:auto;margin:0" onchange="checklistMarca(this)">`;
+return `<label>O que este administrador pode fazer</label><div class="tw"><table class="keep" id="chk"><tr><th>Área</th><th>Ver</th><th>Mexer</th></tr>${Acesso.AREAS.map(a=>`<tr><td>${esc(a.nome)}</td><td>${cx(a,'ver')}</td><td>${a.soVer?'—':cx(a,'mexer')}</td></tr>`).join('')}</table></div><small class="mut">Mexer inclui Ver. Áreas travadas são exigidas por outra marcada. Administradores é sempre só do principal.</small>`;
 }
-function checklistLer(){const p={};document.querySelectorAll('#chk input:checked').forEach(i=>{if(p[i.dataset.a]!=='mexer')p[i.dataset.a]=i.dataset.n});return Acesso.fechar(p)}
-function checklistAplica(perm=checklistLer()){
-const full=Acesso.fechar(perm),trava=new Set();
-for(const [k,n] of Object.entries(full)){
-if(n==='mexer')trava.add(k+':ver');
-for(const [dk,dn] of Object.entries(Acesso.fechar({[k]:n})))if(dk!==k){trava.add(dk+':ver');if(dn==='mexer')trava.add(dk+':mexer')}
+// permissão salva (já fechada) -> menores escolhas que a geram: tira o que outra área já exige
+function checklistMinimo(perm){
+const m=Acesso.fechar(perm);
+for(const k of Object.keys(m)){
+const sem={...m};delete sem[k];
+if(Acesso.fechar(sem)[k]===m[k]){delete m[k];continue}
+if(m[k]==='mexer'&&Acesso.fechar({...m,[k]:'ver'})[k]==='mexer')m[k]='ver';
 }
-document.querySelectorAll('#chk input').forEach(i=>{const k=i.dataset.a,n=i.dataset.n;i.checked=full[k]==='mexer'||full[k]===n;i.disabled=trava.has(k+':'+n)});
+return m;
+}
+function checklistMarca(i){const k=i.dataset.a;if(i.checked)chkEscolha[k]=i.dataset.n;else if(i.dataset.n==='mexer')chkEscolha[k]='ver';else delete chkEscolha[k];checklistAplica()}
+const checklistLer=()=>Acesso.fechar(chkEscolha);
+function checklistAplica(){
+const full=checklistLer();
+document.querySelectorAll('#chk input').forEach(i=>{const k=i.dataset.a,n=i.dataset.n;i.checked=full[k]==='mexer'||full[k]===n;i.disabled=i.checked&&chkEscolha[k]!==n});
 }
 function novoAdministrador(){
 if(!appProfile?.is_principal)return;
@@ -650,13 +659,13 @@ if(!appProfile?.is_principal)return;
 const account=adminAccounts.find(item=>item.user_id===userId);
 if(!account)return;
 const lista=!account.is_principal; // o principal tem acesso total: sem checklist
-modal('Editar administrador',`<p>Alterar o e-mail também altera o login e o endereço usado para recuperação de senha.</p><label>E-mail<input name="email" type="email" required autocomplete="email" value="${esc(account.email)}"></label><label>WhatsApp (opcional)<input name="contact_whatsapp" type="tel" autocomplete="tel" value="${esc(account.contact_whatsapp||'')}"></label>${lista?checklistHtml():''}`,async form=>{
+modal('Editar administrador',`<p>Alterar o e-mail também altera o login e o endereço usado para recuperação de senha.</p><label>E-mail<input name="email" type="email" required autocomplete="email" value="${esc(account.email)}"></label><label>WhatsApp (opcional)<input name="contact_whatsapp" type="tel" autocomplete="tel" value="${esc(account.contact_whatsapp||'')}"></label>${lista?checklistHtml(account.permissoes):''}`,async form=>{
 const {email,whatsapp}=validarContatoAdmin(form.email,form.contact_whatsapp);
 await chamarGerenciadorAdmin({action:'update',user_id:userId,email,contact_whatsapp:whatsapp,...(lista?{permissoes:checklistLer()}:{})});
 await carregarAdministradores();
 setTimeout(()=>aviso('Dados do administrador atualizados.'),100);
 });
-if(lista)checklistAplica(account.permissoes||{});
+if(lista)checklistAplica();
 }
 
 // Um botão de ações por linha, no lugar de três. Fica em position:fixed porque
@@ -1167,7 +1176,7 @@ return `<div class="bar"><h2>Cadastro de lojistas</h2></div><p class="mut">O adm
 }
 function cadastroRepresentante(){
 const x=S.cadastros.find(c=>c.tipoCadastro==='representante');if(!x)return '<div class="empty">Nenhum representante pré-cadastrado.</div>';const d=dadosCadastro(x.username),salvo=cadastroSalvo(x.username),r=S.reps.find(a=>a.id===d.rep_id)||S.reps.find(a=>(a.nome||'').toLowerCase().includes('uberdan'));
-return `<div class="bar"><h2>Cadastro de representante</h2>${pode('cadastros')?`<button class="pri" onclick="fCadastro('${x.username}')">${salvo?'Editar cadastro':'Completar cadastro'}</button>`:''}</div><div class="c"><small>Usuário reservado</small><b>${esc(x.username)}</b><p>${esc(d.nome||r?.nome||x.nome)}</p><span class="tag">${r?'Representante cadastrado':'Cadastro do representante pendente'}</span><p>Acesso: ${badgeAcesso(x.username)}</p><div class="row end">${pode('cadastros')?botoesAcesso(x.username):''}</div></div>${mensagemStatusAcessos()}`;
+return `<div class="bar"><h2>Cadastro de representante</h2>${pode('cadastros')&&pode('reps')?`<button class="pri" onclick="fCadastro('${x.username}')">${salvo?'Editar cadastro':'Completar cadastro'}</button>`:''}</div><div class="c"><small>Usuário reservado</small><b>${esc(x.username)}</b><p>${esc(d.nome||r?.nome||x.nome)}</p><span class="tag">${r?'Representante cadastrado':'Cadastro do representante pendente'}</span><p>Acesso: ${badgeAcesso(x.username)}</p><div class="row end">${pode('cadastros')?botoesAcesso(x.username):''}</div></div>${mensagemStatusAcessos()}`;
 }
 let cadastroAba='lojista';
 let statusAcessos={};

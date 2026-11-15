@@ -5,6 +5,7 @@ const SO_VER = ['fabricar']
 
 // "área:nível" exigido => lista de "área:nível" que passam a ser exigidas
 export const DEPS = {
+  'produtos:ver': ['materia:ver', 'config:ver'], // custo e margem leem matéria-prima e a ficha padrão (config)
   'produtos:mexer': ['moldes:mexer'],
   'moldes:ver': ['produtos:ver', 'materia:ver'],
   'pedidos:ver': ['produtos:ver', 'cadastros:ver', 'reps:ver'],
