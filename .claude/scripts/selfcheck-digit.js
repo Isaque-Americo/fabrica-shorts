@@ -64,7 +64,10 @@ const circMm = (mmPx, tol) => {
   });
   return [m.seg.length > 4 && m.seg.every(s => s.tipo === 'curva'), dv <= 1.5 * mmPx];
 };
+const rEsc = D.escalaFolha ? D.escalaFolha(4000, 3000) : 0;
 testes.push(
+  ['escalaFolha 1,5x1 m', D.escalaFolha && D.escalaFolha(1500, 1000), 0.5],
+  ['escalaFolha grande', rEsc > 0.5 && (4000 / rEsc) * (3000 / rEsc) <= 16e6, true],
   ['círculo mm 2 (tol 1)', circMm(2, 1), [true, true]],
   ['círculo mm 0.5 (tol 0.25)', circMm(0.5, 0.25), [true, true]],
   ['pintar soma', mRet.reduce((a, b) => a + b, 0), 120 * 90],

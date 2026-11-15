@@ -9,9 +9,9 @@
 <script src="molde/digit.js"></script>
 <script src="acesso.js"></script>
 <style>
-:root{--bg:#f4f4f3;--card:#ffffff;--tx:#18181b;--mut:#71717a;--bd:#e4e4e7;--ac:#c2410c;--fill:#f97316;--acx:#0e0e0f;--ok:#16a34a;--bad:#dc2626;--hd:#18181b;color-scheme:light}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--bad:#f87171;--hd:#f4f4f5;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--bad:#f87171;--hd:#f4f4f5;color-scheme:dark}
+:root{--bg:#f4f4f3;--card:#ffffff;--tx:#18181b;--mut:#71717a;--bd:#e4e4e7;--ac:#c2410c;--fill:#f97316;--acx:#0e0e0f;--ok:#16a34a;--bad:#dc2626;--hd:#18181b;--warn:#b45309;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--bad:#f87171;--hd:#f4f4f5;--warn:#fbbf24;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--bad:#f87171;--hd:#f4f4f5;--warn:#fbbf24;color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 'Inter',system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
@@ -38,7 +38,20 @@ input[type=text],input[type=number]{width:100%;min-height:44px;padding:8px 10px;
 .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
 .foto{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:4px;font-size:12px;color:var(--mut);min-width:0}
 .foto img{display:block;width:100%;height:110px;object-fit:contain;background:var(--bg);border-radius:4px}
-.foto .bad{color:var(--bad)}.foto .good{color:var(--ok)}
+.foto .bad{color:var(--bad)}.foto .good{color:var(--ok)}.foto .warn{color:var(--warn)}
+#m-v main{max-width:none;display:grid;grid-template-columns:220px 1fr;gap:16px;align-items:start}
+@media (max-width:800px){#m-v main{grid-template-columns:1fr}}
+.sel{display:block;width:100%;text-align:left;cursor:pointer;margin-bottom:8px;font:inherit;font-size:13px;color:var(--tx)}
+.sel.on{border-color:var(--ac);border-width:2px}
+#m-vis{overflow:auto;max-height:75vh;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
+#m-pl{position:relative;cursor:crosshair}
+#m-pl img{display:block;width:100%;height:100%;user-select:none;-webkit-user-drag:none}
+.cz{position:absolute;width:0;height:0}
+.cz i{position:absolute;left:-9px;top:-9px;width:18px;height:18px;border:2px solid var(--fill);border-radius:50%;background:rgba(249,115,22,.25);cursor:move;touch-action:none}
+.cz b{position:absolute;left:0;top:-34px;transform:translateX(-50%);background:var(--hd);color:var(--bg);padding:0 5px;border-radius:4px;font-size:12px;pointer-events:none}
+.cz button{position:absolute;left:11px;top:-26px;width:20px;height:20px;padding:0;border:0;border-radius:50%;background:var(--bad);color:#fff;cursor:pointer;line-height:20px}
+.cz-in{position:absolute;width:70px;min-height:32px!important;transform:translate(-50%,10px);z-index:2}
+#m-folha{max-width:100%;border:1px solid var(--bd);margin-top:8px}
 #dig-v.arrasta main{outline:2px dashed var(--ac);outline-offset:-6px}
 #toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
 </style>
@@ -68,10 +81,24 @@ input[type=text],input[type=number]{width:100%;min-height:44px;padding:8px 10px;
       <button class="btn pri" id="d-tirar">Tirar foto</button>
       <button class="btn" id="d-galeria">Da galeria</button>
     </div>
+    <button class="btn" id="d-montar" hidden>Marcar cruzes e montar a folha</button>
     <p class="vazio" id="d-solta" hidden>No computador, arraste as fotos para esta tela.</p>
     <div class="grade" id="d-fotos"></div>
     <input type="file" id="in-cam" accept="image/*" capture="environment" hidden>
     <input type="file" id="in-gal" accept="image/*" multiple hidden>
+  </main>
+</div>
+<div id="m-v" hidden>
+  <header class="topo"><button class="btn peq" id="m-volta">← Fotos</button><button class="btn peq" id="m-menos" aria-label="Diminuir">−</button><button class="btn peq" id="m-mais" aria-label="Ampliar">+</button><span class="vazio">Clique na cruz da foto e digite o rótulo (ex.: B2). Arraste para ajustar.</span></header>
+  <main>
+    <div id="m-lista"></div>
+    <div>
+      <div id="m-vis"><div id="m-pl"></div></div>
+      <div class="acoes"><button class="btn pri" id="m-monta">Montar folha</button></div>
+      <p class="vazio" id="m-prog" role="status"></p>
+      <p id="m-aviso" style="color:var(--warn)"></p>
+      <canvas id="m-folha" hidden></canvas><img id="m-folha-img" alt="Folha montada" style="max-width:100%" hidden>
+    </div>
   </main>
 </div>
 <div id="toast" role="status"></div>
@@ -134,14 +161,17 @@ async apagarArqs(l){await sessaoOk();if(l.length)ok(await bk().remove(l))}
 })();
 
 // ---- estado e telas (tela: null = lista; id = uma digitalização) ----
+let mont=false,MA=null,Z=0.25,sal=Promise.resolve(); // montar: tela aberta, arq da foto, zoom, fila de gravação
 let PODE=false,tela=null,DIG=null,fila=[],rodando=false; // fila: toda a fila do IndexedDB, de todas as digitalizações
 const urls=new Map(); // arq -> url (assinada ou do blob) já resolvida
 const dado=d=>({nome:'',tam:'',esp:500,fotos:[],folha:null,...d});
 
 async function render(){
-$('#lista-v').hidden=tela!==null;$('#dig-v').hidden=tela===null;
+$('#lista-v').hidden=tela!==null;$('#dig-v').hidden=tela===null||mont;$('#m-v').hidden=!(mont&&tela!==null);
 if(tela===null)return renderLista();
+if(mont)return renderMontar();
 const d=dado(DIG);
+$('#d-montar').hidden=!PODE||!d.fotos.length;
 $('#d-nome').textContent=d.nome||'(sem nome)';
 $('#d-info').textContent=[d.tam&&'Tamanho '+d.tam,'Espaçamento '+d.esp/10+' cm',d.fotos.length+' foto(s)'].filter(Boolean).join(' · ');
 $('#d-acoes').hidden=$('#d-solta').hidden=!PODE;
@@ -168,7 +198,7 @@ if(!d){toast('Digitalização não encontrada.');return}
 DIG=d;tela=id;location.hash=id;
 await render();processar();
 }
-async function irLista(){tela=null;DIG=null;soltarUrls();history.replaceState(null,'',location.pathname+location.search);try{await render()}catch(e){toast(ptErro(e))}}
+async function irLista(){mont=false;tela=null;DIG=null;soltarUrls();history.replaceState(null,'',location.pathname+location.search);try{await render()}catch(e){toast(ptErro(e))}}
 
 // ---- fotos: reduzir, guardar na fila, subir, acrescentar em fotos ----
 function soltarUrls(){for(const i of fila)if(i.url){URL.revokeObjectURL(i.url);i.url=null}}
@@ -213,9 +243,136 @@ if(tela===i.digId||tela===null)try{await render()}catch(e){}
 }
 addEventListener('online',()=>{fila.forEach(i=>i.estado='enviando');processar()});
 
+// ---- montar: marcar cruzes nas fotos e montar a folha (coordenadas em px da foto guardada, não da tela) ----
+const fmt=n=>n.toFixed(1).replace('.',',');
+const urlDe=arq=>urls.has(arq)?Promise.resolve(urls.get(arq)):B.urlFoto(arq).then(u=>(urls.set(arq,u),u));
+const fotoAt=()=>dado(DIG).fotos.find(f=>f.arq===MA);
+function estado(f,esp){ // ok: entra na montagem; c: cor
+const m=MoldeDigit.validarCruzes(f.cruzes,esp);
+if(m)return {t:m,c:'bad',ok:false};
+const {erro,n}=MoldeDigit.conferir(f.cruzes,esp);
+if(erro===null)return {t:`erro não conferido (só ${n} cruzes)`,c:'warn',ok:true};
+if(!isFinite(erro))return {t:'cruzes em linha reta — confira',c:'bad',ok:false};
+return erro>2?{t:`erro ${fmt(erro)} mm — refaça ou confira as cruzes`,c:'warn',ok:true}:{t:`erro ${fmt(erro)} mm`,c:'good',ok:true};
+}
+function renderMontar(){
+const d=dado(DIG);
+if(!d.fotos.some(f=>f.arq===MA))MA=d.fotos[0]&&d.fotos[0].arq;
+$('#m-lista').innerHTML=d.fotos.map((f,n)=>{const s=estado(f,d.esp);return `<button class="foto sel${f.arq===MA?' on':''}" data-a="mfoto" data-arq="${esc(f.arq)}">Foto ${n+1} · ${f.cruzes.length} cruz(es)<br><span class="${s.c}">${esc(s.t)}</span></button>`}).join('');
+desenhar();
+if(d.folha&&$('#m-folha').hidden)urlDe(d.folha.arq).then(u=>{$('#m-folha-img').src=u;$('#m-folha-img').hidden=false}).catch(()=>{});
+}
+function desenhar(){
+const f=fotoAt(),pl=$('#m-pl');
+if(!f){pl.innerHTML='';return}
+pl.style.width=f.w*Z+'px';pl.style.height=f.h*Z+'px';
+let im=pl.querySelector('img');
+if(!im||im.dataset.arq!==f.arq){
+pl.innerHTML='<img alt="Foto" draggable="false">';im=pl.firstChild;im.dataset.arq=f.arq;
+urlDe(f.arq).then(u=>{if(im.dataset.arq===f.arq)im.src=u}).catch(e=>toast(ptErro(e)));
+}
+pl.querySelectorAll('.cz,.cz-in').forEach(x=>x.remove());
+pl.insertAdjacentHTML('beforeend',f.cruzes.map((c,k)=>`<div class="cz" style="left:${c.x*Z}px;top:${c.y*Z}px"><i data-k="${k}"></i><b>${esc(c.rot)}</b>${PODE?`<button data-a="mdel" data-k="${k}" aria-label="Apagar ${esc(c.rot)}">×</button>`:''}</div>`).join(''));
+}
+// re-lê o doc antes de gravar (outro aparelho pode ter acrescentado fotos); gravações em série
+function persistir(){
+const arq=MA,cz=fotoAt().cruzes.map(c=>({...c}));
+sal=sal.then(async()=>{const d=dado(await B.dig(tela)),f=d.fotos.find(x=>x.arq===arq);if(!f)return;f.cruzes=cz;await B.gravar(tela,d)}).catch(e=>toast(ptErro(e)));
+}
+function mudou(){persistir();renderMontar()}
+function sugerir(f){
+const m=/^([A-Za-z]+)(\d+)$/.exec(f.cruzes.length?f.cruzes[f.cruzes.length-1].rot:'');
+return m?m[1].toUpperCase()+(+m[2]+1):'A1';
+}
+$('#m-pl').addEventListener('click',e=>{
+const pl=e.currentTarget,f=fotoAt();
+if(!PODE||!f||e.target.closest('.cz,.cz-in'))return;
+pl.querySelectorAll('.cz-in').forEach(x=>x.remove());
+const r=pl.getBoundingClientRect(),x=(e.clientX-r.left)/Z,y=(e.clientY-r.top)/Z;
+pl.insertAdjacentHTML('beforeend',`<input type="text" class="cz-in" maxlength="6" aria-label="Rótulo da cruz" style="left:${x*Z}px;top:${y*Z}px">`);
+const inp=pl.querySelector('.cz-in');inp.value=sugerir(f);inp.focus();inp.select();
+inp.onblur=()=>inp.remove();
+inp.onkeydown=ev=>{
+if(ev.key==='Escape')inp.remove();
+if(ev.key!=='Enter')return;
+const rot=inp.value.trim().toUpperCase();
+if(!MoldeDigit.rotMm(rot,dado(DIG).esp)){toast('Rótulo inválido: use letra e número, como A1.');return}
+inp.onblur=null;f.cruzes.push({rot,x:Math.round(x*10)/10,y:Math.round(y*10)/10});mudou();
+};
+});
+$('#m-pl').addEventListener('pointerdown',e=>{
+const i=e.target.closest('.cz i');if(!i||!PODE)return;
+const pl=$('#m-pl'),f=fotoAt(),c=f.cruzes[+i.dataset.k],el=i.parentNode,r=pl.getBoundingClientRect();
+i.setPointerCapture(e.pointerId);
+i.onpointermove=ev=>{c.x=Math.min(f.w,Math.max(0,Math.round((ev.clientX-r.left)/Z*10)/10));c.y=Math.min(f.h,Math.max(0,Math.round((ev.clientY-r.top)/Z*10)/10));el.style.left=c.x*Z+'px';el.style.top=c.y*Z+'px'};
+i.onpointerup=()=>{i.onpointermove=i.onpointerup=null;mudou()};
+});
+$('#d-montar').onclick=()=>{mont=true;render()};
+$('#m-volta').onclick=()=>{mont=false;render()};
+const zoom=k=>{Z=Math.min(2,Math.max(0.05,Z*k));desenhar()};
+$('#m-mais').onclick=()=>zoom(1.25);$('#m-menos').onclick=()=>zoom(0.8);
+
+// uma célula (quadrado de 4 cruzes) por vez: foto escolhida uma vez por célula (a mais perto do centro, como melhorFoto)
+// shortcut: todas as fotos ficam em memória como ImageData (~27 MB cada), ok para algumas dezenas de fotos
+async function montarFolha(){
+const M=MoldeDigit,d=dado(DIG),prog=t=>$('#m-prog').textContent=t,esp=d.esp;
+const est=d.fotos.map(f=>estado(f,esp)),fs=d.fotos.filter((f,k)=>est[k].ok);
+const cs=fs.map(f=>new Map(M.celulas(f.cruzes,esp).map(c=>[c.i+','+c.j,c])));
+const cob=new Set();cs.forEach(m=>m.forEach((c,k)=>cob.add(k)));
+if(!cob.size){toast('Nenhuma foto tem um quadrado completo de 4 cruzes marcadas.');return}
+const cel=[...cob].map(k=>k.split(',').map(Number));
+const i0=Math.min(...cel.map(c=>c[0])),j0=Math.min(...cel.map(c=>c[1])),i1=Math.max(...cel.map(c=>c[0]))+1,j1=Math.max(...cel.map(c=>c[1]))+1;
+const x0=i0*esp,y0=j0*esp,r=M.escalaFolha((i1-i0)*esp,(j1-j0)*esp),W=Math.ceil((i1-i0)*esp/r),Hh=Math.ceil((j1-j0)*esp/r);
+const imgs=[];
+for(const [n,f] of fs.entries()){
+prog(`Carregando foto ${n+1} de ${fs.length}…`);
+const bm=await createImageBitmap(await (await fetch(await urlDe(f.arq))).blob());
+const bw=bm.width,bh=bm.height,c=new OffscreenCanvas(bw,bh).getContext('2d',{willReadFrequently:true});c.drawImage(bm,0,0);bm.close();
+imgs.push(c.getImageData(0,0,bw,bh));
+}
+const out=new ImageData(W,Hh),o32=new Uint32Array(out.data.buffer);o32.fill(0xFFFFFFFF);
+for(const [n,[i,j]] of cel.entries()){
+if(n%4===0){prog(`Montando… ${Math.round(100*n/cel.length)}%`);await new Promise(ok=>setTimeout(ok))}
+const p={x:(i+0.5)*esp,y:(j+0.5)*esp};let k=-1,md=Infinity;
+fs.forEach((f,q)=>{const c=cs[q].get(i+','+j);if(!c)return;const u=M.aplicarH(c.H,p),dd=Math.hypot(u.x-f.w/2,u.y-f.h/2)/Math.max(f.w,f.h);if(dd<md){md=dd;k=q}});
+const h=cs[k].get(i+','+j).H,im=imgs[k],sw=im.width,sh=im.height,sd=im.data;
+const xa=Math.max(0,Math.ceil((i*esp-x0)/r-0.5)),xb=Math.min(W,Math.ceil(((i+1)*esp-x0)/r-0.5)),ya=Math.max(0,Math.ceil((j*esp-y0)/r-0.5)),yb=Math.min(Hh,Math.ceil(((j+1)*esp-y0)/r-0.5));
+for(let py=ya;py<yb;py++)for(let px=xa;px<xb;px++){
+const X=x0+(px+0.5)*r,Y=y0+(py+0.5)*r,w=h[6]*X+h[7]*Y+h[8];
+const u=(h[0]*X+h[1]*Y+h[2])/w-0.5,v=(h[3]*X+h[4]*Y+h[5])/w-0.5;
+if(!(u>=-0.5&&v>=-0.5&&u<=sw-0.5&&v<=sh-0.5))continue; // fora da foto: fica branco
+const ux=Math.min(sw-1,Math.max(0,Math.floor(u))),vy=Math.min(sh-1,Math.max(0,Math.floor(v))),ux1=Math.min(sw-1,ux+1),vy1=Math.min(sh-1,vy+1);
+const fx=Math.min(1,Math.max(0,u-ux)),fy=Math.min(1,Math.max(0,v-vy)),a=(vy*sw+ux)*4,b=(vy*sw+ux1)*4,c=(vy1*sw+ux)*4,e=(vy1*sw+ux1)*4,t=(py*W+px)*4;
+for(let q=0;q<3;q++)out.data[t+q]=(sd[a+q]*(1-fx)+sd[b+q]*fx)*(1-fy)+(sd[c+q]*(1-fx)+sd[e+q]*fx)*fy;
+out.data[t+3]=255;
+}
+}
+const cv=$('#m-folha');cv.width=W;cv.height=Hh;cv.getContext('2d').putImageData(out,0,0);
+const blob=await new Promise(ok=>cv.toBlob(ok,'image/jpeg',0.9));
+if(!blob)throw new Error('Não foi possível gerar a folha.');
+const g=cv.getContext('2d');g.strokeStyle='#dc2626';g.lineWidth=Math.max(2,W/500);
+for(const [i,j] of cel)g.strokeRect((i*esp-x0)/r,(j*esp-y0)/r,esp/r,esp/r); // só no que se vê; o JPEG gravado não leva o contorno
+cv.hidden=false;$('#m-folha-img').hidden=true;
+prog('Gravando a folha…');
+const arq=tela+'/folha.jpg';
+await B.subir(arq,blob);
+const d2=dado(await B.dig(tela));d2.folha={arq,mmPx:r,x0,y0,w:W,h:Hh};await B.gravar(tela,d2);
+DIG.folha=d2.folha;urls.delete(arq);
+const ruins=d.fotos.map((f,k)=>[k,est[k]]).filter(([k,s])=>s.ok&&s.c==='warn').map(([k,s])=>`Foto ${k+1} (${s.t})`);
+$('#m-aviso').textContent=ruins.length?'Atenção: '+ruins.join('; ')+'.':'';
+prog(`Folha montada: ${W}×${Hh} px, ${fmt(r)} mm por pixel, ${cel.length} quadrado(s).`);
+}
+$('#m-monta').onclick=async()=>{
+const b=$('#m-monta');b.disabled=true;
+try{await sal;await montarFolha()}catch(e){console.error(e);toast(ptErro(e));$('#m-prog').textContent=''}
+b.disabled=false;
+};
+
 // ---- eventos ----
 document.addEventListener('click',e=>{
 const b=e.target.closest('[data-a]');if(!b)return;
+if(b.dataset.a==='mfoto'){MA=b.dataset.arq;renderMontar()}
+if(b.dataset.a==='mdel'){const f=fotoAt();f.cruzes.splice(+b.dataset.k,1);mudou()}
 if(b.dataset.a==='abrir')abrir(b.dataset.id).catch(x=>toast(ptErro(x)));
 if(b.dataset.a==='retry'){const i=fila.find(x=>x.arq===b.dataset.arq);if(i){i.estado='enviando';render();processar()}}
 });

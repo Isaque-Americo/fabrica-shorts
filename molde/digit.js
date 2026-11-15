@@ -116,6 +116,13 @@
     return mel;
   }
 
+  // mm por pixel da folha: 0,5 e sobe de 0,25 em 0,25 até caber em maxPx pixels
+  function escalaFolha(wMm, hMm, maxPx = 16e6) {
+    let r = 0.5;
+    while ((wMm / r) * (hMm / r) > maxPx) r += 0.25;
+    return r;
+  }
+
   // ---- contorno automático (px; tudo iterativo, a folha pode ter vários megapixels) ----
 
   // máscara 0/1 da região 4-conectada de cor ≤ tol (RGB) da média 5×5 na semente; furos internos viram 1
@@ -234,7 +241,7 @@
     return { pts: pts.map(p => ({ x: p.x, y: p.y })), seg };
   }
 
-  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, celulas, conferir, cobertura, foraDaCobertura, melhorFoto, pintar, borda, simplificar, paraMolde };
+  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, celulas, conferir, cobertura, foraDaCobertura, melhorFoto, escalaFolha, pintar, borda, simplificar, paraMolde };
   g.MoldeDigit = MoldeDigit;
   if (typeof module !== 'undefined') module.exports = MoldeDigit;
 })(typeof window !== 'undefined' ? window : globalThis);
