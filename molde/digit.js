@@ -142,9 +142,9 @@
     inundar(mask, sy * w + sx, perto);
     // fundo = o que alcança a borda sem passar pela região; o resto é furo
     const fundo = new Uint8Array(n), livre = i => !mask[i];
-    const borda = i => { if (!fundo[i] && !mask[i]) inundar(fundo, i, livre); };
-    for (let x = 0; x < w; x++) { borda(x); borda((h - 1) * w + x); }
-    for (let y = 0; y < h; y++) { borda(y * w); borda(y * w + w - 1); }
+    const semear = i => { if (!fundo[i] && !mask[i]) inundar(fundo, i, livre); };
+    for (let x = 0; x < w; x++) { semear(x); semear((h - 1) * w + x); }
+    for (let y = 0; y < h; y++) { semear(y * w); semear(y * w + w - 1); }
     for (let i = 0; i < n; i++) if (!fundo[i]) mask[i] = 1;
     return mask;
   }
@@ -209,11 +209,11 @@
   }
 
   // vértices -> traços: giro > quina graus = quina; entre quinas fica linha, no resto curva Catmull-Rom (alças a 1/3)
-  function paraMolde(pts, opts = { quina: 35 }) {
-    const n = pts.length, lim = opts.quina;
+  function paraMolde(pts, opts = { quina: 35, passo: 1 }) {
+    const n = pts.length, lim = opts.quina ?? 35, mind = 2 * (opts.passo || 1); // passo = tamanho de 1 px na unidade dos pontos
     const P = k => pts[((k % n) + n) % n];
-    // vizinho no sentido s a ≥ 2 px (ignora a ponta de 1 px da escadinha de pixels)
-    const viz = (k, s) => { let j = k + s; for (let i = 0; i < n / 2 && Math.hypot(P(j).x - P(k).x, P(j).y - P(k).y) < 2; i++) j += s; return P(j); };
+    // vizinho no sentido s a ≥ 2 passos (ignora a ponta de 1 px da escadinha de pixels)
+    const viz = (k, s) => { let j = k + s; for (let i = 0; i < n / 2 && Math.hypot(P(j).x - P(k).x, P(j).y - P(k).y) < mind; i++) j += s; return P(j); };
     const giro = k => {
       const a = viz(k, -1), b = P(k), c = viz(k, 1);
       let d = Math.abs(Math.atan2(c.y - b.y, c.x - b.x) - Math.atan2(b.y - a.y, b.x - a.x)) * 180 / Math.PI;

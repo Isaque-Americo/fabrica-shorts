@@ -52,7 +52,21 @@ mol.seg.forEach((s, k) => {
   const a = mol.pts[k], b = mol.pts[(k + 1) % mol.pts.length];
   for (let i = 0; i <= 10; i++) { const t = i / 10, u = 1 - t, f = c => u * u * u * a[c] + 3 * u * u * t * s.c1[c] + 3 * u * t * t * s.c2[c] + t * t * t * b[c]; dev = Math.max(dev, Math.abs(Math.hypot(f('x') - 100, f('y') - 75) - 50)); }
 });
+// círculo em mm: coordenadas de px multiplicadas por mmPx; passo = mmPx
+const circMm = (mmPx, tol) => {
+  const b = D.borda(D.pintar(imCir, 200, 150, 100, 75, 60), 200, 150).map(p => ({ x: p.x * mmPx, y: p.y * mmPx }));
+  const m = D.paraMolde(D.simplificar(b, tol), { quina: 35, passo: mmPx });
+  let dv = 0;
+  m.seg.forEach((s, k) => {
+    if (s.tipo !== 'curva') return;
+    const a = m.pts[k], c = m.pts[(k + 1) % m.pts.length];
+    for (let i = 0; i <= 10; i++) { const t = i / 10, u = 1 - t, f = q => u * u * u * a[q] + 3 * u * u * t * s.c1[q] + 3 * u * t * t * s.c2[q] + t * t * t * c[q]; dv = Math.max(dv, Math.abs(Math.hypot(f('x') - 100 * mmPx, f('y') - 75 * mmPx) - 50 * mmPx)); }
+  });
+  return [m.seg.length > 4 && m.seg.every(s => s.tipo === 'curva'), dv <= 1.5 * mmPx];
+};
 testes.push(
+  ['círculo mm 2 (tol 1)', circMm(2, 1), [true, true]],
+  ['círculo mm 0.5 (tol 0.25)', circMm(0.5, 0.25), [true, true]],
   ['pintar soma', mRet.reduce((a, b) => a + b, 0), 120 * 90],
   ['borda fechada sem repetir', bRet.length > 4 && (bRet[0].x !== bRet[bRet.length - 1].x || bRet[0].y !== bRet[bRet.length - 1].y), true],
   ['simplificar 4 cantos', sRet.length, 4],
