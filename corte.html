@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="molde/encaixe.js"></script>
 <script src="molde/ordem.js"></script>
+<script src="acesso.js"></script>
 <style>
 :root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;color-scheme:light}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#10151f;--card:#18202e;--tx:#e8ecf3;--mut:#93a0b5;--bd:#2a3447;--ac:#6ea8fe;--acx:#0b1424;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#0b1020;color-scheme:dark}}
@@ -21,6 +22,7 @@ button.pri{background:var(--ac);color:var(--acx)}
 button.ghost,button.sm{background:none;color:var(--ac)}
 button.sm{padding:4px 10px;font-size:13px}
 button.perigo{color:var(--bad);border-color:var(--bad)}
+body.leitura #btn-nova,body.leitura #btn-apagar,body.leitura [data-apagar],body.leitura .acoes{display:none}
 button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 input,select,textarea{font:inherit;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
 a{color:var(--ac)}
@@ -248,6 +250,7 @@ materiais:()=>doCol('materiais')
 })();
 
 // ---- estado ----
+let PODE=false,PODE_PED=false; // moldes:mexer / pedidos:mexer; sem PODE a página é só leitura
 let O=null,ordId=null,estado='salvo',ver=0,salvando=false,timer=null,erroSalvar='';
 let PRODS=[],MATS=[],tecAtual=null,enfAtual=null;
 const RASC=()=>'ordem:'+ordId;
@@ -268,12 +271,12 @@ s.className=e==='salvo'?'ok':erroSalvar&&e==='nao-salvo'?'erro':'';
 s.textContent=e==='salvo'?'Salvo':e==='salvando'?'Salvando…':erroSalvar?'Não salvo — tentando de novo':'Não salvo';
 s.title=e==='nao-salvo'&&erroSalvar?erroSalvar:'';
 }
-function sujou(){ver++;erroSalvar='';marcar('nao-salvo');agendar()}
+function sujou(){if(!PODE)return;ver++;erroSalvar='';marcar('nao-salvo');agendar()}
 function agendar(ms=1500){clearTimeout(timer);timer=setTimeout(salvar,ms)}
 async function salvar(){
 clearTimeout(timer);
 if(salvando){agendar();return}
-if(estado==='salvo')return;
+if(estado==='salvo'||!PODE)return;
 salvando=true;
 const v=ver,t=Date.now(),doc={...structuredClone(O),resumo:resumoDe(O),salvoEm:t};
 try{localStorage.setItem(RASC(),JSON.stringify({em:t,o:doc}))}catch(e){}
@@ -294,7 +297,7 @@ const ords=(await B.ordens()).map(r=>({id:r.id,o:MO.normalizar(r.data)})).sort((
 $('#aviso').hidden=true;$('#lista-v').hidden=false;
 const tb=$('#lista');
 if(!ords.length){tb.innerHTML='<tr><td colspan="6" class="vazio">Nenhuma ordem ainda. Aprove um pedido no app ou use “Nova ordem”.</td></tr>';return}
-tb.innerHTML=ords.map(x=>`<tr><td>${x.o.pedidoId?'#'+esc(x.o.pedidoNum??'?'):'avulsa'}</td><td><a href="${esc(urlCom('id',x.id))}">${esc(x.o.nome||'(sem nome)')}</a></td><td>${esc(x.o.refs.join(', '))}</td><td>${dataBR(x.o.criadaEm)}</td><td class="n" data-metros="${esc(x.id)}">…</td><td><a href="${esc(urlCom('id',x.id))}">Editar</a> <button class="sm perigo" type="button" data-apagar="${esc(x.id)}">Apagar</button></td></tr>`).join('');
+tb.innerHTML=ords.map(x=>`<tr><td>${x.o.pedidoId?'#'+esc(x.o.pedidoNum??'?'):'avulsa'}</td><td><a href="${esc(urlCom('id',x.id))}">${esc(x.o.nome||'(sem nome)')}</a></td><td>${esc(x.o.refs.join(', '))}</td><td>${dataBR(x.o.criadaEm)}</td><td class="n" data-metros="${esc(x.id)}">…</td><td><a href="${esc(urlCom('id',x.id))}">${PODE?'Editar':'Abrir'}</a>${PODE&&(!x.o.pedidoId||PODE_PED)?` <button class="sm perigo" type="button" data-apagar="${esc(x.id)}">Apagar</button>`:''}</td></tr>`).join('');
 tb.querySelectorAll('[data-apagar]').forEach(b=>b.onclick=()=>apagarOrdem(b.dataset.apagar,ords.find(x=>x.id===b.dataset.apagar).o,false));
 // resumo gravado a cada salvamento; ordem antiga sem resumo é calculada aqui
 for(const x of ords){
@@ -306,7 +309,7 @@ const td=tb.querySelector(`[data-metros="${CSS.escape(x.id)}"]`);if(td)td.textCo
 // metros e peças da ordem para a lista; null quando o encaixe falha
 function resumoDe(o){try{const r=MO.resultados(o,o.enfestos.map(e=>MO.calcularEnfesto(e,o,PRODS,MATS)),MATS);return {metros:r.metros,pecas:r.pecas}}catch(e){console.error(e);return {metros:null,pecas:null}}}
 // ordem de pedido: o pedido volta para Pendente antes de apagar; se o passo 2 falhar, apagar de novo é seguro
-async function apagarOrdem(id,o,dentro){
+async function apagarOrdem(id,o,dentro){if(!PODE||(o.pedidoId&&!PODE_PED))return toast('Sem permissão para apagar esta ordem.');
 if(!confirm(o.pedidoId?'Apagar a ordem do pedido #'+(o.pedidoNum??'?')+'? Se o pedido estiver Aprovado, ele volta para Pendente.':'Apagar a ordem “'+(o.nome||'(sem nome)')+'”?'))return;
 try{
 if(o.pedidoId)await B.voltarPedido(o.pedidoId,id);
@@ -315,7 +318,7 @@ if(dentro){clearTimeout(timer);estado='salvo';try{localStorage.removeItem('ordem
 }catch(e){console.error(e);toast('Não foi possível apagar: '+ptErro(e))}
 if(!dentro)abrirLista().catch(e=>console.error(e));
 }
-async function criarEIr(doc){doc.resumo=resumoDe(doc);const id=await B.criar(doc);location.href=urlCom('id',id)}
+async function criarEIr(doc){if(!PODE)return;doc.resumo=resumoDe(doc);const id=await B.criar(doc);location.href=urlCom('id',id)}
 
 // ---- ordem ----
 async function abrirOrdem(id,doc){
@@ -331,7 +334,7 @@ $('#aviso').hidden=true;$('#ordem-v').hidden=false;
 $('#volta').href=urlCom();
 $('#nome').value=O.nome;
 $('#ped-info').textContent=O.pedidoId?'Pedido #'+(O.pedidoNum??'?')+(O.refs.length?' · '+O.refs.join(', '):''):'';
-$('#btn-apagar').onclick=()=>apagarOrdem(id,O,true);
+$('#btn-apagar').onclick=()=>apagarOrdem(id,O,true);$('#btn-apagar').style.display=PODE&&(!O.pedidoId||PODE_PED)?'':'none';$('#nome').readOnly=!PODE;
 marcar('salvo');if(pendente)sujou();
 render();
 }
@@ -433,7 +436,7 @@ el.innerHTML=`<h1>${esc(O.nome||'Ordem de corte')}</h1><p class="vazio">Criada e
 }
 window.addEventListener('beforeprint',montarRel);
 $('#btn-rel').onclick=()=>{montarRel();window.print()};
-function restaurar(foco){if(foco){const el=document.querySelector(`[data-foco="${CSS.escape(foco)}"]`);if(el)el.focus()}}
+function restaurar(foco){if(!PODE)document.querySelectorAll('#enf-corpo input,#enf-corpo select,#enf-corpo button:not([data-acao=props])').forEach(x=>x.disabled=true);if(foco){const el=document.querySelector(`[data-foco="${CSS.escape(foco)}"]`);if(el)el.focus()}}
 
 function itemHtml(e,it,i,aba){
 const p=prod(it.produtoId),pn=pecasDe(p,aba),k=`${i}-`;
@@ -524,7 +527,7 @@ $('#pr-enf-l').textContent=e.nome;
 $('#pr-cam').value=e.camadas;$('#pr-alt').value=e.alturaMax||'';$('#pr-comp').value=campo(e.compMax/1000);
 $('#pr-cab').value=campo(e.cabeceira/10);$('#pr-oe').value=campo(e.ourelaE/10);$('#pr-od').value=campo(e.ourelaD/10);$('#pr-sent').value=e.sentido;
 }
-propsMat();
+propsMat();if(!PODE)d.querySelectorAll('input,textarea,select').forEach(x=>x.disabled=true);
 d.showModal();
 }
 function propsMat(){
@@ -553,13 +556,15 @@ window.addEventListener('beforeunload',e=>{if(O&&estado!=='salvo'){e.preventDefa
 
 async function iniciar(){
 try{
+let perfil=null;
 if(!LOCAL){
 const {data:{session}}=await sb.auth.getSession();
 const {data:{user}}=session?await sb.auth.getUser():{data:{}};
 if(!session||!user)return bloquear('Entre no app para ver as ordens de corte.',true);
-const {data:perfil}=await sb.from('user_profiles').select('role').eq('user_id',user.id).maybeSingle();
-if(!perfil||perfil.role!=='admin')return bloquear('Só administradores veem as ordens de corte.');
+({data:perfil}=await sb.from('user_profiles').select('role,is_principal,permissoes').eq('user_id',user.id).maybeSingle());
+if(!Acesso.pode(perfil,'moldes','ver'))return bloquear('Só administradores veem as ordens de corte.');
 }
+PODE=LOCAL||Acesso.pode(perfil,'moldes','mexer');PODE_PED=LOCAL||Acesso.pode(perfil,'pedidos','mexer');document.body.classList.toggle('leitura',!PODE);
 const [ps,ms]=await Promise.all([B.produtos(),B.materiais()]);
 PRODS=ps.map(r=>({...r.data,id:r.id}));MATS=ms.map(r=>({...r.data,id:r.id}));
 const id=Q.get('id');

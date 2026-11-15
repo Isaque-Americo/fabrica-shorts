@@ -9,6 +9,7 @@
 <script src="molde/encaixe.js"></script>
 <script src="molde/ordem.js"></script>
 <script src="molde/exporta.js"></script>
+<script src="acesso.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
 :root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;
@@ -452,8 +453,8 @@ if(!LOCAL){
 const {data:{session}}=await sb.auth.getSession();
 const {data:{user}}=session?await sb.auth.getUser():{data:{}};
 if(!session||!user)return bloquear('Entre no app para ver o enfesto.',true);
-const {data:perfil}=await sb.from('user_profiles').select('role').eq('user_id',user.id).maybeSingle();
-if(!perfil||perfil.role!=='admin')return bloquear('Só administradores veem as ordens de corte.');
+const {data:perfil}=await sb.from('user_profiles').select('role,is_principal,permissoes').eq('user_id',user.id).maybeSingle();
+if(!Acesso.pode(perfil,'moldes','ver'))return bloquear('Só administradores veem as ordens de corte.');
 }
 const id=Q.get('ordem'),enfId=Q.get('enf');
 if(!id||!enfId)return bloquear('Abra o enfesto pela ordem de corte.');

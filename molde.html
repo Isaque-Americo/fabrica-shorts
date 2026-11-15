@@ -8,6 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="molde/geo.js"></script>
 <script src="molde/modelo.js"></script>
+<script src="acesso.js"></script>
 <script src="molde/desenho.js"></script>
 <style>
 :root{--bg:#f8f9fa;--card:#ffffff;--tx:#212529;--mut:#6c757d;--bd:#dee2e6;--ac:#007bff;--acx:#ffffff;--ok:#28a745;--warn:#ffc107;--bad:#dc3545;--hd:#343a40;
@@ -90,6 +91,7 @@ dialog h3{margin:0 0 12px}
 #props p{margin:8px 0 0}
 select{font:inherit;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
 select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
+body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.leitura #btn-desfazer,body.leitura #btn-refazer,body.leitura #btn-extrair,body.leitura #m-add{display:none}
 #ferramentas button:disabled,#btn-extrair:disabled,#props button:disabled{opacity:.4;cursor:not-allowed}
 #tams button{border-color:var(--c);color:var(--tx);min-width:34px}
 #tams button[aria-pressed="true"]{background:var(--c);color:var(--card)}
@@ -330,6 +332,7 @@ fotoUrl:f=>f&&!f.startsWith('data:')?SB_URL+'/storage/v1/object/public/produtos/
 })();
 
 // ---- estado global (usado pelas Tasks 5–6) ----
+let PODE=false; // moldes:mexer; sem PODE o editor é só leitura
 let M=null,H=null,estado='salvo',molId=null;
 let ver=0,salvando=false,timer=null,erroSalvar='',ligadosSalvos=[],zoom=1;
 // desenho: vx,vy = canto da vista em mm; sel = ids de traços/pontos soltos/textos selecionados (Task 6 usa); op = ação em curso
@@ -374,16 +377,16 @@ desenharPecas();
 }
 
 // alteração que vale como passo do histórico
-function alterou(){H.gravar(M);sujou()}
+function alterou(){if(!PODE)return;H.gravar(M);sujou()}
 // marca não salvo, redesenha e agenda salvar (sem passo no histórico)
-function sujou(){ver++;erroSalvar='';pontaErro=null;marcar('nao-salvo');desenhar();desenharPainel();desenharMed();agendar()}
+function sujou(){if(!PODE)return;ver++;erroSalvar='';pontaErro=null;marcar('nao-salvo');desenhar();desenharPainel();desenharMed();agendar()}
 function agendar(ms=1500){clearTimeout(timer);timer=setTimeout(salvar,ms)}
-function aplicar(m){M=MM.normalizar(m);$('#nome').value=M.nome;sujou()}
+function aplicar(m){if(!PODE)return;M=MM.normalizar(m);$('#nome').value=M.nome;sujou()}
 
 async function salvar(){
 clearTimeout(timer);
 if(salvando){agendar();return}
-if(estado==='salvo')return;
+if(estado==='salvo'||!PODE)return;
 salvando=true;
 const v=ver,t=Date.now(),doc={...structuredClone(M),salvoEm:t};
 try{localStorage.setItem(RASC(),JSON.stringify({em:t,m:doc}))}catch(e){}
@@ -476,12 +479,14 @@ async function abrir(){
 let id=Q.get('id');const pid=Q.get('produto');
 let doc=id?await B.molde(id):null,pendente=false,criado=false;
 if(id&&!doc)return bloquear('Molde não encontrado.');
+const SEM_CRIAR='Você pode ver moldes, mas não criar.';
 if(!id&&pid){
 const achado=await B.moldePorProduto(pid);
 if(achado){id=achado.id;doc=achado.data}
 else{
 const p=await B.produto(pid);
 if(!p)return bloquear('Produto não encontrado.');
+if(!PODE)return bloquear(SEM_CRIAR);
 doc=MM.novo([p.ref,p.nome].filter(Boolean).join(' ')||'Novo molde');
 molId=null;
 if(!podeLigar(p))return bloquear('Molde não criado. O produto continua com o molde que já tem.');
@@ -494,6 +499,7 @@ pendente=criado=true; // primeiro salvamento grava molId/mol no produto
 }
 }
 if(!id&&!pid&&Q.get('novo')==='1'){ // "Criar molde" do menu do app: molde sem produto; as Referências ligam depois
+if(!PODE)return bloquear(SEM_CRIAR);
 doc=MM.novo('Novo molde');
 molId=null;
 const g=await dlgGrade(doc,true);
@@ -508,18 +514,19 @@ molId=id;
 const u=new URLSearchParams(location.search);u.delete('produto');u.delete('novo');u.set('id',id);history.replaceState(null,'','?'+u);
 M=MM.normalizar(doc);ligadosSalvos=criado?[]:[...M.produtoIds]; // recém-criado: o produto ainda não tem molId, tem de ligar
 let r=null;try{r=JSON.parse(localStorage.getItem(RASC()))}catch(e){}
-if(r&&r.em>(doc.salvoEm||0)){
+if(PODE&&r&&r.em>(doc.salvoEm||0)){
 if(confirm('Há alterações deste molde de '+new Date(r.em).toLocaleString('pt-BR')+' que não chegaram ao servidor. Recuperar?')){M=MM.normalizar(r.m);pendente=true}
 else try{localStorage.removeItem(RASC())}catch(e){}
 }
 H=MM.historico();H.gravar(M);
-$('#aviso').hidden=true;$('#editor').hidden=false;$('#nome').value=M.nome;
+$('#aviso').hidden=true;$('#editor').hidden=false;$('#nome').value=M.nome;$('#nome').readOnly=!PODE;document.body.classList.toggle('leitura',!PODE);
+for(const s of ['#lista-pecas','#props','#aba-medidas','#aba-grad'])$(s).inert=!PODE;
 tamVer=M.base;
 marcar('salvo');if(pendente)sujou();else{desenhar();desenharPainel()}
 mostrarAvisos(MM.molParaProduto(M).avisos);
 B.tecidos().then(l=>{tecidos=l;preencherProps();desenhar()}).catch(e=>{console.error(e);toast('Lista de tecidos não carregou: '+ptErro(e))});
 // grade sem o base: molParaProduto sai sem peças e o salvar não grava o mol
-if(M.grade.length&&!M.grade.includes(M.base)){
+if(PODE&&M.grade.length&&!M.grade.includes(M.base)){
 const t=`A grade deste molde não tem o tamanho base (${M.base}). Escolha a grade e o tamanho base.`;
 toast(t);abrirGrade(t);
 }
@@ -591,13 +598,15 @@ const fm=$('#foto-mini');fm.hidden=!u;if(u)fm.firstElementChild.src=u;
 
 async function iniciar(){
 try{
+let perfil=null;
 if(!LOCAL){
 const {data:{session}}=await sb.auth.getSession();
 const {data:{user}}=session?await sb.auth.getUser():{data:{}};
 if(!session||!user)return bloquear('Entre no app para editar moldes.',true);
-const {data:perfil}=await sb.from('user_profiles').select('role').eq('user_id',user.id).maybeSingle();
-if(!perfil||perfil.role!=='admin')return bloquear('Só administradores editam moldes.');
+({data:perfil}=await sb.from('user_profiles').select('role,is_principal,permissoes').eq('user_id',user.id).maybeSingle());
+if(!Acesso.pode(perfil,'moldes','ver'))return bloquear('Só administradores editam moldes.');
 }
+PODE=LOCAL||Acesso.pode(perfil,'moldes','mexer');
 await abrir();
 }catch(e){console.error(e);bloquear('Não foi possível abrir o molde. '+ptErro(e))}
 }
@@ -1134,7 +1143,7 @@ tela.addEventListener('pointerdown',e=>{
 if(!M)return;
 if(e.button===1||(e.button===0&&espaco)){pan={x:e.clientX,y:e.clientY,vx,vy};tela.setPointerCapture(e.pointerId);e.preventDefault();return}
 if(e.button===2){op=null;desenhar();return}
-if(e.button!==0)return;
+if(e.button!==0||!PODE)return;
 if(foraBase()){toast('Edite no tamanho base');return}
 if(modoPeca){e.preventDefault();return}
 tela.setPointerCapture(e.pointerId);
@@ -1144,11 +1153,11 @@ tela.addEventListener('pointermove',e=>{
 if(!M)return;ultCli={x:e.clientX,y:e.clientY};
 if(pan){vx=pan.vx-(e.clientX-pan.x)/zoom;vy=pan.vy-(e.clientY-pan.y)/zoom;desenhar();return}
 const p=mm(e);
-if(foraBase())return;
+if(foraBase()||!PODE)return;
 rato=ferr==='sel'||ferr==='grad'?null:grudar(p);
 T[ferr].move&&T[ferr].move(p,e);desenhar();
 });
-tela.addEventListener('pointerup',e=>{if(!M)return;if(pan){pan=null;return}if(e.button!==0||foraBase())return;if(modoPeca)cliquePeca(mm(e),e);else if(T[ferr].up)T[ferr].up(mm(e),e)});
+tela.addEventListener('pointerup',e=>{if(!M)return;if(pan){pan=null;return}if(e.button!==0||foraBase()||!PODE)return;if(modoPeca)cliquePeca(mm(e),e);else if(T[ferr].up)T[ferr].up(mm(e),e)});
 tela.addEventListener('pointerleave',()=>{if(rato){rato=null;desenhar()}});
 tela.addEventListener('contextmenu',e=>e.preventDefault());
 tela.addEventListener('wheel',e=>{if(!M)return;e.preventDefault();zoomEm(e.clientX,e.clientY,Math.pow(1.0015,-e.deltaY))},{passive:false});
@@ -1157,6 +1166,7 @@ function zoomEm(cx,cy,f){const r=tela.getBoundingClientRect(),px=cx-r.left,py=cy
 function zoomMeio(f){const r=tela.getBoundingClientRect();zoomEm(r.left+r.width/2,r.top+r.height/2,f)}
 document.addEventListener('keydown',e=>{
 if(!M||e.ctrlKey||e.metaKey||e.altKey||e.target.closest('input,textarea,dialog,select'))return;
+if(!PODE&&e.key!==' ')return;
 const k=e.key;
 if(foraBase()&&k!==' '&&k!=='Escape')return;
 if(op&&T[ferr].digitado&&/^[0-9,.\-]$/.test(k)){e.preventDefault();abrirMedida(k,ultCli.x,ultCli.y);return}
