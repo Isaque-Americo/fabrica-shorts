@@ -23,6 +23,9 @@ const Hr = D.cantosRet(fr(800, 500), 800, 500), pr = D.aplicarH(Hr, { x: 400, y:
 const testes = [
   ['cantosRet mapeia o centro', Math.hypot(pr.x - pv.x, pr.y - pv.y) < 1e-6, true],
   ['cantosRet falta um canto', D.cantosRet(fr(800, 500).slice(0, 3), 800, 500), null],
+  // ordem do clique não importa: cantos achados pela posição na foto (rótulos errados de propósito)
+  ['cantosRet embaralhado', (() => { const e = fr(800, 500).map((c, i) => ({ ...c, rot: ['B2', 'A1', 'B1', 'A2'][i] })).reverse(); const p = D.aplicarH(D.cantosRet(e, 800, 500), { x: 400, y: 250 }); return Math.hypot(p.x - pv.x, p.y - pv.y) < 1e-6; })(), true],
+  ['ordenarCantos rótulos', D.ordenarCantos(fr(800, 500).reverse()).map(c => c.rot), ['A1', 'A2', 'B1', 'B2']],
   ['desvioDiag exata', D.desvioDiag(800, 500, Math.hypot(800, 500)) < 1e-9, true],
   ['desvioDiag 10 mm', Math.abs(D.desvioDiag(800, 500, Math.hypot(800, 500) + 10) - 10) < 1e-9, true],
   ['rotMm B3', D.rotMm('B3', esp), { x: 1000, y: 500 }],

@@ -65,10 +65,18 @@
   }
 
   // retângulo de 4 cantos (A1 cima-esq, A2 cima-dir, B2 baixo-dir, B1 baixo-esq), w×h em mm; H leva mm -> px da foto
+  // os 4 cantos pela posição na foto (a ordem do clique não importa): cima-esq A1, cima-dir A2, baixo-esq B1, baixo-dir B2
+  // shortcut: supõe a foto com o retângulo "em pé" (largura na horizontal); foto girada 90° troca w com h
+  function ordenarCantos(cruzes) {
+    if (cruzes.length < 4) return null;
+    const porY = [...cruzes].sort((a, b) => a.y - b.y), ex = (a, b) => a.x - b.x;
+    const [tl, tr] = porY.slice(0, 2).sort(ex), [bl, br] = porY.slice(2, 4).sort(ex);
+    return [{ ...tl, rot: 'A1' }, { ...tr, rot: 'A2' }, { ...bl, rot: 'B1' }, { ...br, rot: 'B2' }];
+  }
   function cantosRet(cruzes, w, h) {
-    const q = ['A1', 'A2', 'B2', 'B1'].map(r => cruzes.find(c => c.rot.toUpperCase() === r));
-    if (q.some(c => !c)) return null;
-    return homografia([{ x: 0, y: 0 }, { x: w, y: 0 }, { x: w, y: h }, { x: 0, y: h }], q);
+    const q = ordenarCantos(cruzes);
+    if (!q) return null;
+    return homografia([{ x: 0, y: 0 }, { x: w, y: 0 }, { x: 0, y: h }, { x: w, y: h }], q);
   }
 
   // quanto a diagonal medida com a trena foge do retângulo ideal (mm): fita fora de esquadro ou medida errada
@@ -296,7 +304,7 @@
     return { ang, tx: (P1.x + P2.x) / 2 - r.x - f.x0, ty: (P1.y + P2.y) / 2 - r.y - f.y0 };
   }
 
-  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, sugerirRot, cantosRet, desvioDiag, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, pintar, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
+  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, sugerirRot, cantosRet, ordenarCantos, desvioDiag, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, pintar, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
   g.MoldeDigit = MoldeDigit;
   if (typeof module !== 'undefined') module.exports = MoldeDigit;
 })(typeof window !== 'undefined' ? window : globalThis);

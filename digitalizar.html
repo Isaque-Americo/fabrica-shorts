@@ -305,14 +305,16 @@ return r.blob();
 }
 const fotoAt=()=>dado(DIG).fotos.find(f=>f.arq===MA);
 // modo retângulo: cantos A1 cima-esq, A2 cima-dir, B2 baixo-dir, B1 baixo-esq (mostrados como 1 a 4)
-const CANTOS=[['A1','1','de cima, à esquerda'],['A2','2','de cima, à direita'],['B2','3','de baixo, à direita'],['B1','4','de baixo, à esquerda']];
-const rotVis=rot=>dado(DIG).ret?(CANTOS.find(c=>c[0]===String(rot).toUpperCase())||[,rot])[1]:rot;
-const proximoCanto=f=>CANTOS.find(c=>!f.cruzes.some(x=>x.rot.toUpperCase()===c[0]));
+// modo retângulo: a ordem do clique não importa; com 4 cantos, os rótulos vêm da posição na foto (MoldeDigit.ordenarCantos)
+const CANTOS={A1:'1 cima-esq',A2:'2 cima-dir',B1:'3 baixo-esq',B2:'4 baixo-dir'};
+const rotVis=rot=>dado(DIG).ret?(CANTOS[String(rot).toUpperCase()]||rot):rot;
+const proximoCanto=f=>f.cruzes.length<4?{n:f.cruzes.length+1}:null;
+const rotularCantos=f=>{if(dado(DIG).ret&&f.cruzes.length>=4)f.cruzes=MoldeDigit.ordenarCantos(f.cruzes)};
 function estado(f,esp){ // ok: entra na montagem; c: cor
 const ret=dado(DIG).ret;
 if(ret){
 const falta=proximoCanto(f);
-if(falta)return {t:`marque o canto ${falta[1]} (${falta[2]})`,c:'bad',ok:false};
+if(falta)return {t:`faltam ${5-falta.n} canto(s): clique nos 4 cantos da fita`,c:'bad',ok:false};
 if(!MoldeDigit.cantosRet(f.cruzes,ret.w,ret.h))return {t:'cantos em linha reta — confira',c:'bad',ok:false};
 const dd=MoldeDigit.desvioDiag(ret.w,ret.h,ret.diag);
 return dd>2?{t:`a diagonal medida difere ${fmt(dd)} mm do esperado — confira a fita e a trena`,c:'warn',ok:true}:{t:'4 cantos marcados, diagonal confere',c:'good',ok:true};
@@ -329,7 +331,7 @@ const d=dado(DIG);
 $('#m-depois').hidden=!d.folha;
 if(!d.fotos.some(f=>f.arq===MA))MA=d.fotos[0]&&d.fotos[0].arq;
 const fa=fotoAt(),pc=d.ret&&fa&&proximoCanto(fa);
-$('#m-dica').innerHTML=d.ret?(pc?`Clique no <b>canto ${pc[1]}</b> (${pc[2]}) do retângulo de fita.`:'4 cantos marcados. Arraste para ajustar.'):'Clique em cada cruz e confira o rótulo. Letra = linha (A em cima), número = coluna (1 à esquerda): <b>A1 A2</b> em cima, <b>B1 B2</b> embaixo. Arraste para ajustar.';
+$('#m-dica').innerHTML=d.ret?(pc?`Clique nos <b>4 cantos</b> do retângulo de fita, em qualquer ordem (falta${pc.n<4?'m':''} ${5-pc.n}). Use o + para ampliar.`:'4 cantos marcados. Arraste para ajustar.'):'Clique em cada cruz e confira o rótulo. Letra = linha (A em cima), número = coluna (1 à esquerda): <b>A1 A2</b> em cima, <b>B1 B2</b> embaixo. Arraste para ajustar.';
 $('#m-lista').innerHTML=d.fotos.map((f,n)=>{const s=estado(f,d.esp);return `<button class="foto sel${f.arq===MA?' on':''}" data-a="mfoto" data-arq="${esc(f.arq)}">Foto ${n+1} · ${f.cruzes.length} cruz(es)<br><span class="${s.c}">${esc(s.t)}</span></button>`}).join('');
 desenhar();
 if(d.folha&&$('#m-folha').hidden)urlDe(d.folha.arq).then(u=>{$('#m-folha-img').src=u;$('#m-folha-img').hidden=false}).catch(()=>{});
@@ -351,7 +353,7 @@ function persistir(){
 const arq=MA,cz=fotoAt().cruzes.map(c=>({...c}));
 sal=sal.then(async()=>{const d=dado(await B.dig(tela)),f=d.fotos.find(x=>x.arq===arq);if(!f)return;f.cruzes=cz;await B.gravar(tela,d)}).catch(e=>toast(ptErro(e)));
 }
-function mudou(){persistir();renderMontar()}
+function mudou(){const f=fotoAt();if(f)rotularCantos(f);persistir();renderMontar()}
 const sugerir=f=>MoldeDigit.sugerirRot(f.cruzes,dado(DIG).esp);
 $('#m-pl').addEventListener('click',e=>{
 const pl=e.currentTarget,f=fotoAt();
@@ -359,8 +361,8 @@ if(!PODE||!f||e.target.closest('.cz,.cz-in'))return;
 pl.querySelectorAll('.cz-in').forEach(x=>x.remove());
 const r=pl.getBoundingClientRect(),x=(e.clientX-r.left)/Z,y=(e.clientY-r.top)/Z;
 if(dado(DIG).ret){ // modo retângulo: o clique já é o próximo canto, sem digitar rótulo
-const pc=proximoCanto(f);if(!pc)return toast('Os 4 cantos já estão marcados. Arraste para ajustar ou apague um com ×.');
-f.cruzes.push({rot:pc[0],x:Math.round(x*10)/10,y:Math.round(y*10)/10});return mudou();
+if(!proximoCanto(f))return toast('Os 4 cantos já estão marcados. Arraste para ajustar ou apague um com ×.');
+f.cruzes.push({rot:'C'+f.cruzes.length,x:Math.round(x*10)/10,y:Math.round(y*10)/10});return mudou(); // rótulo provisório até ter os 4
 }
 pl.insertAdjacentHTML('beforeend',`<input type="text" class="cz-in" maxlength="6" aria-label="Rótulo da cruz" style="left:${x*Z}px;top:${y*Z}px">`);
 const inp=pl.querySelector('.cz-in');inp.value=sugerir(f);inp.focus();inp.select();
