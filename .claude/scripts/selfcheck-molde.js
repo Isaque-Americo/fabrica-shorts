@@ -151,6 +151,7 @@ testes.push(
   ['molParaProduto fio 45 caixa', [prodQd.pecas[0].w, prodQd.pecas[0].h], [cxQd.w, cxQd.h], 1],
   ['molParaProduto oculta fica fora', M.molParaProduto({ ...qd, pecas: [{ ...qd.pecas[0], visivel: false }] }).pecas.length, 0],
   ['normalizar vazio', [nVazio.pontos, nVazio.tracos, nVazio.pecas, nVazio.base], [{}, [], [], 'M']],
+  ['normalizar fundos padrao', [nVazio.fundos, M.normalizar({ fundos: { M: { dig: 'd1' } } }).fundos], [{}, { M: { dig: 'd1' } }]],
   ['normalizar margem padrao', M.normalizar({ pecas: [{ id: 'a' }] }).pecas[0].margem, 10],
   ['novo', [M.novo('x').nome, M.novo('x').v, M.novo('x').base], ['x', 1, 'M']],
   ['historico desfazer 2', h1, { n: 1 }],

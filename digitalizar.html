@@ -6,6 +6,9 @@
 <title>Digitalizar molde</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Barlow+Condensed:wght@600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="molde/geo.js"></script>
+<script src="molde/modelo.js"></script>
+<script src="molde/desenho.js"></script>
 <script src="molde/digit.js"></script>
 <script src="acesso.js"></script>
 <style>
@@ -39,8 +42,16 @@ input[type=text],input[type=number]{width:100%;min-height:44px;padding:8px 10px;
 .foto{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:4px;font-size:12px;color:var(--mut);min-width:0}
 .foto img{display:block;width:100%;height:110px;object-fit:contain;background:var(--bg);border-radius:4px}
 .foto .bad{color:var(--bad)}.foto .good{color:var(--ok)}.foto .warn{color:var(--warn)}
-#m-v main{max-width:none;display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:start}
-@media (max-width:800px){#m-v main{grid-template-columns:minmax(0,1fr)}}
+#m-v main,#c-v main{max-width:none;display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:800px){#m-v main,#c-v main{grid-template-columns:minmax(0,1fr)}}
+#c-v main{grid-template-columns:300px minmax(0,1fr)}
+@media (max-width:800px){#c-v main{grid-template-columns:minmax(0,1fr)}}
+#c-vis{overflow:auto;max-height:80vh;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
+#c-pl{position:relative;cursor:crosshair}
+#c-pl canvas{display:block;width:100%}
+#c-ov{position:absolute;left:0;top:0;height:100%;pointer-events:none}
+select{width:100%;min-height:44px;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+input[type=range]{width:100%}
 .sel{display:block;width:100%;text-align:left;cursor:pointer;margin-bottom:8px;font:inherit;font-size:13px;color:var(--tx)}
 .sel.on{border-color:var(--ac);border-width:2px}
 #m-vis{overflow:auto;max-height:75vh;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
@@ -82,6 +93,8 @@ input[type=text],input[type=number]{width:100%;min-height:44px;padding:8px 10px;
       <button class="btn" id="d-galeria">Da galeria</button>
     </div>
     <button class="btn" id="d-montar" hidden>Marcar cruzes e montar a folha</button>
+    <button class="btn" id="d-contorno" hidden>Contorno automático</button>
+    <button class="btn" id="d-apagar" hidden>Apagar fotos</button>
     <p class="vazio" id="d-solta" hidden>No computador, arraste as fotos para esta tela.</p>
     <div class="grade" id="d-fotos"></div>
     <input type="file" id="in-cam" accept="image/*" capture="environment" hidden>
@@ -99,6 +112,30 @@ input[type=text],input[type=number]{width:100%;min-height:44px;padding:8px 10px;
       <p id="m-aviso" style="color:var(--warn)"></p>
       <canvas id="m-folha" hidden></canvas><img id="m-folha-img" alt="Folha montada" style="max-width:100%" hidden>
     </div>
+  </main>
+</div>
+<div id="c-v" hidden>
+  <header class="topo"><button class="btn peq" id="c-volta">← Digitalização</button><span class="vazio">Clique no papel, na folha, para contornar.</span></header>
+  <main>
+    <div>
+      <label for="c-tol">Tolerância de cor: <b id="c-tol-v">40</b></label>
+      <input type="range" id="c-tol" min="5" max="120" value="40">
+      <label for="c-suav">Suavizar (mm): <b id="c-suav-v"></b></label>
+      <input type="range" id="c-suav" step="0.1">
+      <p class="vazio" id="c-info" role="status">Clique no papel.</p>
+      <p id="c-aviso" style="color:var(--warn)" role="status"></p>
+      <div class="card" id="c-levar">
+        <b>Levar para o molde</b>
+        <label for="c-modo">O que levar</label>
+        <select id="c-modo"><option value="a">Peça base</option><option value="b">Peça só de um tamanho</option><option value="c">Só a folha de fundo</option></select>
+        <label for="c-molde">Molde</label>
+        <select id="c-molde"><option value="">Molde novo</option></select>
+        <div id="c-tam-l"><label for="c-tam">Tamanho</label><input type="text" id="c-tam" maxlength="20" list="c-tams"><datalist id="c-tams"></datalist></div>
+        <div id="c-peca-l" hidden><label for="c-peca">Peça que usa a folha</label><select id="c-peca"></select></div>
+        <div class="acoes"><button class="btn pri" id="c-leva">Levar para o molde</button></div>
+      </div>
+    </div>
+    <div id="c-vis"><div id="c-pl"><canvas id="c-cv"></canvas><canvas id="c-ov"></canvas></div></div>
   </main>
 </div>
 <div id="toast" role="status"></div>
@@ -161,16 +198,19 @@ async apagarArqs(l){await sessaoOk();if(l.length)ok(await bk().remove(l))}
 })();
 
 // ---- estado e telas (tela: null = lista; id = uma digitalização) ----
-let mont=false,MA=null,Z=0.25,sal=Promise.resolve(); // montar: tela aberta, arq da foto, zoom, fila de gravação
+let cont=false,CT=null,mont=false,MA=null,Z=0.25,sal=Promise.resolve(); // montar: tela aberta, arq da foto, zoom, fila de gravação
 let PODE=false,tela=null,DIG=null,fila=[],rodando=false; // fila: toda a fila do IndexedDB, de todas as digitalizações
 const urls=new Map(); // arq -> url (assinada ou do blob) já resolvida
 const dado=d=>({nome:'',tam:'',esp:500,fotos:[],folha:null,...d});
 
 async function render(){
-$('#lista-v').hidden=tela!==null;$('#dig-v').hidden=tela===null||mont;$('#m-v').hidden=!(mont&&tela!==null);
+$('#lista-v').hidden=tela!==null;$('#dig-v').hidden=tela===null||mont||cont;$('#m-v').hidden=!(mont&&tela!==null);$('#c-v').hidden=!(cont&&tela!==null);
 if(tela===null)return renderLista();
+if(cont)return;
 if(mont)return renderMontar();
 const d=dado(DIG);
+$('#d-contorno').hidden=!d.folha;
+$('#d-apagar').hidden=!PODE||!(d.fotos.length||d.folha);
 $('#d-montar').hidden=!PODE||!d.fotos.length;
 $('#d-nome').textContent=d.nome||'(sem nome)';
 $('#d-info').textContent=[d.tam&&'Tamanho '+d.tam,'Espaçamento '+d.esp/10+' cm',d.fotos.length+' foto(s)'].filter(Boolean).join(' · ');
@@ -198,7 +238,7 @@ if(!d){toast('Digitalização não encontrada.');return}
 DIG=d;tela=id;location.hash=id;
 await render();processar();
 }
-async function irLista(){mont=false;tela=null;DIG=null;soltarUrls();history.replaceState(null,'',location.pathname+location.search);try{await render()}catch(e){toast(ptErro(e))}}
+async function irLista(){mont=cont=false;CT=null;tela=null;DIG=null;soltarUrls();history.replaceState(null,'',location.pathname+location.search);try{await render()}catch(e){toast(ptErro(e))}}
 
 // ---- fotos: reduzir, guardar na fila, subir, acrescentar em fotos ----
 function soltarUrls(){for(const i of fila)if(i.url){URL.revokeObjectURL(i.url);i.url=null}}
@@ -230,6 +270,7 @@ for(let i;(i=fila.find(x=>x.estado==='enviando'));){
 try{
 if(!await B.dig(i.digId))throw new Error('Digitalização não encontrada.'); // não cria doc fantasma
 await B.subir(i.arq,i.blob);
+if(!fila.includes(i)){await B.apagarArqs([i.arq]);continue} // "Apagar fotos" tirou da fila durante o envio
 const d=dado(await B.dig(i.digId));
 if(!d.fotos.some(f=>f.arq===i.arq)){d.fotos.push({arq:i.arq,w:i.w,h:i.h,cruzes:[]});await B.gravar(i.digId,d)}
 await FILA('readwrite',s=>s.delete(i.arq));
@@ -370,6 +411,176 @@ const b=$('#m-monta');b.disabled=true;
 try{await sal;await montarFolha()}catch(e){console.error(e);toast(ptErro(e));$('#m-prog').textContent=''}
 b.disabled=false;
 };
+
+// ---- moldes (docs col 'moldes'): mesmas chamadas e mesma chave local de molde.html ----
+const BM=LOCAL?(()=>{
+const K='molde-local:moldes',ler=()=>{try{return JSON.parse(localStorage.getItem(K))||{}}catch(e){return {}}};
+const rede=()=>{if(!navigator.onLine||window.simularOffline)throw new Error('Failed to fetch')};
+return {
+async lista(){rede();return Object.entries(ler()).map(([id,data])=>({id,data}))},
+async molde(id){rede();return ler()[id]||null},
+async criar(d){rede();const id='m'+Date.now(),t=ler();t[id]=d;localStorage.setItem(K,JSON.stringify(t));return id},
+async gravar(id,d){rede();const t=ler();t[id]=d;localStorage.setItem(K,JSON.stringify(t))}
+};
+})():(()=>{
+const ok=r=>{if(r.error)throw r.error;return r.data};
+async function sessaoOk(){const {data:{session}}=await sb.auth.getSession();if(!session)throw new Error('Sua sessão expirou.')}
+return {
+async lista(){await sessaoOk();return ok(await sb.from('docs').select('id,data').eq('col','moldes').order('created_at'))},
+async molde(id){await sessaoOk();const r=ok(await sb.from('docs').select('data').eq('id',id).eq('col','moldes').maybeSingle());return r?r.data:null},
+async criar(d){await sessaoOk();return ok(await sb.from('docs').insert({col:'moldes',data:d}).select('id').single()).id},
+async gravar(id,d){await sessaoOk();if(!ok(await sb.from('docs').update({data:d}).eq('id',id).eq('col','moldes').select('id')).length)throw new Error('Sem permissão para salvar.')}
+};
+})();
+
+// ---- contorno automático: clicar no papel da folha; tudo em px da folha, convertido para mm só depois ----
+const MM=MoldeModelo,MD=MoldeDesenho;
+let MOLDES=[];
+const cor=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+async function abrirContorno(){
+const d=dado(DIG),f=d.folha;if(!f)return;
+try{
+const bm=await createImageBitmap(await (await fetch(await urlDe(f.arq))).blob()); // fetch -> blob: o canvas não fica contaminado
+const cv=$('#c-cv'),ov=$('#c-ov');cv.width=ov.width=bm.width;cv.height=ov.height=bm.height;
+const g=cv.getContext('2d',{willReadFrequently:true});g.drawImage(bm,0,0);bm.close();
+const mn=Math.max(0.3,f.mmPx),s=$('#c-suav');
+s.min=mn;s.max=Math.max(3,mn);s.value=Math.min(s.max,Math.max(mn,1));$('#c-suav-v').textContent=fmt(+s.value);
+CT={w:cv.width,h:cv.height,img:g.getImageData(0,0,cv.width,cv.height),seed:null,mask:null,bordaMm:null,res:null,fora:[]};
+cont=true;await render();
+$('#c-info').textContent='Clique no papel.';$('#c-aviso').textContent='';ov.getContext('2d').clearRect(0,0,ov.width,ov.height);
+$('#c-levar').hidden=!PODE;
+carregarMoldes();
+}catch(e){console.error(e);toast(ptErro(e))}
+}
+async function carregarMoldes(){
+try{
+MOLDES=(await BM.lista()).sort((a,b)=>String(a.data.nome||'').localeCompare(String(b.data.nome||'')));
+$('#c-molde').innerHTML='<option value="">Molde novo</option>'+MOLDES.map(m=>`<option value="${esc(m.id)}">${esc(m.data.nome||m.id)}</option>`).join('');
+}catch(e){toast('Lista de moldes não carregou: '+ptErro(e))}
+mudouMolde();
+}
+function mudouMolde(){
+const m=MOLDES.find(x=>x.id===$('#c-molde').value),modo=$('#c-modo').value;
+$('#c-tam-l').hidden=modo==='a';
+const mm=m&&MM.normalizar(m.data);
+$('#c-tams').innerHTML=mm?MM.tamanhos(mm).map(t=>`<option value="${esc(t)}">`).join(''):'';
+$('#c-peca-l').hidden=!(modo==='c'&&mm);
+$('#c-peca').innerHTML='<option value="">(nenhuma)</option>'+(mm?mm.pecas.map(p=>`<option value="${esc(p.id)}">${esc(p.nome||p.id)}</option>`).join(''):'');
+if(!$('#c-tam').value)$('#c-tam').value=dado(DIG).tam||'';
+}
+function pintarContorno(sx,sy){
+CT.seed=[sx,sy];
+CT.mask=MoldeDigit.pintar(CT.img.data,CT.w,CT.h,sx,sy,+$('#c-tol').value);
+const f=dado(DIG).folha,b=MoldeDigit.borda(CT.mask,CT.w,CT.h);
+CT.bordaMm=b.map(p=>({x:f.x0+(p.x+0.5)*f.mmPx,y:f.y0+(p.y+0.5)*f.mmPx})); // pixel (x,y) vale o mm do seu centro
+suavizar();
+}
+function suavizar(){
+if(!CT||!CT.bordaMm)return;
+const d=dado(DIG),f=d.folha,suav=+$('#c-suav').value;
+$('#c-suav-v').textContent=fmt(suav);
+if(CT.bordaMm.length<3){CT.res=null;CT.fora=[];$('#c-info').textContent='Região muito pequena — clique em outro ponto do papel ou aumente a tolerância.'}
+else{
+const pts=MoldeDigit.simplificar(CT.bordaMm,suav);
+CT.res=MoldeDigit.paraMolde(pts,{quina:35,passo:f.mmPx}); // passo = 1 px em mm: sem ele a curva vira escadinha
+const cob=MoldeDigit.cobertura(d.fotos.filter(x=>estado(x,d.esp).ok),d.esp);
+CT.fora=MoldeDigit.foraDaCobertura(CT.res.pts,cob,d.esp);
+const lados=CT.res.seg.filter(s=>s.tipo==='linha').length,cur=CT.res.seg.length-lados;
+$('#c-info').textContent=`Contorno com ${CT.res.pts.length} pontos (${lados} retas, ${cur} curvas).`;
+}
+$('#c-aviso').textContent=CT.fora.some(Boolean)?'Faltou foto ou cruz aqui: os trechos em laranja ficam fora dos quadrados com 4 cruzes.':'';
+desenharContorno();
+}
+function desenharContorno(){
+const ov=$('#c-ov'),g=ov.getContext('2d'),f=dado(DIG).folha;
+g.clearRect(0,0,ov.width,ov.height);
+if(!CT.res)return;
+const {pts,seg}=CT.res,n=pts.length,X=p=>(p.x-f.x0)/f.mmPx-0.5,Y=p=>(p.y-f.y0)/f.mmPx-0.5;
+g.lineWidth=Math.max(2,ov.width/400);
+pts.forEach((a,k)=>{
+const b=pts[(k+1)%n],s=seg[k];
+g.strokeStyle=cor(CT.fora[k]||CT.fora[(k+1)%n]?'--warn':'--ac');
+g.beginPath();g.moveTo(X(a),Y(a));
+if(s.tipo==='curva')g.bezierCurveTo(X(s.c1),Y(s.c1),X(s.c2),Y(s.c2),X(b),Y(b));else g.lineTo(X(b),Y(b));
+g.stroke();
+});
+g.fillStyle=cor('--hd');
+for(const p of pts){g.beginPath();g.arc(X(p),Y(p),g.lineWidth*1.5,0,7);g.fill()}
+}
+$('#c-pl').addEventListener('click',e=>{
+if(!CT)return;
+const r=$('#c-cv').getBoundingClientRect();
+pintarContorno(Math.min(CT.w-1,Math.max(0,Math.floor((e.clientX-r.left)*CT.w/r.width))),Math.min(CT.h-1,Math.max(0,Math.floor((e.clientY-r.top)*CT.h/r.height))));
+});
+$('#c-tol').oninput=()=>$('#c-tol-v').textContent=$('#c-tol').value;
+$('#c-tol').onchange=()=>{if(CT&&CT.seed)pintarContorno(...CT.seed)};
+$('#c-suav').oninput=suavizar;
+$('#c-modo').onchange=$('#c-molde').onchange=mudouMolde;
+$('#d-contorno').onclick=abrirContorno;
+$('#c-volta').onclick=()=>{cont=false;CT=null;render()};
+
+// peça fechada a partir do contorno (pontos e traços entram no molde como se fossem desenhados); devolve a peça
+function pecaDoContorno(m,res,nome){
+const r2=p=>({x:Math.round(p.x*100)/100,y:Math.round(p.y*100)/100});
+const n=res.pts.length,ids=res.pts.map(p=>MD.ponto(m,r2(p))),tr=[];
+res.seg.forEach((s,k)=>{
+const a=ids[k],b=ids[(k+1)%n];if(a===b)return;
+const t={id:MM.uid(m,'t'),tipo:s.tipo==='curva'?'curva':'reta',a,b};
+if(s.tipo==='curva'){t.c1=r2(s.c1);t.c2=r2(s.c2)}
+m.tracos.push(t);tr.push(t.id);
+});
+const r=MD.novaPeca(m,tr);
+if(!r.ok)throw new Error(r.erro||'O contorno não fecha.');
+if(nome)r.peca.nome=nome;
+return r.peca;
+}
+async function levar(){
+if(!PODE||!CT)return;
+const d=dado(DIG),f=d.folha,modo=$('#c-modo').value,mid=$('#c-molde').value,res=modo==='c'?null:CT.res;
+let tam=$('#c-tam').value.trim();
+if(res&&CT.fora.some(Boolean)&&!confirm('Parte do contorno ficou fora dos quadrados com 4 cruzes (faltou foto ou cruz aqui). Levar para o molde mesmo assim?'))return;
+if(modo!=='c'&&!res&&!confirm('Sem contorno automático: só a folha entra no molde, como fundo. Continuar?'))return;
+const b=$('#c-leva');b.disabled=true;
+try{
+const novo=!mid;
+let m=novo?MM.novo(d.nome||'Molde digitalizado'):(x=>x&&MM.normalizar(x))(await BM.molde(mid)); // re-lê antes de gravar
+if(!m){toast('Molde não encontrado.');return}
+if(novo)m.base=modo==='a'?(d.tam||'M'):tam;
+const alvo=modo==='a'?m.base:tam;
+if(!alvo){toast('Informe o tamanho.');return}
+if(!novo&&modo!=='a'&&!MM.tamanhos(m).includes(alvo)){toast(`O molde não tem o tamanho ${alvo}. Tamanhos: ${MM.tamanhos(m).join(', ')}.`);return}
+if(m.fundos[alvo]&&!confirm(`O tamanho ${alvo} deste molde já tem uma folha de fundo. Trocar?`))return;
+let pid=null;
+if(modo==='c')pid=$('#c-peca').value||null;
+else if(res){const p=pecaDoContorno(m,res,d.nome);if(modo==='b')p.tam=alvo;pid=p.id}
+m.fundos[alvo]={dig:tela,arq:f.arq,mmPx:f.mmPx,x0:f.x0,y0:f.y0,w:f.w,h:f.h,tx:0,ty:0,ang:0,peca:pid};
+const id=novo?await BM.criar(m):(await BM.gravar(mid,m),mid);
+location.href='molde.html?id='+encodeURIComponent(id)+(LOCAL?'&local=1':'');
+}catch(e){console.error(e);toast(ptErro(e))}
+b.disabled=false;
+}
+$('#c-leva').onclick=levar;
+
+// "Apagar fotos": fotos e folha saem do storage e do doc; o que já está nos moldes (peças, gradação) fica
+async function apagarFotos(){
+if(!PODE||!tela)return;
+if(!confirm('Apagar as fotos e a folha desta digitalização? (a folha de fundo some do molde; peças e gradação ficam)'))return;
+const id=tela;
+try{
+const q=fila.filter(i=>i.digId===id);
+fila=fila.filter(i=>i.digId!==id);
+for(const i of q){if(i.url)URL.revokeObjectURL(i.url);await FILA('readwrite',s=>s.delete(i.arq))}
+await sal;
+const d=dado(await B.dig(id)),arqs=d.fotos.map(f=>f.arq);
+if(d.folha)arqs.push(d.folha.arq);
+d.fotos=[];d.folha=null;
+await B.gravar(id,d);
+await B.apagarArqs(arqs);
+for(const a of arqs)urls.delete(a);
+DIG=d;MA=null;await render();toast('Fotos apagadas.');
+}catch(e){console.error(e);toast(ptErro(e))}
+}
+$('#d-apagar').onclick=apagarFotos;
 
 // ---- eventos ----
 document.addEventListener('click',e=>{

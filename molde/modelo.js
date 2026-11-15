@@ -20,7 +20,7 @@
     return {
       ...d, nome: d.nome || '', produtoIds: d.produtoIds || [], base: d.base || 'M',
       pontos: d.pontos || {}, tracos: d.tracos || [], textos: d.textos || [], v: d.v || 1,
-      grade: d.grade || [], grad: d.grad || {}, medidas: d.medidas || [], foto: d.foto || '',
+      grade: d.grade || [], grad: d.grad || {}, medidas: d.medidas || [], foto: d.foto || '', fundos: d.fundos || {},
       pecas: (d.pecas || []).map(p => ({
         ...p, nome: p.nome || '', cortar: p.cortar ?? 1, par: !!p.par, tracos: p.tracos || [], dobra: p.dobra || null,
         fio: p.fio || { a: { x: 0, y: 0 }, b: { x: 0, y: 100 } }, margem: p.margem ?? 10, margemTraco: p.margemTraco || {},
