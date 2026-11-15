@@ -39,7 +39,8 @@ input[type=text],input[type=number]{width:100%;min-height:44px;padding:8px 10px;
 .acoes{display:grid;gap:10px;margin:12px 0}
 @media (min-width:600px){.acoes{grid-template-columns:1fr 1fr}}
 .grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px}
-.foto{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:4px;font-size:12px;color:var(--mut);min-width:0}
+.foto{position:relative;background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:4px;font-size:12px;color:var(--mut);min-width:0}
+.foto .fx{position:absolute;top:-8px;right:-8px;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:var(--bad);color:#fff;font-size:16px;line-height:28px;cursor:pointer}
 .foto img{display:block;width:100%;height:110px;object-fit:contain;background:var(--bg);border-radius:4px}
 .foto .bad{color:var(--bad)}.foto .good{color:var(--ok)}.foto .warn{color:var(--warn)}
 #m-v main,#c-v main{max-width:none;display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px;align-items:start}
@@ -216,8 +217,9 @@ $('#d-nome').textContent=d.nome||'(sem nome)';
 $('#d-info').textContent=[d.tam&&'Tamanho '+d.tam,'Espaçamento '+d.esp/10+' cm',d.fotos.length+' foto(s)'].filter(Boolean).join(' · ');
 $('#d-acoes').hidden=$('#d-solta').hidden=!PODE;
 const un=s=>`<div class="foto">${s}</div>`,daqui=fila.filter(i=>i.digId===tela);
-$('#d-fotos').innerHTML=daqui.map(i=>un(`<img data-q="${esc(i.arq)}" alt="">`+(i.estado==='falhou'?`<span class="bad">Falhou: ${esc(i.erro)}</span> <button class="btn peq" data-a="retry" data-arq="${esc(i.arq)}">Tentar de novo</button>`:'Enviando…'))).join('')
-+d.fotos.map((f,n)=>un(`<img data-f="${esc(f.arq)}" alt="Foto ${n+1}"><span class="good">Enviada</span>`)).join('')
+const x=(a,arq,n)=>PODE?`<button class="fx" data-a="${a}" data-arq="${esc(arq)}" aria-label="Apagar ${n}">×</button>`:'';
+$('#d-fotos').innerHTML=daqui.map(i=>un(`<img data-q="${esc(i.arq)}" alt="">`+(i.estado==='falhou'?`<span class="bad">Falhou: ${esc(i.erro)}</span> <button class="btn peq" data-a="retry" data-arq="${esc(i.arq)}">Tentar de novo</button>`+x('qdel',i.arq,'foto não enviada'):'Enviando…'))).join('')
++d.fotos.map((f,n)=>un(`<img data-f="${esc(f.arq)}" alt="Foto ${n+1}"><span class="good">Enviada</span>`+x('fdel',f.arq,'foto '+(n+1)))).join('')
 ||'<p class="vazio">Nenhuma foto ainda.</p>';
 for(const im of document.querySelectorAll('#d-fotos img')){
 const q=im.dataset.q,arq=q||im.dataset.f;
@@ -595,6 +597,32 @@ DIG=d;MA=null;await render();toast('Fotos apagadas.');
 }catch(e){console.error(e);toast(ptErro(e))}
 }
 $('#d-apagar').onclick=apagarFotos;
+// uma foto enviada: storage primeiro (se falhar, o doc fica igual); a folha já montada continua até montar de novo
+async function apagarFoto(arq){
+if(!PODE||!tela)return;
+const id=tela;
+if(!confirm('Apagar esta foto?'+(dado(DIG).folha?' A folha já montada usa as fotos antigas: monte de novo depois.':'')))return;
+try{
+await sal;
+const d=dado(await B.dig(id));
+if(!d.fotos.some(f=>f.arq===arq)){toast('Essa foto já não existe.');DIG=d;return render()}
+await B.apagarArqs([arq]);
+d.fotos=d.fotos.filter(f=>f.arq!==arq);
+await B.gravar(id,d);
+urls.delete(arq);if(MA===arq)MA=null;
+DIG=d;await render();toast('Foto apagada.');
+}catch(e){console.error(e);toast(ptErro(e))}
+}
+// foto que falhou e ainda está só no aparelho
+async function apagarDaFila(arq){
+const i=fila.find(x=>x.arq===arq);
+if(!i||i.estado!=='falhou'||!confirm('Apagar esta foto que não foi enviada?'))return;
+try{
+await FILA('readwrite',s=>s.delete(arq));
+fila=fila.filter(x=>x!==i);if(i.url)URL.revokeObjectURL(i.url);
+await render();
+}catch(e){console.error(e);toast(ptErro(e))}
+}
 
 // ---- eventos ----
 document.addEventListener('click',e=>{
@@ -602,6 +630,8 @@ const b=e.target.closest('[data-a]');if(!b)return;
 if(b.dataset.a==='mfoto'){MA=b.dataset.arq;renderMontar()}
 if(b.dataset.a==='mdel'){const f=fotoAt();f.cruzes.splice(+b.dataset.k,1);mudou()}
 if(b.dataset.a==='abrir')abrir(b.dataset.id).catch(x=>toast(ptErro(x)));
+if(b.dataset.a==='fdel')apagarFoto(b.dataset.arq);
+if(b.dataset.a==='qdel')apagarDaFila(b.dataset.arq);
 if(b.dataset.a==='retry'){const i=fila.find(x=>x.arq===b.dataset.arq);if(i){i.estado='enviando';render();processar()}}
 });
 $('#n-abre').onclick=()=>{$('#nova').hidden=false;$('#n-abre').hidden=true;$('#n-nome').focus()};
