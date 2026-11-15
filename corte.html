@@ -42,7 +42,7 @@ dialog h3{margin:0 0 12px}
 main{max-width:1100px;margin:0 auto;padding:16px}
 .vazio{color:var(--mut);font-size:13px}
 .card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px}
-table.lst{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--bd);border-radius:10px}
+table.lst{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--bd);border-radius:10px}@media (max-width:640px){main>table.lst,table.lst:not(#rel table){display:block;overflow-x:auto}}
 table.lst th,table.lst td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left}
 table.lst th{color:var(--mut);font-weight:500;font-size:13px}
 table.lst td.n,table.lst th.n{text-align:right}
@@ -84,7 +84,7 @@ fieldset.grp{border:1px solid var(--bd);border-radius:8px;margin:12px 0 0;paddin
 fieldset.grp legend{font-weight:600;font-size:14px;padding:0 4px}
 #pr-mat-info{font-size:13px;color:var(--mut);margin:4px 0 0}
 textarea{resize:vertical;min-height:60px}
-#toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:#fff;padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
+#toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
 @media (max-width:560px){.duas{grid-template-columns:1fr}main{padding:12px}}
 #rel{display:none}
 @media print{
