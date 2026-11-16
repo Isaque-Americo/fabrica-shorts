@@ -348,7 +348,7 @@ let PODE=false; // moldes:mexer; sem PODE o editor é só leitura
 let M=null,H=null,estado='salvo',molId=null;
 let ver=0,salvando=false,timer=null,erroSalvar='',ligadosSalvos=[],zoom=1;
 // desenho: vx,vy = canto da vista em mm; sel = ids de traços/pontos soltos/textos selecionados (Task 6 usa); op = ação em curso
-let vx=-20,vy=-20,ferr='sel',op=null,rato=null,imaLigado=true,espaco=false,pan=null;
+let vx=-20,vy=-20,ferr='sel',op=null,rato=null,imaLigado=true,espaco=false,pan=null,ferrCtrl=null,opCtrl=null;
 const sel=new Set();
 // peças: pecaSel = id da peça no painel; modoPeca = clique no contorno marca bainha/pique/pence; pontaErro = ponta solta do último Extrair
 let pecaSel=null,modoPeca=null,pontaErro=null;
@@ -867,7 +867,8 @@ if(e.shiftKey){if(sel.has(id))sel.delete(id);else sel.add(id)}else{gradPt=id;aba
 desenhar();desenharGrad()}}
 };
 
-function escolher(f){
+function escolher(f,deCtrl=false){
+if(!deCtrl){ferrCtrl=null;opCtrl=null}
 ferr=f;op=null;modoPeca=null;fecharMedida();if(M)preencherProps();if(f==='grad')aba('grad');tela.classList.toggle('mao',f==='mao');
 document.querySelectorAll('#ferramentas [data-f]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===f));
 $('#dica').textContent=M?dicaAgora():T[f].dica;if(M)desenhar();
@@ -1247,7 +1248,9 @@ tela.addEventListener('wheel',e=>{if(!M)return;e.preventDefault();zoomEm(e.clien
 function zoomEm(cx,cy,f){const r=tela.getBoundingClientRect(),px=cx-r.left,py=cy-r.top,mx=vx+px/zoom,my=vy+py/zoom;zoom=Math.min(20,Math.max(.1,zoom*f));vx=mx-px/zoom;vy=my-py/zoom;desenhar()}
 function zoomMeio(f){const r=tela.getBoundingClientRect();zoomEm(r.left+r.width/2,r.top+r.height/2,f)}
 document.addEventListener('keydown',e=>{
-if(!M||e.ctrlKey||e.metaKey||e.altKey||e.target.closest('input,textarea,dialog,select'))return;
+if(!M||e.target.closest('input,textarea,dialog,select'))return;
+if(e.key==='Control'&&!e.repeat&&!ferrCtrl){if(ferr!=='mao'){ferrCtrl=ferr;opCtrl=op;escolher('mao',true)}return}
+if(e.ctrlKey||e.metaKey||e.altKey)return;
 if(!PODE&&e.key!==' ')return;
 const k=e.key;
 if(foraBase()&&k!==' '&&k!=='Escape')return;
@@ -1259,7 +1262,11 @@ const l=k.toLowerCase();
 if(l==='m'){alternarIma();return}
 const f=FERRS.find(x=>x[3].toLowerCase()===l);if(f)escolher(f[0]);
 });
-document.addEventListener('keyup',e=>{if(e.key===' ')espaco=false});
+document.addEventListener('keyup',e=>{
+if(e.key===' ')espaco=false;
+if(e.key==='Control'&&ferrCtrl){const v=ferrCtrl,o=opCtrl;ferrCtrl=null;opCtrl=null;escolher(v,true);if(o){op=o;desenhar()}}
+});
+window.addEventListener('blur',()=>{if(ferrCtrl){const v=ferrCtrl,o=opCtrl;ferrCtrl=null;opCtrl=null;escolher(v,true);if(o){op=o;desenhar()}}});
 iniciar();
 </script>
 </body>
