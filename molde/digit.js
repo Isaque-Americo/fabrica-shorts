@@ -175,33 +175,35 @@
 
   // máscara 0/1 da região 4-conectada de cor ≤ tol (RGB) da média 5×5 na semente; furos internos viram 1
   function pintar(rgba, w, h, sx, sy, tol) {
-    const n = w * h, mask = new Uint8Array(n), pilha = new Int32Array(n);
+    const n = w * h, mask = new Uint8Array(n);
     let r = 0, gg = 0, b = 0, c = 0;
     for (let y = Math.max(0, sy - 2); y <= Math.min(h - 1, sy + 2); y++) for (let x = Math.max(0, sx - 2); x <= Math.min(w - 1, sx + 2); x++) {
       const o = (y * w + x) * 4; r += rgba[o]; gg += rgba[o + 1]; b += rgba[o + 2]; c++;
     }
     r /= c; gg /= c; b /= c;
     const perto = i => Math.hypot(rgba[i * 4] - r, rgba[i * 4 + 1] - gg, rgba[i * 4 + 2] - b) <= tol;
-    // inunda a partir de s sobre pixels com ok(i) e ainda sem marca em m; marca com 1
-    const inundar = (m, s, ok) => {
-      let t = 0; m[s] = 1; pilha[t++] = s;
-      while (t) {
-        const i = pilha[--t], x = i % w;
-        if (x > 0 && !m[i - 1] && ok(i - 1)) { m[i - 1] = 1; pilha[t++] = i - 1; }
-        if (x < w - 1 && !m[i + 1] && ok(i + 1)) { m[i + 1] = 1; pilha[t++] = i + 1; }
-        if (i >= w && !m[i - w] && ok(i - w)) { m[i - w] = 1; pilha[t++] = i - w; }
-        if (i < n - w && !m[i + w] && ok(i + w)) { m[i + w] = 1; pilha[t++] = i + w; }
-      }
-    };
     if (sx < 0 || sy < 0 || sx >= w || sy >= h || !perto(sy * w + sx)) return mask;
-    inundar(mask, sy * w + sx, perto);
+    inundar(mask, w, h, sy * w + sx, perto);
     // fundo = o que alcança a borda sem passar pela região; o resto é furo
     const fundo = new Uint8Array(n), livre = i => !mask[i];
-    const semear = i => { if (!fundo[i] && !mask[i]) inundar(fundo, i, livre); };
+    const semear = i => { if (!fundo[i] && !mask[i]) inundar(fundo, w, h, i, livre); };
     for (let x = 0; x < w; x++) { semear(x); semear((h - 1) * w + x); }
     for (let y = 0; y < h; y++) { semear(y * w); semear(y * w + w - 1); }
     for (let i = 0; i < n; i++) if (!fundo[i]) mask[i] = 1;
-    return limpar(mask, w, h);
+    return limpar(semFio(mask, w, h, sy * w + sx), w, h);
+  }
+
+  // inunda m (4-conexo) a partir de s sobre pixels com ok(i) e ainda sem marca; marca com 1
+  function inundar(m, w, h, s, ok) {
+    const n = w * h, pilha = new Int32Array(n);
+    let t = 0; m[s] = 1; pilha[t++] = s;
+    while (t) {
+      const i = pilha[--t], x = i % w;
+      if (x > 0 && !m[i - 1] && ok(i - 1)) { m[i - 1] = 1; pilha[t++] = i - 1; }
+      if (x < w - 1 && !m[i + 1] && ok(i + 1)) { m[i + 1] = 1; pilha[t++] = i + 1; }
+      if (i >= w && !m[i - w] && ok(i - w)) { m[i - w] = 1; pilha[t++] = i - w; }
+      if (i < n - w && !m[i + w] && ok(i + w)) { m[i + w] = 1; pilha[t++] = i + w; }
+    }
   }
 
   // mínimo (erosão) ou máximo (dilatação) 3x3, separável; fora da imagem repete a beirada para não comer a região que encosta nela
@@ -221,6 +223,22 @@
     for (let i = 0; i < 2 * r; i++) m = morf(m, w, h, true);
     for (let i = 0; i < r; i++) m = morf(m, w, h, false);
     return m;
+  }
+
+  // corta o fio fino do vazamento (a tinta escapa por uma fresta de sombra e corre pela beirada da folha).
+  // A erosão de r px diz o que é corpo grosso e corta o pescoço; fica só o pedaço do clique; depois o detalhe
+  // original volta onde encosta nesse corpo. Assim quina viva e bico colado na peça ficam inteiros, mas o que
+  // só se segurava pela fresta some. shortcut: r = 3 px; baixar se um molde de verdade tiver pescoço legítimo fino.
+  function semFio(mask, w, h, seed, r = 3) {
+    const n = w * h;
+    let a = mask;
+    for (let i = 0; i < r; i++) a = morf(a, w, h, false);
+    for (let i = 0; i < r; i++) a = morf(a, w, h, true);
+    if (a[seed]) { const c = new Uint8Array(n); inundar(c, w, h, seed, i => a[i] === 1); a = c; } // semente comida pela erosão: não filtra
+    for (let i = 0; i < r; i++) a = morf(a, w, h, true);
+    const o = new Uint8Array(n);
+    for (let i = 0; i < n; i++) o[i] = a[i] & mask[i];
+    return o;
   }
 
   // contorno externo (Moore): pixels de dentro da região, em sentido horário na tela, sem repetir o primeiro
@@ -323,7 +341,7 @@
     return { ang, tx: (P1.x + P2.x) / 2 - r.x - f.x0, ty: (P1.y + P2.y) / 2 - r.y - f.y0 };
   }
 
-  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, sugerirRot, cantosRet, ordenarCantos, desvioDiag, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, pintar, limpar, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
+  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, sugerirRot, cantosRet, ordenarCantos, desvioDiag, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, pintar, limpar, semFio, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
   g.MoldeDigit = MoldeDigit;
   if (typeof module !== 'undefined') module.exports = MoldeDigit;
 })(typeof window !== 'undefined' ? window : globalThis);

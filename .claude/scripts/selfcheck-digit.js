@@ -100,9 +100,27 @@ testes.push(
     for (let y = 40; y <= 160; y++) { const d = Math.round(ru() * 5); for (let x = 50; x < 50 + d; x++) pente[y * W + x] = 0; }
     const vert = m => D.simplificar(D.borda(m, W, H), 1.5).length;
     const limpo = D.limpar(puro, W, H);
+    // vazamento: a mancha escapa por um pescoço de 2 px e estoura num bolsão do fundo
+    const sem = 90 * W + 150, cx = (m, xa, xb, ya, yb) => { for (let y = ya; y <= yb; y++) for (let x = xa; x <= xb; x++) m[y * W + x] = 1; return m; };
+    const fio = cx(new Uint8Array(W * H), 50, 250, 40, 160);
+    for (let y = 160; y <= 190; y++) { fio[y * W + 49] = 1; fio[y * W + 50] = 1; }
+    cx(fio, 5, 49, 185, 195);
+    const semPuro = D.semFio(puro, W, H, sem), semF = D.semFio(fio, W, H, sem), abaixo = m => { let c = 0; for (let y = 170; y < H; y++) for (let x = 0; x < W; x++) c += m[y * W + x]; return c; };
+    // bico de 7 px colado na peça e pique de 3 px cortado para dentro: nenhum dos dois pode sumir
+    const bico = cx(new Uint8Array(W * H), 50, 250, 40, 160); cx(bico, 147, 153, 20, 39);
+    const sb = D.semFio(bico, W, H, sem); let alt = 0;
+    for (let y = 20; y < 40; y++) { let t = 0; for (let x = 147; x <= 153; x++) t += sb[y * W + x]; if (t) alt++; }
+    const piq = cx(new Uint8Array(W * H), 50, 250, 40, 160);
+    for (let y = 40; y <= 59; y++) for (let x = 149; x <= 151; x++) piq[y * W + x] = 0;
+    const sp = D.limpar(D.semFio(piq, W, H, sem), W, H); let fundoPiq = 0;
+    for (let y = 40; y < 60; y++) { let t = 0; for (let x = 149; x <= 151; x++) t += sp[y * W + x]; if (!t) fundoPiq++; }
     return [
       ['limpar não mexe em retângulo', puro.every((v, i) => v === limpo[i]), true],
       ['limpar derruba pente', vert(D.limpar(pente, W, H)) * 3 < vert(pente), true],
+      ['semFio não mexe em retângulo', puro.every((v, i) => v === semPuro[i]), true],
+      ['semFio corta o vazamento', [abaixo(fio) > 0, abaixo(semF)], [true, 0]],
+      ['semFio guarda bico de 7 px', alt, 20],
+      ['semFio guarda pique de 3 px', fundoPiq, 20],
     ];
   })(),
   ['borda fechada sem repetir', bRet.length > 4 && (bRet[0].x !== bRet[bRet.length - 1].x || bRet[0].y !== bRet[bRet.length - 1].y), true],
