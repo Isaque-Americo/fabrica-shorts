@@ -142,15 +142,17 @@
       const principal = principalDe(p, ordem); // peça sem tecido vai na aba do principal
       for (const [tam, gq] of Object.entries(it.grade || {})) {
         const gr = nn(gq); if (!gr) continue;
+        const cpr = camadasPorRoupa(enf, ordem, p, tam, tecidos); // 2: cada roupa sai de um par de camadas, então cada peça pede metade das posições
         pecasTam(p, tam).forEach((q, k) => {
           if (!(q && q.pts && q.pts.length > 2) || (q.tecido || principal) !== aba.materiaId) return;
           const nome = q.nome || String(k);
           if (it.pecas && !it.pecas.includes(nome)) return;
-          const base = { q, k, p, cor: it.cor, tam, nome }, qtd = nn(q.qtd), N = gr * qtd;
+          // peça que não é par num enfesto de par de camadas sobra meia peça quando a grade é ímpar: arredonda para cima
+          const base = { q, k, p, cor: it.cor, tam, nome }, qtd = nn(q.qtd), N = Math.ceil(gr * qtd / cpr);
           const rot = su ? 'nenhuma' : q.rot, esp = !!q.espelhar;
           if (tub && q.tubular) { const m = meiaPeca(q.pts); repete(N, () => item(base, m, { rot: 'nenhuma', espelhar: false, meia: true, rende: 1 })); } // girar/espelhar tiraria a dobra de Y=0
           else if (tub) repete(Math.ceil(N / 2), () => item(base, q.pts, { rot, espelhar: esp, rende: 2 })); // dois panos por camada
-          else if (q.par && !unico && !impar) repete(N / 2, () => item(base, q.pts, { rot, espelhar: false, rende: 1 })); // face a face: cada posição rende o par em duas camadas (metade das camadas já sai espelhada)
+          else if (q.par && !unico && !impar) repete(N, () => item(base, q.pts, { rot, espelhar: false, rende: 1 })); // face a face: cada posição rende o par em duas camadas (metade das camadas já sai espelhada)
           else if (q.par && !unico && !esp) repete(N, () => item(base, q.pts, { rot, espelhar: false, rende: 1 })); // camadas ímpares, par simétrico: o par vem de duas posições
           else if (q.par) { // único, ou duplo com camadas ímpares (a camada a mais ficaria sem o par)
             const n = gr * Math.ceil(qtd / 2), espelhada = esp ? q.pts.map(([x, y]) => [x, -y]) : q.pts;
