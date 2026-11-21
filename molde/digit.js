@@ -201,7 +201,26 @@
     for (let x = 0; x < w; x++) { semear(x); semear((h - 1) * w + x); }
     for (let y = 0; y < h; y++) { semear(y * w); semear(y * w + w - 1); }
     for (let i = 0; i < n; i++) if (!fundo[i]) mask[i] = 1;
-    return mask;
+    return limpar(mask, w, h);
+  }
+
+  // mínimo (erosão) ou máximo (dilatação) 3x3, separável; fora da imagem repete a beirada para não comer a região que encosta nela
+  function morf(src, w, h, max) {
+    const t = new Uint8Array(w * h), o = new Uint8Array(w * h), jun = (a, b, c) => max ? (a | b | c) : (a & b & c);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; t[i] = jun(src[x > 0 ? i - 1 : i], src[i], src[x < w - 1 ? i + 1 : i]); }
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { const i = y * w + x; o[i] = jun(t[y > 0 ? i - w : i], t[i], t[y < h - 1 ? i + w : i]); }
+    return o;
+  }
+
+  // abertura seguida de fecho: apaga pente e baía de até r px na beirada (sombra, vinco, foco ruim), que viram
+  // dezenas de vértices falsos no Douglas-Peucker. Retângulo e quina reta sobrevivem (elemento quadrado).
+  // shortcut: r fixo em 1 px; subir para 2 se a foto for muito maior que a folha e a beirada continuar tremida.
+  function limpar(mask, w, h, r = 1) {
+    let m = mask;
+    for (let i = 0; i < r; i++) m = morf(m, w, h, false);
+    for (let i = 0; i < 2 * r; i++) m = morf(m, w, h, true);
+    for (let i = 0; i < r; i++) m = morf(m, w, h, false);
+    return m;
   }
 
   // contorno externo (Moore): pixels de dentro da região, em sentido horário na tela, sem repetir o primeiro
@@ -304,7 +323,7 @@
     return { ang, tx: (P1.x + P2.x) / 2 - r.x - f.x0, ty: (P1.y + P2.y) / 2 - r.y - f.y0 };
   }
 
-  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, sugerirRot, cantosRet, ordenarCantos, desvioDiag, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, pintar, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
+  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, sugerirRot, cantosRet, ordenarCantos, desvioDiag, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, pintar, limpar, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
   g.MoldeDigit = MoldeDigit;
   if (typeof module !== 'undefined') module.exports = MoldeDigit;
 })(typeof window !== 'undefined' ? window : globalThis);

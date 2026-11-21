@@ -92,6 +92,19 @@ testes.push(
   ['círculo mm 2 (tol 1)', circMm(2, 1), [true, true]],
   ['círculo mm 0.5 (tol 0.25)', circMm(0.5, 0.25), [true, true]],
   ['pintar soma', mRet.reduce((a, b) => a + b, 0), 120 * 90],
+  ...(() => {
+    // beirada em pente (sombra/vinco): limpar tem de derrubar os vértices falsos sem mexer em retângulo
+    const W = 300, H = 200, ru = (s => () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648)(11);
+    const puro = new Uint8Array(W * H), pente = new Uint8Array(W * H);
+    for (let y = 40; y <= 160; y++) for (let x = 50; x <= 250; x++) { puro[y * W + x] = 1; pente[y * W + x] = 1; }
+    for (let y = 40; y <= 160; y++) { const d = Math.round(ru() * 5); for (let x = 50; x < 50 + d; x++) pente[y * W + x] = 0; }
+    const vert = m => D.simplificar(D.borda(m, W, H), 1.5).length;
+    const limpo = D.limpar(puro, W, H);
+    return [
+      ['limpar não mexe em retângulo', puro.every((v, i) => v === limpo[i]), true],
+      ['limpar derruba pente', vert(D.limpar(pente, W, H)) * 3 < vert(pente), true],
+    ];
+  })(),
   ['borda fechada sem repetir', bRet.length > 4 && (bRet[0].x !== bRet[bRet.length - 1].x || bRet[0].y !== bRet[bRet.length - 1].y), true],
   ['simplificar 4 cantos', sRet.length, 4],
   ['simplificar cantos', cantos.every(([x, y]) => sRet.some(p => Math.hypot(p.x - x, p.y - y) <= 1)), true],
