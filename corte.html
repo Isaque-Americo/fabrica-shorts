@@ -437,7 +437,7 @@ const grade=tams.length?`<table class="lst" aria-label="Grade total por referên
 return `<dl class="painel">${[
   it('Tecido',nf(r.metros)+' m'),it('Peso do tecido',nf(r.pesoTecido)+' kg'),it('Peso das peças',nf(r.pesoPecas)+' kg'),
   it('Desperdício',nf(r.pesoDesperdicio)+' kg',r.pesoTecido?nf(r.pesoDesperdicio/r.pesoTecido*100,1)+'%':''),
-  it('Consumo linear',nf(r.consumoLinear,3)+' m/peça'),it('Custo do tecido',brl(r.custo)),it('Peças de roupa',String(r.pecas))].join('')}</dl>`+
+  it('Consumo linear',nf(r.consumoLinear,3)+' m/roupa'),it('Custo do tecido',brl(r.custo)),it('Peças de roupa',String(r.pecas))].join('')}</dl>`+
   grade+(fora.length?`<p class="vazio">Fora do cálculo (sem risco): ${esc(fora.join('; '))}.</p>`:'');
 }
 // relatório A4 (só na impressão): resultados, enfestos e a grade de cada enfesto
