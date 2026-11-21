@@ -487,8 +487,8 @@ setTimeout(()=>aviso(obrigatoria?'Senha temporária trocada.':'Senha alterada.')
 const S={produtos:[],reps:[],pedidos:[],lojas:[],cadastros:[],materiais:[],config:[]};
 const SZ=['P','M','G','GG','G1','G2','G3','G4'];
 const ST=['Pendente','Aprovado','Recusado','Faturado','Enviado','Entregue','Cancelado'];
-const TABS_ADMIN=[['painel','Painel'],['produtos','Produtos'],['materia','Matéria-prima'],['pedidos','Pedidos'],['fabricar','A fabricar'],['molde','Criar molde'],['digitalizar','Digitalizar molde'],['corte','Ordens de corte'],['reps','Representantes'],['cadastros','Cadastros'],['estoque','Estoque']];
-const GRUPOS_ADMIN=[['VISÃO GERAL',['painel']],['VENDAS',['pedidos','reps','cadastros']],['PRODUÇÃO',['fabricar','corte','molde','digitalizar']],['CATÁLOGO',['produtos','materia','estoque']],['',['administradores']]];
+const TABS_ADMIN=[['painel','Painel'],['produtos','Produtos'],['materia','Matéria-prima'],['pedidos','Pedidos'],['fabricar','A fabricar'],['moldes','Moldes'],['corte','Ordens de corte'],['reps','Representantes'],['cadastros','Cadastros'],['estoque','Estoque']];
+const GRUPOS_ADMIN=[['VISÃO GERAL',['painel']],['VENDAS',['pedidos','reps','cadastros']],['PRODUÇÃO',['fabricar','corte','moldes']],['CATÁLOGO',['produtos','materia','estoque']],['',['administradores']]];
 const TABS_LOJISTA=[['catalogo','Catálogo'],['pedidos','Pedidos']];
 const TABS_REP=[['painel','Comissões'],['catalogo','Catálogo'],['pedidos','Pedidos']];
 function iconForTab(k){
@@ -498,8 +498,7 @@ case 'produtos':return 'inventory_2';
 case 'materia':return 'texture';
 case 'pedidos':return 'receipt_long';
 case 'fabricar':return 'precision_manufacturing';
-case 'molde':return 'draw';
-case 'digitalizar':return 'document_scanner';
+case 'moldes':return 'draw';
 case 'corte':return 'content_cut';
 case 'reps':return 'groups';
 case 'cadastros':return 'person_add';
@@ -604,11 +603,11 @@ sb.auth.onAuthStateChange(async (e,s)=>{if(e==='PASSWORD_RECOVERY'&&s){history.r
 })();
 
 function render(){
-const tabs=appProfile?.role==='lojista'?TABS_LOJISTA:appProfile?.role==='representante'?TABS_REP:[...TABS_ADMIN.filter(([k])=>k==='molde'?pode('moldes')&&pode('produtos'):pode(Acesso.ABA_AREA[k],'ver')),...(appProfile?.is_principal?[['administradores','Administradores']]:[])];
+const tabs=appProfile?.role==='lojista'?TABS_LOJISTA:appProfile?.role==='representante'?TABS_REP:[...TABS_ADMIN.filter(([k])=>pode(Acesso.ABA_AREA[k],'ver')),...(appProfile?.is_principal?[['administradores','Administradores']]:[])];
 if(!tabs.length){$('#sidebar-nav').innerHTML='';$('#page-title').textContent='Sem acesso';const shell=document.getElementById('app-shell');if(shell)shell.style.display='flex';$('#app').innerHTML='<div class="alert">Sem acesso a nenhuma área; fale com o administrador principal.</div>';return}
 if(!tabs.some(([k])=>k===tab))tab=tabs[0][0];
 const pendNav=!['lojista','representante'].includes(appProfile?.role)?S.pedidos.filter(o=>o.status==='Pendente').length:0;
-const lk=([k,l])=>{const p=k==='pedidos'&&pendNav>0?` <span class="pill">${pendNav}</span>`:'';return k==='molde'?`<a href="molde.html?novo=1" target="_blank" rel="noopener"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`:k==='digitalizar'?`<a href="digitalizar.html"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`:k==='corte'?`<a href="corte.html"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`:`<a href="#" class="${k===tab?'active':''}" onclick="tab='${k}';render();return false;"><span class="material-icons">${iconForTab(k)}</span> ${l}${p}</a>`};
+const lk=([k,l])=>{const p=k==='pedidos'&&pendNav>0?` <span class="pill">${pendNav}</span>`:'';return k==='corte'?`<a href="corte.html"><span class="material-icons">${iconForTab(k)}</span> ${l}</a>`:`<a href="#" class="${k===tab?'active':''}" onclick="tab='${k}';render();return false;"><span class="material-icons">${iconForTab(k)}</span> ${l}${p}</a>`};
 $('#sidebar-nav').innerHTML=!['lojista','representante'].includes(appProfile?.role)?GRUPOS_ADMIN.map(([g,ks])=>{const v=ks.map(k=>tabs.find(t=>t[0]===k)).filter(Boolean);return v.length?(g?`<div class="grupo">${g}</div>`:'')+v.map(lk).join(''):''}).join(''):tabs.map(lk).join('');
 $('#page-title').textContent=tabs.find(t=>t[0]===tab)?.[1]||'Painel';
 $('#page-subtitle').textContent='';
@@ -616,9 +615,29 @@ const shell=document.getElementById('app-shell');
 if(shell) shell.style.display='flex';
 const a=$('#app');
 if(!db&&ready){a.innerHTML='<div class="alert">Não foi possível conectar ao banco de dados. Verifique sua internet e recarregue a página.</div>';return}
-a.innerHTML=({painel,produtos,catalogo,materia,pedidos,fabricar,reps,cadastros,estoque,administradores:adminAccountsPage})[tab]();
+a.innerHTML=({painel,produtos,catalogo,materia,pedidos,fabricar,reps,cadastros,estoque,moldes:moldesPage,administradores:adminAccountsPage})[tab]();
 rotula(a);
 if(tab==='administradores'&&!adminAccounts.length&&!adminAccountsLoading&&!adminAccountsError)carregarAdministradores();
+if(tab==='moldes'&&!moldesCarregado&&!moldesCarregando)carregarListaMoldes();
+}
+
+// Aba Moldes: um lugar só para criar, digitalizar e abrir molde já feito (antes eram dois itens soltos no menu)
+let moldesLista=[],moldesCarregando=false,moldesCarregado=false,moldesErro='';
+async function carregarListaMoldes(){
+moldesCarregando=true;moldesErro='';if(tab==='moldes')render();
+const {data,error}=await sb.from('docs').select('id,nome:data->>nome,salvo:data->>salvoEm').eq('col','moldes');
+moldesCarregando=false;moldesCarregado=true;
+if(error){moldesErro='Não foi possível carregar os moldes: '+ptErro(error);moldesLista=[]}
+else moldesLista=(data||[]).sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||'')));
+if(tab==='moldes')render();
+}
+function moldesPage(){
+const mexer=pode('moldes');
+const linhas=moldesLista.map(m=>`<tr><td>${esc(m.nome||'(sem nome)')}</td><td>${m.salvo&&+m.salvo?esc(new Date(+m.salvo).toLocaleString('pt-BR')):'—'}</td><td><button class="sm" onclick="window.open('molde.html?id=${encodeURIComponent(m.id)}','_blank')">Abrir</button></td></tr>`).join('');
+return `<div class="bar end"><div class="row"><button class="ghost" onclick="carregarListaMoldes()">Atualizar</button>${mexer?`<button class="ghost" onclick="location.href='digitalizar.html'">Digitalizar molde</button>`:''}${mexer&&pode('produtos')?`<button class="pri" onclick="window.open('molde.html?novo=1','_blank')">Criar molde</button>`:''}</div></div>
+<p class="mut">“Criar molde” abre o editor em branco. “Digitalizar molde” monta o molde a partir de fotos do papel. Abaixo, os moldes que já existem.</p>
+${moldesErro?`<div class="alert">${esc(moldesErro)}</div>`:''}${moldesCarregando?'<p class="mut">Carregando moldes…</p>':''}
+<div class="tw"><table><tr><th>Molde</th><th>Última alteração</th><th>Ações</th></tr>${linhas||(moldesCarregando||moldesErro?'':'<tr><td colspan="3">Nenhum molde criado ainda.</td></tr>')}</table></div>`;
 }
 
 let adminAccounts=[],adminAccountsLoading=false,adminAccountsError='';
@@ -864,7 +883,7 @@ modal(id?'Editar produto':'Novo produto',`
  <div class="r2" style="align-items:flex-start;margin:0">${campoFoto('F')}${campoFoto('C')}</div>
  <small>Reduzidas para 1200px e convertidas em JPEG antes de subir. Aparecem no catálogo do lojista.</small></fieldset>
  <fieldset style="border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:8px 0"><legend style="padding:0 6px;font-weight:600">Ficha técnica</legend>
-  <label>Molde<select name="molId" required><option value="">— escolha o molde —</option>${moldes.map(m=>`<option value="${esc(m.id)}"${m.id===p.molId?' selected':''}>${esc(m.nome||'(sem nome)')}</option>`).join('')}<option value="plt"${!p.molId&&p.mol?' selected':''}>Importar PLT</option></select><small>Crie o molde pelo menu “Criar molde”. “Importar PLT” usa o arquivo de plotter escolhido abaixo.</small></label>
+  <label>Molde<select name="molId" required><option value="">— escolha o molde —</option>${moldes.map(m=>`<option value="${esc(m.id)}"${m.id===p.molId?' selected':''}>${esc(m.nome||'(sem nome)')}</option>`).join('')}<option value="plt"${!p.molId&&p.mol?' selected':''}>Importar PLT</option></select><small>Crie o molde pelo menu “Moldes”. “Importar PLT” usa o arquivo de plotter escolhido abaixo.</small></label>
   <label>Tecido<select name="tecidoId" required><option value="">— escolha o tecido —</option>${S.materiais.filter(m=>m.tipo==='tecido').sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(m=>`<option value="${m.id}"${m.id===p.tecidoId?' selected':''}>${esc(m.nome)}${m.comp?' · '+esc(m.comp):''}${m.cor?' · '+esc(m.cor):''} (${brl4(matCusto(m))}/m)</option>`).join('')}</select></label>
  <div class="g2"><label>Consumo de tecido P–GG (m por peça)<input name="cons" type="number" step="0.001" min="0" value="${p.cons??''}"></label>
  <label>Consumo de tecido G1–G4 (m por peça)<input name="consG" type="number" step="0.001" min="0" value="${p.consG??''}" placeholder="igual ao P–GG"></label>

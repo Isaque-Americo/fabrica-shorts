@@ -30,7 +30,7 @@ const testes = [
   ['permissoes null false', A.pode(adm(null), 'pedidos', 'ver'), false],
   ['perfil null false', A.pode(null, 'pedidos', 'ver'), false],
   ['ação desconhecida false', A.pode(adm({ pedidos: 'mexer' }), 'pedidos', 'apagar'), false],
-  ['ABA_AREA', ig(A.ABA_AREA, { painel: 'painel', produtos: 'produtos', materia: 'materia', pedidos: 'pedidos', fabricar: 'fabricar', molde: 'moldes', corte: 'moldes', digitalizar: 'moldes', reps: 'reps', cadastros: 'cadastros', estoque: 'estoque' }), true],
+  ['ABA_AREA', ig(A.ABA_AREA, { painel: 'painel', produtos: 'produtos', materia: 'materia', pedidos: 'pedidos', fabricar: 'fabricar', moldes: 'moldes', molde: 'moldes', corte: 'moldes', digitalizar: 'moldes', reps: 'reps', cadastros: 'cadastros', estoque: 'estoque' }), true],
   ['DEPS exportado', typeof A.DEPS, 'object'],
 ];
 

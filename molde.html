@@ -581,7 +581,7 @@ doc.produtoIds=[];
 id=await B.criar(doc);
 criado=true;
 }
-if(!id)return bloquear('Nenhum molde escolhido. Use “Criar molde” no menu do app.');
+if(!id)return bloquear('Nenhum molde escolhido. Use “Criar molde”, dentro de “Moldes” no menu do app.');
 molId=id;
 const u=new URLSearchParams(location.search);u.delete('produto');u.delete('novo');u.delete('sync');u.delete('vindo');u.set('id',id);history.replaceState(null,'','?'+u);
 if(Q.get('sync')==='1')pendente=true; // veio do digitalizar: salva uma vez para ligarProdutos levar a peça aos produtos

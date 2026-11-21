@@ -18,7 +18,8 @@
     'estoque:ver': ['produtos:ver'],
     'cadastros:mexer': ['pedidos:mexer', 'reps:ver'], // ativar acesso de representante dá acesso aos pedidos dele
   };
-  const ABA_AREA = { painel: 'painel', produtos: 'produtos', materia: 'materia', pedidos: 'pedidos', fabricar: 'fabricar', molde: 'moldes', corte: 'moldes', digitalizar: 'moldes', reps: 'reps', cadastros: 'cadastros', estoque: 'estoque' };
+  // 'moldes' é a aba única do app (criar, digitalizar e a lista); 'molde'/'digitalizar' seguem aqui porque outras telas ainda perguntam por eles
+  const ABA_AREA = { painel: 'painel', produtos: 'produtos', materia: 'materia', pedidos: 'pedidos', fabricar: 'fabricar', moldes: 'moldes', molde: 'moldes', corte: 'moldes', digitalizar: 'moldes', reps: 'reps', cadastros: 'cadastros', estoque: 'estoque' };
 
   function fechar(perm) {
     const soVer = new Set(AREAS.filter(a => a.soVer).map(a => a.k));
