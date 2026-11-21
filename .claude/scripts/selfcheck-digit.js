@@ -93,6 +93,32 @@ testes.push(
   ['círculo mm 0.5 (tol 0.25)', circMm(0.5, 0.25), [true, true]],
   ['pintar soma', mRet.reduce((a, b) => a + b, 0), 120 * 90],
   ...(() => {
+    // foto manchada (veio da mesa, papel amassado): sem o borrar de pintar dá 229 pontos e só 97% da folha,
+    // porque a textura serrilha a beirada e abre baía dentro do papel. Números medidos nesta mesma cena.
+    const W = 600, H = 450, M = 60, ideal = (W - 2 * M - 1) * (H - 2 * M - 1), P = 8, A = 40;
+    const ru = (s => () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648)(777);
+    const gw = Math.ceil(W / P) + 2, gh = Math.ceil(H / P) + 2, g = new Float32Array(gw * gh);
+    for (let i = 0; i < g.length; i++) g[i] = ru() - 0.5;
+    const foto = (amp) => { // papel sobre mesa, com gradiente de luz e a mancha interpolada da grade g
+      const im = new Uint8ClampedArray(W * H * 4);
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+        const i = Math.floor(x / P), j = Math.floor(y / P), tx = x / P - i, ty = y / P - j;
+        const t = (g[j * gw + i] * (1 - tx) + g[j * gw + i + 1] * tx) * (1 - ty) + (g[(j + 1) * gw + i] * (1 - tx) + g[(j + 1) * gw + i + 1] * tx) * ty;
+        const c = (x > M && x < W - M && y > M && y < H - M) ? [205, 193, 172] : [118, 118, 124], luz = 1 - 0.18 * x / W, o = (y * W + x) * 4;
+        for (let k = 0; k < 3; k++) im[o + k] = c[k] * luz + t * 2 * amp;
+        im[o + 3] = 255;
+      }
+      return im;
+    };
+    const mm = (im) => { const m = D.pintar(im, W, H, W >> 1, H >> 1, 45); let a = 0; for (let i = 0; i < m.length; i++) a += m[i]; return { pts: D.simplificar(D.borda(m, W, H), 1.5).length, area: a }; };
+    const manchada = mm(foto(A)), chapada = mm(foto(0)), plano = new Uint8ClampedArray(W * H * 4).fill(177);
+    return [
+      ['borrar não mexe em cor chapada', D.borrar(plano, W, H).every((v, i) => v === plano[i]), true],
+      ['pintar trata a foto manchada', [manchada.pts <= 130, manchada.area >= 0.98 * ideal], [true, true]],
+      ['tratamento não desloca beirada limpa', [chapada.pts, chapada.area], [4, ideal]],
+    ];
+  })(),
+  ...(() => {
     // beirada em pente (sombra/vinco): limpar tem de derrubar os vértices falsos sem mexer em retângulo
     const W = 300, H = 200, ru = (s => () => (s = (s * 1103515245 + 12345) % 2147483648) / 2147483648)(11);
     const puro = new Uint8Array(W * H), pente = new Uint8Array(W * H);

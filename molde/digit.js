@@ -173,8 +173,44 @@
 
   // ---- contorno automático (px; tudo iterativo, a folha pode ter vários megapixels) ----
 
+  // média quadrada de raio r nos 3 canais (soma corrente, separável; alfa intacto). Tratamento da foto antes de
+  // comparar cor: o grão e o veio da mesa fazem o pixel pular o limite de tolerância, cada pulo vira dente na
+  // máscara e vértice no Douglas-Peucker. Medido em cena sintética com mancha de 4 px: 229 -> 73 pontos, e a área
+  // da folha sobe de 82% para 100% (sem isso a textura abre baía dentro do papel). Quadrado limpo sai idêntico.
+  // shortcut: r = 1 px; r = 2 piorou toda medida que fiz, e borrar o mapa de diferença em vez dos canais é bem
+  // pior (268 contra 73) — não trocar sem medir de novo.
+  function borrar(rgba, w, h, r = 1) {
+    if (r < 1) return rgba;
+    const n = w * h, out = new Uint8ClampedArray(rgba), t = new Float32Array(n);
+    for (let ch = 0; ch < 3; ch++) {
+      for (let y = 0; y < h; y++) {
+        let s = 0, c = 0;
+        for (let x = 0; x <= r && x < w; x++) { s += rgba[(y * w + x) * 4 + ch]; c++; }
+        for (let x = 0; x < w; x++) {
+          t[y * w + x] = s / c;
+          const a = x + r + 1, m = x - r;
+          if (a < w) { s += rgba[(y * w + a) * 4 + ch]; c++; }
+          if (m >= 0) { s -= rgba[(y * w + m) * 4 + ch]; c--; }
+        }
+      }
+      for (let x = 0; x < w; x++) {
+        let s = 0, c = 0;
+        for (let y = 0; y <= r && y < h; y++) { s += t[y * w + x]; c++; }
+        for (let y = 0; y < h; y++) {
+          out[(y * w + x) * 4 + ch] = s / c;
+          const a = y + r + 1, m = y - r;
+          if (a < h) { s += t[a * w + x]; c++; }
+          if (m >= 0) { s -= t[m * w + x]; c--; }
+        }
+      }
+    }
+    return out;
+  }
+
   // máscara 0/1 da região 4-conectada de cor ≤ tol (RGB) da média 5×5 na semente; furos internos viram 1
   function pintar(rgba, w, h, sx, sy, tol) {
+    const cru = rgba;
+    rgba = borrar(rgba, w, h); // a foto entra tratada: sem isso a textura serrilha a beirada e abre baía
     const n = w * h, mask = new Uint8Array(n);
     let r = 0, gg = 0, b = 0, c = 0;
     for (let y = Math.max(0, sy - 2); y <= Math.min(h - 1, sy + 2); y++) for (let x = Math.max(0, sx - 2); x <= Math.min(w - 1, sx + 2); x++) {
@@ -190,7 +226,13 @@
     for (let x = 0; x < w; x++) { semear(x); semear((h - 1) * w + x); }
     for (let y = 0; y < h; y++) { semear(y * w); semear(y * w + w - 1); }
     for (let i = 0; i < n; i++) if (!fundo[i]) mask[i] = 1;
-    return limpar(semFio(mask, w, h, sy * w + sx), w, h);
+    const fim = limpar(semFio(mask, w, h, sy * w + sx), w, h);
+    // o borrar come 1 px da beirada (0,5 mm por lado num molde). Devolve esse px, mas só onde o pixel cru ainda
+    // é da cor da folha — assim a medida bate com a foto sem tratar e não incha onde o contraste é fraco.
+    const anel = morf(fim, w, h, true), cruPerto = i => Math.hypot(cru[i * 4] - r, cru[i * 4 + 1] - gg, cru[i * 4 + 2] - b) <= tol;
+    const out = new Uint8Array(n);
+    for (let i = 0; i < n; i++) out[i] = fim[i] || (anel[i] && cruPerto(i)) ? 1 : 0;
+    return out;
   }
 
   // inunda m (4-conexo) a partir de s sobre pixels com ok(i) e ainda sem marca; marca com 1
@@ -341,7 +383,7 @@
     return { ang, tx: (P1.x + P2.x) / 2 - r.x - f.x0, ty: (P1.y + P2.y) / 2 - r.y - f.y0 };
   }
 
-  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, sugerirRot, cantosRet, ordenarCantos, desvioDiag, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, pintar, limpar, semFio, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
+  const MoldeDigit = { rotMm, homografia, aplicarH, inversa, validarCruzes, sugerirRot, cantosRet, ordenarCantos, desvioDiag, celulas, conferir, cobertura, foraDaCobertura, bordaFora, melhorFoto, escalaFolha, borrar, pintar, limpar, semFio, borda, simplificar, paraMolde, folhaParaMolde, moldeParaFolha, alinharFolha };
   g.MoldeDigit = MoldeDigit;
   if (typeof module !== 'undefined') module.exports = MoldeDigit;
 })(typeof window !== 'undefined' ? window : globalThis);

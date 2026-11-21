@@ -49,10 +49,12 @@ input[type=text],input[type=number]{width:100%;min-height:44px;padding:8px 10px;
 #c-v main{grid-template-columns:300px minmax(0,1fr)}
 @media (max-width:800px){#c-v main{grid-template-columns:minmax(0,1fr)}}
 #c-vis{overflow:auto;max-height:80vh;border:1px solid var(--bd);border-radius:8px;background:var(--card)}
-#c-pl{position:relative;cursor:crosshair;width:fit-content;max-width:100%}
-#c-pl canvas{display:block;width:100%;max-height:78vh;object-fit:contain}
-#c-cv{width:auto;max-width:100%}
-#c-ov{position:absolute;left:0;top:0;height:100%;pointer-events:none}
+/* a foto manda na altura (height:auto): assim a caixa do canvas tem a mesma proporção do bitmap e a conta de
+   tela -> pixel vale em qualquer zoom. A largura de #c-pl é escrita em px pelo zoom; #c-vis rola o que passar. */
+#c-pl{position:relative;cursor:crosshair;width:fit-content;max-width:100%;touch-action:none}
+#c-pl canvas{display:block;width:100%;height:auto}
+#c-ov{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}
+#c-pl.pegando{cursor:grabbing}
 select{width:100%;min-height:44px;padding:8px 10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
 input[type=range]{width:100%}
 .sel{display:block;width:100%;text-align:left;cursor:pointer;margin-bottom:8px;font:inherit;font-size:13px;color:var(--tx)}
@@ -134,6 +136,8 @@ input.cz-in{position:absolute;width:44px;height:24px;min-height:24px;padding:0 4
       <input type="range" id="c-tol" min="5" max="120" value="40">
       <label for="c-suav">Suavizar (mm): <b id="c-suav-v"></b></label>
       <input type="range" id="c-suav" step="0.1">
+      <label for="c-zoom">Zoom <span class="vazio">(ou Ctrl + roda)</span>:<b id="c-zoom-v">1x</b></label>
+      <input type="range" id="c-zoom" min="1" max="8" step="any" value="1">
       <p class="vazio" id="c-info" role="status">Clique no papel.</p>
       <p id="c-aviso" style="color:var(--warn)" role="status"></p>
       <div class="card" id="c-levar">
@@ -493,16 +497,23 @@ const mn=Math.max(0.3,f.mmPx),s=$('#c-suav');
 s.min=mn;s.max=Math.max(3,mn);s.value=Math.min(s.max,Math.max(mn,1));$('#c-suav-v').textContent=fmt(+s.value);
 CT={w:cv.width,h:cv.height,img:g.getImageData(0,0,cv.width,cv.height),seed:null,mask:null,bordaMm:null,res:null,fora:[]};
 cont=true;await render();
+zerarZoom(); // depois do render: #c-vis já tem tamanho na tela
 $('#c-aviso').textContent='';ov.getContext('2d').clearRect(0,0,ov.width,ov.height);
 $('#c-levar').hidden=!PODE;
 carregarMoldes();
 pintarContorno(Math.floor(CT.w/2),Math.floor(CT.h/2)); // já contorna a partir do centro da folha; clicar no papel refaz de outro ponto
 }catch(e){console.error(e);toast(ptErro(e))}
 }
+// molde já gravado com este nome (sem olhar maiúscula nem espaço nas pontas); null se o nome está vazio
+const mesmoNome=n=>{const k=String(n||'').trim().toLowerCase();return k&&MOLDES.find(m=>String(m.data.nome||'').trim().toLowerCase()===k)||null};
 async function carregarMoldes(){
 try{
 MOLDES=(await BM.lista()).sort((a,b)=>String(a.data.nome||'').localeCompare(String(b.data.nome||'')));
 $('#c-molde').innerHTML='<option value="">Molde novo</option>'+MOLDES.map(m=>`<option value="${esc(m.id)}">${esc(m.data.nome||m.id)}</option>`).join('');
+// molde que já tem o nome desta digitalização vem escolhido: cada peça da mesma referência cai no mesmo
+// molde, em vez de criar um molde novo com nome repetido a cada "Levar"
+const ja=mesmoNome(dado(DIG).nome);
+if(ja)$('#c-molde').value=ja.id;
 }catch(e){toast('Lista de moldes não carregou: '+ptErro(e))}
 mudouMolde();
 }
@@ -532,12 +543,14 @@ if(CT.bordaMm.length<3){CT.res=null;CT.fora=[];$('#c-info').textContent='Região
 else{
 const pts=MoldeDigit.simplificar(CT.bordaMm,suav);
 CT.res=MoldeDigit.paraMolde(pts,{quina:35,passo:f.mmPx}); // passo = 1 px em mm: sem ele a curva vira escadinha
+CT.pts=CT.res.pts; // cópias que paraMolde já fez: arrastar um ponto não mexe na borda traçada
 // trecho k (vértice k até k+1) fica fora se algum pixel de borda entre os dois ficou fora (simplificar devolve os mesmos objetos);
 // só os do meio: o canto de um lado cortado não pinta os lados vizinhos; trecho sem meio usa as duas pontas
 const ix=new Map(CT.bordaMm.map((p,i)=>[p,i])),id=pts.map(p=>ix.get(p)),N=CT.bordaMm.length;
 CT.fora=id.map((a,k)=>{const b=id[(k+1)%id.length];if((a+1)%N===b)return CT.foraPx[a]&&CT.foraPx[b];for(let i=(a+1)%N;i!==b;i=(i+1)%N)if(CT.foraPx[i])return true;return false});
 const lados=CT.res.seg.filter(s=>s.tipo==='linha').length,cur=CT.res.seg.length-lados;
-$('#c-info').textContent=`Contorno com ${CT.res.pts.length} pontos (${lados} retas, ${cur} curvas).`;
+CT.info=`Contorno com ${CT.res.pts.length} pontos (${lados} retas, ${cur} curvas).`;
+$('#c-info').textContent=CT.info+' Arraste um ponto para acertar; o zoom ajuda a mirar.';
 }
 $('#c-aviso').textContent=CT.fora.some(Boolean)?'Faltou foto ou cruz aqui: os trechos em laranja encostam na beirada da folha ou em quadrado sem 4 cruzes — o papel pode continuar além da foto.':'';
 desenharContorno();
@@ -558,11 +571,101 @@ g.stroke();
 g.fillStyle=cor('--hd');
 for(const p of pts){g.beginPath();g.arc(X(p),Y(p),g.lineWidth*1.5,0,7);g.fill()}
 }
+// ---- zoom e arrastar ponto ----
+// largura de #c-pl com zoom 1: a foto inteira cabendo na janela, pela largura ou pela altura
+function zerarZoom(){
+const vis=$('#c-vis');
+CT.base=Math.max(50,Math.min(vis.clientWidth,(vis.clientHeight||1)*CT.w/CT.h));
+CT.zoom=1;$('#c-zoom').value=1;$('#c-zoom-v').textContent='1x';
+aplicarZoom();
+}
+function aplicarZoom(ancora){
+const pl=$('#c-pl'),vis=$('#c-vis'),larg=Math.round(CT.base*CT.zoom);
+pl.style.maxWidth='none';pl.style.width=larg+'px';
+if(ancora){ // o que estava embaixo do cursor (ou no meio da janela) continua no mesmo lugar da tela
+vis.scrollLeft=ancora.x*larg-ancora.px;
+vis.scrollTop=ancora.y*larg*CT.h/CT.w-ancora.py;
+}
+}
+// ponto fixo do zoom: onde ele cai no conteúdo (0..1) e em que lugar da janela tem de continuar. Sem cx/cy, o meio.
+function ancoraEm(cx,cy){
+const vis=$('#c-vis'),r=vis.getBoundingClientRect(),larg=Math.round(CT.base*CT.zoom); // mesma largura que aplicarZoom escreveu, senão o ponto desliza
+const px=cx==null?vis.clientWidth/2:cx-r.left,py=cy==null?vis.clientHeight/2:cy-r.top;
+return{x:(vis.scrollLeft+px)/larg,y:(vis.scrollTop+py)/(larg*CT.h/CT.w),px,py};
+}
+function zoomPara(z,ancora){
+CT.zoom=Math.min(8,Math.max(1,z)); // sem passo fixo: o pinça do trackpad manda delta pequeno e seria arredondado a zero
+$('#c-zoom').value=CT.zoom;$('#c-zoom-v').textContent=fmt(CT.zoom)+'x';
+aplicarZoom(ancora);
+}
+// ponto da tela -> mm da folha, e o contrário; valem em qualquer zoom porque a caixa guarda a proporção
+function mmDaTela(e){
+const r=$('#c-cv').getBoundingClientRect(),f=dado(DIG).folha,k=CT.w/r.width;
+return{x:f.x0+((e.clientX-r.left)*k+0.5)*f.mmPx,y:f.y0+((e.clientY-r.top)*k+0.5)*f.mmPx};
+}
+function telaDoPonto(p,r,f){const k=r.width/CT.w;return{x:r.left+((p.x-f.x0)/f.mmPx-0.5)*k,y:r.top+((p.y-f.y0)/f.mmPx-0.5)*k}}
+// índice do ponto a até 16 px da tela do clique (o mais perto); -1 se nenhum
+function pontoPerto(e){
+if(!CT||!CT.pts)return -1;
+const r=$('#c-cv').getBoundingClientRect(),f=dado(DIG).folha;
+let mi=-1,md=16;
+CT.pts.forEach((p,i)=>{const t=telaDoPonto(p,r,f),d=Math.hypot(t.x-e.clientX,t.y-e.clientY);if(d<md){md=d;mi=i}});
+return mi;
+}
+function refazerTracos(){
+const f=dado(DIG).folha,r=MoldeDigit.paraMolde(CT.pts,{quina:35,passo:f.mmPx});
+CT.res={pts:CT.pts,seg:r.seg}; // guarda o mesmo array: o índice do arrasto continua valendo
+desenharContorno();
+}
+let arrasto=null,passeio=null,pegou=false; // arrasto = {i} enquanto segura; pegou = trava para o clique seguinte não repintar
+$('#c-pl').addEventListener('pointerdown',e=>{
+if(!CT||!CT.res)return;
+const i=pontoPerto(e);
+pegou=i>=0; // todo pointerdown reescreve a trava: ela nunca sobra de um arrasto que não virou clique
+if(i<0){ // longe de ponto: arrastar passeia pela foto (com zoom, a barra de rolagem é o único jeito senão)
+const vis=$('#c-vis');
+passeio={x:e.clientX,y:e.clientY,sx:vis.scrollLeft,sy:vis.scrollTop};
+try{$('#c-pl').setPointerCapture(e.pointerId)}catch(_){}
+return;
+}
+arrasto={i};$('#c-pl').classList.add('pegando');
+try{$('#c-pl').setPointerCapture(e.pointerId)}catch(_){}
+e.preventDefault();
+});
+$('#c-pl').addEventListener('pointermove',e=>{
+if(passeio){
+const vis=$('#c-vis'),dx=e.clientX-passeio.x,dy=e.clientY-passeio.y;
+vis.scrollLeft=passeio.sx-dx;vis.scrollTop=passeio.sy-dy;
+if(Math.hypot(dx,dy)>4)pegou=true; // passeou: o clique que vem não é pedido de repintar
+return;
+}
+if(!arrasto)return;
+const p=mmDaTela(e);CT.pts[arrasto.i].x=p.x;CT.pts[arrasto.i].y=p.y;
+refazerTracos();
+});
+const soltar=e=>{
+if(passeio){passeio=null;try{$('#c-pl').releasePointerCapture(e.pointerId)}catch(_){}return}
+if(!arrasto)return;
+try{$('#c-pl').releasePointerCapture(e.pointerId)}catch(_){}
+$('#c-pl').classList.remove('pegando');
+$('#c-info').textContent=CT.info+' Ponto movido à mão — mexer na tolerância ou no suavizar refaz o contorno e perde o ajuste.';
+arrasto=null;
+};
+$('#c-pl').addEventListener('pointerup',soltar);
+$('#c-pl').addEventListener('pointercancel',soltar);
 $('#c-pl').addEventListener('click',e=>{
 if(!CT)return;
+if(pegou){pegou=false;return} // soltou um ponto: não é pedido de repintar
 const r=$('#c-cv').getBoundingClientRect();
 pintarContorno(Math.min(CT.w-1,Math.max(0,Math.floor((e.clientX-r.left)*CT.w/r.width))),Math.min(CT.h-1,Math.max(0,Math.floor((e.clientY-r.top)*CT.h/r.height))));
 });
+$('#c-zoom').oninput=()=>{if(CT)zoomPara(+$('#c-zoom').value,ancoraEm())};
+// Ctrl + roda dá zoom no que está embaixo do cursor, como na aba de molde; sem Ctrl a roda só rola a janela
+$('#c-vis').addEventListener('wheel',e=>{
+if(!CT||!(e.ctrlKey||e.metaKey))return;
+e.preventDefault(); // senão o navegador dá zoom na página inteira
+zoomPara(CT.zoom*Math.pow(1.0015,-e.deltaY),ancoraEm(e.clientX,e.clientY));
+},{passive:false});
 $('#c-tol').oninput=()=>$('#c-tol-v').textContent=$('#c-tol').value;
 $('#c-tol').onchange=()=>{if(CT&&CT.seed)pintarContorno(...CT.seed)};
 $('#c-suav').oninput=suavizar;
@@ -597,6 +700,7 @@ if(modo!=='c'&&!res&&!confirm('Sem contorno automático: só a folha entra no mo
 const b=$('#c-leva');b.disabled=true;
 try{
 const novo=!mid;
+if(novo&&mesmoNome(d.nome)&&!confirm(`Já existe um molde chamado "${d.nome}". Criar outro com o mesmo nome? (para juntar as peças na mesma referência, cancele e escolha o molde na lista)`))return;
 let m=novo?MM.novo(d.nome||'Molde digitalizado'):(x=>x&&MM.normalizar(x))(await BM.molde(mid)); // re-lê antes de gravar
 if(!m){toast('Molde não encontrado.');return}
 // mesma regra do editor: molde ligado a produto, ao salvar, grava também no produto
