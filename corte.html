@@ -158,7 +158,7 @@ body{background:#fff;font-size:10pt}
     <div class="duas">
       <label class="campo">Camadas <input id="pr-cam" type="number" min="1" step="1"></label>
       <label class="campo">Altura máxima (camadas) <input id="pr-alt" type="number" min="0" step="1" placeholder="sem limite"></label>
-      <label class="campo">Comprimento máximo (m) <input id="pr-comp" inputmode="decimal" autocomplete="off" placeholder="sem limite"></label>
+      <label class="campo" title="Comprimento útil da mesa de enfesto, onde o risco vai ser estendido. Não é a largura do tecido.">Comprimento da mesa (m) <input id="pr-comp" inputmode="decimal" autocomplete="off" placeholder="sem limite"></label>
       <label class="campo">Cabeceira (cm) <input id="pr-cab" inputmode="decimal" autocomplete="off"></label>
       <label class="campo pr-ourela">Ourela esquerda (cm) <input id="pr-oe" inputmode="decimal" autocomplete="off"></label>
       <label class="campo pr-ourela">Ourela direita (cm) <input id="pr-od" inputmode="decimal" autocomplete="off"></label>
@@ -389,7 +389,7 @@ c.setAttribute('aria-labelledby',e?'tab-'+e.id:'');
 agendarRes();
 if(!e){c.innerHTML='<p class="vazio">Nenhum enfesto neste tecido. Use “+ Enfesto”.</p>';return restaurar(foco)}
 const tub=!!(m&&m.tubular);
-const res=[`${e.camadas} camada(s)`,e.alturaMax?`altura máx. ${e.alturaMax}`:'',e.compMax?`comp. máx. ${nf(e.compMax/1000)} m`:'',
+const res=[`${e.camadas} camada(s)`,e.alturaMax?`altura máx. ${e.alturaMax}`:'',e.compMax?`mesa de ${nf(e.compMax/1000)} m`:'',
   e.cabeceira?`cabeceira ${nf(e.cabeceira/10,1)} cm`:'',!tub&&(e.ourelaE||e.ourelaD)?`ourelas ${nf(e.ourelaE/10,1)} / ${nf(e.ourelaD/10,1)} cm`:'',
   e.sentido==='unico'?'sentido único':'sentido duplo'].filter(Boolean).map(esc).join(' · ');
 const alto=e.alturaMax&&e.camadas>e.alturaMax?` · <span class="ruim">camadas acima da altura máxima</span>`:'';
@@ -422,7 +422,7 @@ const e=curEnf(),lin=e&&document.querySelector(`#res-${CSS.escape(e.id)} [data-l
 if(lin){
 const c=cs[O.enfestos.indexOf(e)];
 lin.innerHTML=c?`Risco ${nf(c.comp/1000)} m · ${nf(c.comp/1000*e.camadas)} m de tecido · aproveitamento ${nf(c.aproveitamento*100,1)}%`+
-  (e.compMax&&c.comp>e.compMax?' · <span class="ruim">passa do comprimento máximo</span>':'')+[...new Set((c.avisos||[]).map(a=>a.motivo))].map(m=>' · '+esc(m)).join('')
+  (e.compMax&&c.comp>e.compMax?' · <span class="ruim">mais comprido que a mesa</span>':'')+[...new Set((c.avisos||[]).map(a=>a.motivo))].map(m=>' · '+esc(m)).join('')
   :'<span class="vazio">Sem risco: '+esc(semRisco(e))+'.</span>';
 }
 $('#res-ordem-c').innerHTML=htmlRes(cs);

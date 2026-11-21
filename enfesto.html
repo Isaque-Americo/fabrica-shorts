@@ -226,7 +226,7 @@ item('Camadas',String(cam),ENF.alturaMax?'altura máx. '+ENF.alturaMax:'');
 item('Largura útil',nf(C.largUtil/10,1)+' cm',MAT.tubular?'tubular':'');
 item('Peças cortadas',String(C.pecasTotal*cam),C.pecasTotal+' por camada');
 $('#painel').innerHTML=lista.join('');
-if(ENF.compMax&&comp>ENF.compMax)av.push(['','Passa do comprimento máximo da mesa ('+nf(ENF.compMax/1000)+' m).']);
+if(ENF.compMax&&comp>ENF.compMax)av.push(['','O risco é mais comprido que a mesa ('+nf(ENF.compMax/1000)+' m). Se a mesa for maior, corrija o comprimento nas Propriedades do enfesto.']);
 if(ENF.alturaMax&&cam>ENF.alturaMax)av.push(['','Camadas acima da altura máxima ('+ENF.alturaMax+').']);
 for(const a of C.avisos||[])av.push(['leve',`${nomePeca(a.peca)} (${a.tam}): ${a.motivo}.`]);
 $('#avisos').innerHTML=av.map(([c,t])=>`<li class="${c}">${esc(t)}</li>`).join('');
