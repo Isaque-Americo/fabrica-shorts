@@ -19,6 +19,12 @@ jobs:
           SB_URL: https://kgikdyqyoaqrhsshpmcw.supabase.co
           SB_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI
         run: |
-          curl -sS --fail-with-body --retry 3 --retry-all-errors --max-time 30 \
+          code=$(curl -sS -o resposta.txt -w '%{http_code}' \
+            --retry 3 --retry-all-errors --max-time 30 \
             -H "apikey: $SB_KEY" -H "Authorization: Bearer $SB_KEY" \
-            "$SB_URL/rest/v1/docs?select=id&limit=1"
+            "$SB_URL/rest/v1/docs?select=id&limit=1") || exit 1
+          echo "HTTP $code: $(cat resposta.txt)"
+          # 401 e o esperado: a tabela docs so abre depois do login. O que importa
+          # e que o Postgres respondeu, logo o projeto esta acordado. Falha so se
+          # nao houve resposta (000) ou se o servidor quebrou (5xx).
+          [ "$code" -ge 200 ] && [ "$code" -lt 500 ]
