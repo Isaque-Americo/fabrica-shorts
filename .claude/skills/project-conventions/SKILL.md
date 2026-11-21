@@ -13,7 +13,8 @@ user-invocable: false
 
 ## Não executar
 - Comandos que escrevem no banco: `supabase db push`, `migration repair`, `functions deploy`
-- Comandos git que alterem repositório: commit, push, merge, rebase
+- Comandos git que reescrevem histórico ou juntam ramos: merge, rebase
+- (`commit` e `push` para o `origin` liberados pelo dono em 2026-11-21; continuam valendo as outras regras: nada de credencial em arquivo rastreado, nada de mexer nos arquivos da lista "Não alterar")
 
 ## Credenciais
 - Nunca grave chaves, tokens ou senhas em arquivos.
