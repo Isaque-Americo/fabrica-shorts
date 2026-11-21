@@ -95,7 +95,7 @@ dialog h3{margin:0 0 12px}
 select{font:inherit;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
 select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
 body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.leitura #btn-desfazer,body.leitura #btn-refazer,body.leitura #btn-extrair,body.leitura #m-add{display:none}
-#ferramentas button:disabled,#btn-extrair:disabled,#props button:disabled{opacity:.4;cursor:not-allowed}
+#ferramentas button:disabled,#btn-extrair:disabled,#props button:disabled,#topo button:disabled{opacity:.4;cursor:not-allowed}
 #tams button{border-color:var(--c);color:var(--tx);min-width:34px}
 #tams button[aria-pressed="true"]{background:var(--c);color:var(--card)}
 #tams button.base{font-weight:700;text-decoration:underline}
@@ -134,6 +134,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
 #editor{grid-template:auto auto 1fr auto/1fr;grid-template-areas:"topo" "ferr" "tela" "painel"}
 #ferramentas{flex-direction:row;border-right:0;border-bottom:1px solid var(--bd)}
 #painel{border-left:0;border-top:1px solid var(--bd);max-height:30vh}
+.rot{display:none} /* no celular a barra já enche de botão: fica só a seta, o aria-label diz o resto */
 }
 </style>
 </head>
@@ -161,8 +162,8 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
       <button class="sm" type="button" id="zoom-mais" title="Aumentar zoom" aria-label="Aumentar zoom">+</button>
     </span>
     <span class="grupo" role="group" aria-label="Histórico">
-      <button class="sm" type="button" id="btn-desfazer" title="Desfazer (Ctrl+Z)">Desfazer</button>
-      <button class="sm" type="button" id="btn-refazer" title="Refazer (Ctrl+Y)">Refazer</button>
+      <button class="sm" type="button" id="btn-desfazer" title="Desfazer (Ctrl+Z)" aria-label="Desfazer" aria-keyshortcuts="Control+Z">↶ <span class="rot">Desfazer</span></button>
+      <button class="sm" type="button" id="btn-refazer" title="Refazer (Ctrl+Y)" aria-label="Refazer" aria-keyshortcuts="Control+Y">↷ <span class="rot">Refazer</span></button>
     </span>
   </header>
   <nav id="ferramentas" aria-label="Ferramentas"></nav>
@@ -448,7 +449,9 @@ desenharPecas();
 // alteração que vale como passo do histórico
 function alterou(){if(!PODE)return;H.gravar(M);sujou()}
 // marca não salvo, redesenha e agenda salvar (sem passo no histórico)
-function sujou(){if(!PODE)return;ver++;erroSalvar='';pontaErro=null;marcar('nao-salvo');desenhar();desenharPainel();desenharMed();agendar()}
+function sujou(){if(!PODE)return;ver++;erroSalvar='';pontaErro=null;marcar('nao-salvo');desenhar();desenharPainel();desenharMed();setas();agendar()}
+// seta apagada = não tem passo para esse lado. Vale para o clique e para o Ctrl+Z, que passa pelo mesmo botão
+function setas(){if(!H)return;const p=H.pode();$('#btn-desfazer').disabled=!p.desfazer;$('#btn-refazer').disabled=!p.refazer}
 function agendar(ms=1500){clearTimeout(timer);timer=setTimeout(salvar,ms)}
 function aplicar(m){if(!PODE)return;M=MM.normalizar(m);$('#nome').value=M.nome;sujou()}
 
@@ -588,7 +591,7 @@ if(PODE&&r&&r.em>(doc.salvoEm||0)){
 if(confirm('Há alterações deste molde de '+new Date(r.em).toLocaleString('pt-BR')+' que não chegaram ao servidor. Recuperar?')){M=MM.normalizar(r.m);pendente=true}
 else try{localStorage.removeItem(RASC())}catch(e){}
 }
-H=MM.historico();H.gravar(M);
+H=MM.historico();H.gravar(M);setas(); // abre com as duas setas apagadas: nada feito ainda
 $('#aviso').hidden=true;$('#editor').hidden=false;$('#nome').value=M.nome;$('#nome').readOnly=!PODE;document.body.classList.toggle('leitura',!PODE);
 for(const s of ['#lista-pecas','#props','#aba-medidas','#aba-grad'])$(s).inert=!PODE;
 tamVer=M.base;

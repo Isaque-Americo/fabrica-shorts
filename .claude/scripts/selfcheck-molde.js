@@ -156,6 +156,9 @@ testes.push(
   ['novo', [M.novo('x').nome, M.novo('x').v, M.novo('x').base], ['x', 1, 'M']],
   ['historico desfazer 2', h1, { n: 1 }],
   ['historico refazer', h2, { n: 2 }],
+  ['historico pode no meio', h.pode(), { desfazer: true, refazer: true }],
+  ['historico pode no comeco', (q => (q.desfazer(), q.pode()))(M.historico()), { desfazer: false, refazer: false }],
+  ['historico pode no fim', (q => (q.gravar({ n: 1 }), q.gravar({ n: 2 }), q.pode()))(M.historico()), { desfazer: true, refazer: false }],
 );
 
 // ferramentas de desenho (molde/desenho.js)

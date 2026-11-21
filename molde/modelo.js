@@ -226,7 +226,9 @@
     return {
       gravar(m) { pilha = pilha.slice(0, i + 1); pilha.push(structuredClone(m)); if (pilha.length > limite) pilha.shift(); i = pilha.length - 1; },
       desfazer: () => i > 0 ? structuredClone(pilha[--i]) : null,
-      refazer: () => i < pilha.length - 1 ? structuredClone(pilha[++i]) : null
+      refazer: () => i < pilha.length - 1 ? structuredClone(pilha[++i]) : null,
+      // tem passo para trás / para frente: o editor desliga a seta quando não tem, senão o clique não faz nada e parece quebrado
+      pode: () => ({ desfazer: i > 0, refazer: i < pilha.length - 1 })
     };
   }
 
