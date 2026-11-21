@@ -406,7 +406,7 @@ restaurar(foco);
 function semRisco(e){
 const t=O.tecidos.find(x=>x.id===e.tecidoId),m=t&&mat(t.materiaId);
 if(!m)return 'este tecido ainda não tem matéria-prima: escolha em Propriedades';
-if(!(+m.larg>0))return `o tecido "${nomeMat(m)}" está sem largura útil: cadastre a largura do rolo na aba Matéria-prima do App`;
+if(!(MO.largM(m)>0))return `o tecido "${nomeMat(m)}" está sem largura útil: cadastre a largura do rolo (ou a gramatura e o rendimento em m/kg) na aba Matéria-prima do App`;
 if(!e.itens.length)return 'nenhum produto neste enfesto';
 if(!e.itens.some(it=>Object.values(it.grade||{}).some(q=>q>0)))return 'nenhuma quantidade na grade';
 if(!e.itens.some(it=>pecasDe(prod(it.produtoId),t).length))return 'nenhuma peça do molde vai neste tecido';
@@ -479,7 +479,8 @@ return `<article class="item" aria-label="${esc(nomeProd(p))}"><header><strong>$
 
 function infoMat(m){
 const pr=MO.matCusto(m);
-return [m.larg?'largura '+nf(m.larg)+' m':'largura não informada',m.forn?'fornecedor '+m.forn:'',m.gram?nf(m.gram,0)+' g/m²':'',pr?brl(pr)+'/m':'',
+const lg=MO.largM(m);
+return [lg?'largura '+nf(lg)+' m'+(+m.larg>0?'':' (pelo rendimento)'):'largura não informada',m.forn?'fornecedor '+m.forn:'',m.gram?nf(m.gram,0)+' g/m²':'',pr?brl(pr)+'/m':'',
   m.tubular?'tubular':'aberto',m.sentidoUnico?'sentido único':'',(+m.encolhC||+m.encolhL)?`encolhimento ${nf(m.encolhC,1)}% × ${nf(m.encolhL,1)}%`:''].filter(Boolean).join(' · ');
 }
 

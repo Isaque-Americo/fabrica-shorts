@@ -196,7 +196,7 @@ let C=null,P=[],OC=null,selJ=-1,Z=0,W=0; // C = calcularEnfesto; P = posições 
 const extras=[];
 function corTam(t){let i=SZ.indexOf(t);if(i<0){if(!extras.includes(t))extras.push(t);i=SZ.length+extras.indexOf(t)}return `var(--t${i%8})`}
 const oe=()=>MAT&&MAT.tubular?0:ENF.ourelaE; // tubular não tem ourela
-const larg=()=>(+MAT.larg||0)*1000;
+const larg=()=>MO.largM(MAT)*1000;
 const compAtual=()=>E.compPosicoes(C.itens,P)+ENF.cabeceira;
 const NS='http://www.w3.org/2000/svg';
 
@@ -209,7 +209,7 @@ if(entrar){const a=document.createElement('a');a.href='index.html';a.textContent
 function calcular(){
 C=MO.calcularEnfesto(ENF,O,PRODS,MATS);
 selJ=-1;$('#b-mini').disabled=$('#b-exp').disabled=!C;
-if(!C){P=[];OC=null;$('#area').innerHTML='<p class="vazio">'+(!MAT?'Este enfesto está sem tecido: escolha o tecido na ordem.':!(+MAT.larg>0)?`O tecido "${esc(MAT.nome||'')}" está sem largura útil: sem ela não dá para montar o risco. Cadastre a largura do rolo na aba Matéria-prima.`:'Não foi possível montar o risco: confira as peças e a grade, e se alguma peça é mais larga que o tecido.')+'</p>';painel();return}
+if(!C){P=[];OC=null;$('#area').innerHTML='<p class="vazio">'+(!MAT?'Este enfesto está sem tecido: escolha o tecido na ordem.':!(MO.largM(MAT)>0)?`O tecido "${esc(MAT.nome||'')}" está sem largura útil: sem ela não dá para montar o risco. Cadastre a largura do rolo — ou a gramatura e o rendimento em m/kg — na aba Matéria-prima.`:'Não foi possível montar o risco: confira as peças e a grade, e se alguma peça é mais larga que o tecido.')+'</p>';painel();return}
 P=C.posicoes.map(p=>({...p}));OC=E.ocupacao(C.itens,P,C.largUtil);
 desenharPecas();desenharFundo();painel();selecionar(-1);
 }
@@ -223,7 +223,7 @@ item('Aproveitamento',nf(ap*100,1)+'%',comp!==C.comp?'automático '+nf(C.aprovei
 item('Comprimento',nf(comp/1000)+' m',(ENF.cabeceira?'com cabeceira de '+nf(ENF.cabeceira/10,1)+' cm':'')+(comp!==C.comp?(ENF.cabeceira?' · ':'')+'automático '+nf(C.comp/1000)+' m':''));
 item('Total de tecido',nf(comp/1000*cam)+' m',nf(comp/1000)+' m × '+cam+' camada(s)');
 item('Camadas',String(cam),ENF.alturaMax?'altura máx. '+ENF.alturaMax:'');
-item('Largura útil',nf(C.largUtil/10,1)+' cm',MAT.tubular?'tubular':'');
+item('Largura útil',nf(C.largUtil/10,1)+' cm',[MAT.tubular?'tubular':'',+MAT.larg>0?'':'largura pelo rendimento'].filter(Boolean).join(' · '));
 item('Peças cortadas',String(C.pecasTotal*cam),C.pecasTotal+' por camada');
 $('#painel').innerHTML=lista.join('');
 if(ENF.compMax&&comp>ENF.compMax)av.push(['','Passa do comprimento máximo da mesa ('+nf(ENF.compMax/1000)+' m).']);

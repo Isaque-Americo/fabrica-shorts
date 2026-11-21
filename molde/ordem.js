@@ -10,6 +10,9 @@
   // R$/m do tecido, igual a matCusto do index.html para tipo 'tecido'
   const matCusto = m => !m ? 0 : m.cobr === 'mt' ? num(m.preco) : num(m.rend) > 0 ? num(m.preco) / num(m.rend) : 0;
 
+  // largura útil do rolo: sem larg cadastrada, deduz pela gramatura e pelo rendimento (m/kg), que a compra por kg já informa
+  const largM = m => { if (num(m && m.larg) > 0) return num(m.larg); const gr = num(m && m.gram), re = num(m && m.rend); return gr > 0 && re > 0 ? 1000 / (gr * re * (m.tubular ? 2 : 1)) : 0; };
+
   function normEnfesto(e, i) {
     e = e || {};
     return {
@@ -162,7 +165,7 @@
   // posições em mm a partir do início do encaixe (sem ourela E); comp inclui a cabeceira. null: sem peças, sem tecido ou peça mais larga que o tecido
   function calcularEnfesto(enf, ordem, produtos, tecidos) {
     const { aba, mat } = contexto(enf, ordem, tecidos); if (!mat) return null;
-    const largUtil = num(mat.larg) * 1000 - (mat.tubular ? 0 : num(enf.ourelaE) + num(enf.ourelaD)); // tubular não tem ourela: a dobra fica na borda real
+    const largUtil = largM(mat) * 1000 - (mat.tubular ? 0 : num(enf.ourelaE) + num(enf.ourelaD)); // tubular não tem ourela: a dobra fica na borda real
     const itens = pecasEnfesto(enf, ordem, produtos, tecidos), r = E.encaixar(itens, largUtil);
     if (!r) return null;
     const comp = r.comp + num(enf.cabeceira), areaPecas = itens.reduce((a, x) => a + x.area, 0), grade = {};
@@ -191,7 +194,7 @@
       const { mat } = contexto(enf, ordem, tecidos), cam = Math.max(1, nn(enf.camadas)), m = c.comp / 1000 * cam;
       const kgm2 = num(mat && mat.gram) / 1000 * (mat && mat.tubular ? 2 : 1);
       r.metros += m; r.custo += m * matCusto(mat);
-      r.pesoTecido += m * num(mat && mat.larg) * kgm2;
+      r.pesoTecido += m * largM(mat) * kgm2;
       r.pesoPecas += num(c.areaPecas) / 1e6 * cam * kgm2;
       if (Object.keys(c.grade || {}).length) mPrincipal += m;
       for (const [ref, gt] of Object.entries(c.grade || {})) for (const [t, q] of Object.entries(gt)) {
@@ -208,7 +211,7 @@
   // com as regras do tecido (largura útil = larg sem ourela, encolhimento, sentido único, tubular) ÷ peças de roupa.
   // {cons (P–GG), consG (G1–G4)}, cada um null se não houver tamanho; null se nenhum
   function consumoPeloMolde(p, mat) {
-    const pt = p && p.mol && p.mol.porTam; if (!pt || !mat || !(num(mat.larg) > 0)) return null;
+    const pt = p && p.mol && p.mol.porTam; if (!pt || !mat || !(largM(mat) > 0)) return null;
     const tecidos = [{ ...mat, id: mat.id || 'm' }], ordem = { tecidos: [{ id: 't', materiaId: tecidos[0].id }] };
     const por = tams => {
       tams = tams.filter(t => pt[t] && pt[t].length); if (!tams.length) return null;
@@ -221,7 +224,7 @@
     return cons == null && consG == null ? null : { cons, consG };
   }
 
-  const MoldeOrdem = { normalizar, nova, deFabricar, dePedido, semMolde, ajustarGrade, pecasEnfesto, calcularEnfesto, resultados, matCusto, meiaPeca, consumoPeloMolde };
+  const MoldeOrdem = { normalizar, nova, deFabricar, dePedido, semMolde, ajustarGrade, pecasEnfesto, calcularEnfesto, resultados, matCusto, largM, meiaPeca, consumoPeloMolde };
   g.MoldeOrdem = MoldeOrdem;
   if (typeof module !== 'undefined') module.exports = MoldeOrdem;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -496,6 +496,20 @@ testes.push(
   ['consumoPeloMolde sem porTam, sem tecido ou sem largura: null', [cpm({ id: 'p1', mol: { pecas: [pc()] } }, tec()), cpm(prodC(['M']), null), cpm(prodC(['M']), tec({ larg: 0 }))], [null, null, null]],
 );
 
+
+// largura util deduzida: tecido comprado por kg sem larg, com gramatura (g/m2) e rendimento (m/kg)
+const tecKg = o => tec({ larg: 0, cobr: 'kg', preco: 25.9, gram: 180, rend: 3.27, ...o });
+const largDed = 1000 / (180 * 3.27);
+const cKg = ce([pc()], tecKg(), { ourelaE: 20, ourelaD: 30 });
+const rKg = cKg && fn(() => O.resultados(O.normalizar(ordemO({ ourelaE: 20, ourelaD: 30 })), [cKg], [tecKg()]), null);
+testes.push(
+  ['largM: larg cadastrada manda', fn(() => O.largM(tec({ rend: 3.27 })), 0), 1.6],
+  ['largM: sem larg, deduz pela gramatura e pelo rendimento', fn(() => O.largM(tecKg()), 0), largDed, 1e-9],
+  ['largM: tubular tem dois panos em cada metro', fn(() => O.largM(tecKg({ tubular: true })), 0), largDed / 2, 1e-9],
+  ['largM: sem gramatura, sem rendimento ou sem tecido: 0', [fn(() => O.largM(tecKg({ gram: 0 })), -1), fn(() => O.largM(tecKg({ rend: 0 })), -1), fn(() => O.largM(null), -1)], [0, 0, 0]],
+  ['calcularEnfesto usa a largura deduzida', cKg && cKg.largUtil, largDed * 1000 - 50, 1e-9],
+  ['peso do tecido usa a largura deduzida', rKg && rKg.pesoTecido, cKg && cKg.comp / 1000 * largDed * 0.18, 1e-9],
+);
 // ajuste manual (molde/encaixe.js ocupacao/cabe/moverPeca/compPosicoes) sobre o cCab: 4 quadrados de 200 mm em 1550 mm
 const ajuste = (() => {
   if (!cCab || !E.ocupacao) return null;
