@@ -357,7 +357,7 @@ const uid=()=>Math.random().toString(36).slice(2,10);
 // tamanhos do produto: os de p.mol.porTam, senão a grade do app; mais os que já têm quantidade ou pedido
 function tamsDe(p,it){
 const pt=p&&p.mol&&p.mol.porTam,base=pt&&Object.keys(pt).length?Object.keys(pt):SZ;
-return [...new Set([...base,...Object.keys(it.grade).filter(t=>it.grade[t]),...Object.keys(it.falta)])];
+return [...new Set([...base,...Object.keys(it.grade).filter(t=>it.grade[t]),...Object.keys(it.falta)])].sort(ordTam); // porTam vem na ordem da grade do molde, que pode estar fora de ordem
 }
 // nomes das peças do molde que vão neste tecido (mesma regra do MoldeOrdem: peça sem tecido vai no principal)
 function pecasDe(p,aba){
