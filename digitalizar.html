@@ -148,6 +148,7 @@ input.cz-in{position:absolute;width:44px;height:24px;min-height:24px;padding:0 4
         <select id="c-molde"><option value="">Molde novo</option></select>
         <div id="c-tam-l"><label for="c-tam">Tamanho</label><input type="text" id="c-tam" maxlength="20" list="c-tams"><datalist id="c-tams"></datalist></div>
         <div id="c-peca-l" hidden><label for="c-peca">Peça que usa a folha</label><select id="c-peca"></select></div>
+        <p id="c-aviso" class="vazio" role="status"></p>
         <div class="acoes"><button class="btn pri" id="c-leva">Levar para o molde</button></div>
       </div>
     </div>
@@ -525,6 +526,13 @@ $('#c-tams').innerHTML=mm?MM.tamanhos(mm).map(t=>`<option value="${esc(t)}">`).j
 $('#c-peca-l').hidden=!(modo==='c'&&mm);
 $('#c-peca').innerHTML='<option value="">(nenhuma)</option>'+(mm?mm.pecas.map(p=>`<option value="${esc(p.id)}">${esc(p.nome||p.id)}</option>`).join(''):'');
 if(!$('#c-tam').value)$('#c-tam').value=dado(DIG).tam||'';
+// diz com letras o que o botão vai fazer: criar um molde ou entrar num que já existe. Sem isso o único sinal é
+// a palavra "Molde novo" no seletor, e o dono não sabia se tinha acabado de criar molde ou não
+const nome=String(dado(DIG).nome||'').trim(),ja=!mm&&mesmoNome(nome),ts=mm?MM.tamanhos(mm):[];
+$('#c-aviso').innerHTML=mm
+?`Vai entrar no molde <b>${esc(mm.nome||'sem nome')}</b>, que já tem ${mm.pecas.length} peça(s)${ts.length?' nos tamanhos '+esc(ts.join(', ')):''}.`
+:`Vai <b>criar um molde novo</b> chamado <b>${esc(nome||'Molde digitalizado')}</b>.`+(ja?' Já existe um molde com esse nome: escolha-o na lista acima para as peças ficarem juntas.':'');
+$('#c-leva').textContent=mm?'Levar para este molde':'Criar o molde e levar';
 }
 function pintarContorno(sx,sy){
 CT.seed=[sx,sy];
@@ -717,7 +725,8 @@ m.fundos[alvo]={dig:tela,arq:f.arq,mmPx:f.mmPx,x0:f.x0,y0:f.y0,w:f.w,h:f.h,tx:0,
 m.salvoEm=Date.now(); // rascunho local mais velho que isto não pergunta "Recuperar?"
 const id=novo?await BM.criar(m):(await BM.gravar(mid,m),mid);
 // sync=1: o editor salva uma vez ao abrir e o salvar dele (ligarProdutos) leva as peças aos produtos ligados
-location.href='molde.html?id='+encodeURIComponent(id)+(m.produtoIds.length?'&sync=1':'')+(LOCAL?'&local=1':'');
+// vindo=: o editor abre com um recado dizendo se o molde acabou de ser criado ou se a peça entrou num que já existia
+location.href='molde.html?id='+encodeURIComponent(id)+(m.produtoIds.length?'&sync=1':'')+'&vindo='+(novo?'novo':'add')+(LOCAL?'&local=1':'');
 }catch(e){console.error(e);toast(ptErro(e))}
 finally{b.disabled=false}
 }

@@ -583,7 +583,7 @@ criado=true;
 }
 if(!id)return bloquear('Nenhum molde escolhido. Use “Criar molde” no menu do app.');
 molId=id;
-const u=new URLSearchParams(location.search);u.delete('produto');u.delete('novo');u.delete('sync');u.set('id',id);history.replaceState(null,'','?'+u);
+const u=new URLSearchParams(location.search);u.delete('produto');u.delete('novo');u.delete('sync');u.delete('vindo');u.set('id',id);history.replaceState(null,'','?'+u);
 if(Q.get('sync')==='1')pendente=true; // veio do digitalizar: salva uma vez para ligarProdutos levar a peça aos produtos
 M=MM.normalizar(doc);ligadosSalvos=criado?[]:[...M.produtoIds]; // recém-criado: o produto ainda não tem molId, tem de ligar
 let r=null;try{r=JSON.parse(localStorage.getItem(RASC()))}catch(e){}
@@ -592,7 +592,10 @@ if(confirm('Há alterações deste molde de '+new Date(r.em).toLocaleString('pt-
 else try{localStorage.removeItem(RASC())}catch(e){}
 }
 H=MM.historico();H.gravar(M);setas(); // abre com as duas setas apagadas: nada feito ainda
-$('#aviso').hidden=true;$('#editor').hidden=false;$('#nome').value=M.nome;$('#nome').readOnly=!PODE;document.body.classList.toggle('leitura',!PODE);
+$('#aviso').hidden=true;$('#editor').hidden=false;$('#nome').value=M.nome;
+// recado de quem veio da digitalização: Q foi lido antes do replaceState, então ainda tem o vindo=
+if(Q.get('vindo')==='novo')toast('Molde "'+(M.nome||'sem nome')+'" criado com a folha digitalizada.');
+else if(Q.get('vindo')==='add')toast('A folha entrou no molde "'+(M.nome||'sem nome')+'", que agora tem '+M.pecas.length+' peça(s).');$('#nome').readOnly=!PODE;document.body.classList.toggle('leitura',!PODE);
 for(const s of ['#lista-pecas','#props','#aba-medidas','#aba-grad'])$(s).inert=!PODE;
 tamVer=M.base;
 marcar('salvo');if(pendente)sujou();else{desenhar();desenharPainel()}
