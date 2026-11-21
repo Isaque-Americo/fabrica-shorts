@@ -209,7 +209,7 @@ if(entrar){const a=document.createElement('a');a.href='index.html';a.textContent
 function calcular(){
 C=MO.calcularEnfesto(ENF,O,PRODS,MATS);
 selJ=-1;$('#b-mini').disabled=$('#b-exp').disabled=!C;
-if(!C){P=[];OC=null;$('#area').innerHTML='<p class="vazio">Não foi possível montar o risco: confira o tecido do enfesto, as peças e a grade, e se alguma peça é mais larga que o tecido.</p>';painel();return}
+if(!C){P=[];OC=null;$('#area').innerHTML='<p class="vazio">'+(!MAT?'Este enfesto está sem tecido: escolha o tecido na ordem.':!(+MAT.larg>0)?`O tecido "${esc(MAT.nome||'')}" está sem largura útil: sem ela não dá para montar o risco. Cadastre a largura do rolo na aba Matéria-prima.`:'Não foi possível montar o risco: confira as peças e a grade, e se alguma peça é mais larga que o tecido.')+'</p>';painel();return}
 P=C.posicoes.map(p=>({...p}));OC=E.ocupacao(C.itens,P,C.largUtil);
 desenharPecas();desenharFundo();painel();selecionar(-1);
 }
