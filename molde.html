@@ -721,6 +721,8 @@ $('#btn-enfesto').onclick=async()=>{
 if(!M.produtoIds.length)return toast('Ligue este molde a uma referência primeiro (botão Referências): o enfesto é por produto.');
 await salvar();
 if(estado!=='salvo')return toast('O molde ainda não foi salvo. Confira a conexão e tente de novo.');
+// o produto pode ter ficado com mol velho (ou nenhum) de um salvamento antigo: salvar sem mudanca nao reescreve
+try{await ligarProdutos(M)}catch(e){console.error(e);return toast('Não deu para levar o molde para a referência: '+ptErro(e))}
 location.href='corte.html?prod='+encodeURIComponent(M.produtoIds[0])+(LOCAL?'&local=1':'');
 };
 $('#btn-grade').onclick=()=>abrirGrade('');
