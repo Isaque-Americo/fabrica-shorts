@@ -20,7 +20,7 @@
     return {
       ...d, nome: d.nome || '', produtoIds: d.produtoIds || [], base: d.base || 'M',
       pontos: d.pontos || {}, tracos: d.tracos || [], textos: d.textos || [], v: d.v || 1,
-      grade: d.grade || [], grad: d.grad || {}, medidas: d.medidas || [], foto: d.foto || '', fundos: d.fundos || {},
+      grade: d.grade || [], grad: d.grad || {}, gradAuto: d.gradAuto || null, medidas: d.medidas || [], foto: d.foto || '', fundos: d.fundos || {},
       pecas: (d.pecas || []).map(p => ({
         ...p, nome: p.nome || '', cortar: p.cortar ?? 1, par: !!p.par, tracos: p.tracos || [], dobra: p.dobra || null,
         fio: p.fio || { a: { x: 0, y: 0 }, b: { x: 0, y: 100 } }, margem: p.margem ?? 10, margemTraco: p.margemTraco || {},
@@ -141,6 +141,31 @@
     });
     m.grad[pontoId] = r;
   }
+  // gradacao automatica: a cada tamanho a peca aumenta x na horizontal e y na vertical (mm),
+  // repartido entre os pontos pela distancia ao centro da peca. Refaz a gradacao do molde inteiro.
+  function graduarTudo(m, x, y) {
+    const tams = tamanhos(m), ib = tams.indexOf(m.base);
+    if (ib < 0) return;
+    const vistos = new Set(), grupos = [];
+    for (const p of m.pecas) {
+      const ids = new Set();
+      for (const t of p.tracos || []) { const tr = acha(m, t.id); if (tr) for (const k of ['a', 'b', 'c']) if (tr[k] && m.pontos[tr[k]]) ids.add(tr[k]); }
+      if (ids.size) { grupos.push([...ids]); for (const id of ids) vistos.add(id); }
+    }
+    const soltos = Object.keys(m.pontos).filter(id => !vistos.has(id)); // ponto fora de peca cresce com o desenho todo
+    if (soltos.length) grupos.push(soltos);
+    m.grad = {};
+    for (const ids of grupos) {
+      const xs = ids.map(id => m.pontos[id].x), ys = ids.map(id => m.pontos[id].y);
+      const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+      const w = x1 - x0, h = y1 - y0, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+      for (const id of ids) {
+        const px = w ? (m.pontos[id].x - cx) / w : 0, py = h ? (m.pontos[id].y - cy) / h : 0;
+        const r = m.grad[id] = {};
+        tams.forEach((t, i) => { r[t] = { dx: px * x * (i - ib), dy: py * y * (i - ib) }; });
+      }
+    }
+  }
   function copiarRegra(m, de, para) {
     for (const id of para) if (m.grad[de]) m.grad[id] = structuredClone(m.grad[de]); else delete m.grad[id];
   }
@@ -232,7 +257,7 @@
     };
   }
 
-  const MoldeModelo = { GRADES, novo, normalizar, uid, tracoPts, encadear, costura, corte, tamanhos, noTamanho, graduarPasso, copiarRegra,
+  const MoldeModelo = { GRADES, novo, normalizar, uid, tracoPts, encadear, costura, corte, tamanhos, noTamanho, graduarPasso, graduarTudo, copiarRegra,
     removerGradacao, separarTamanhos, medir, aplicarBainha, molParaProduto, historico };
   g.MoldeModelo = MoldeModelo;
   if (typeof module !== 'undefined') module.exports = MoldeModelo;

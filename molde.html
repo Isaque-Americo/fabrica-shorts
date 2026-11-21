@@ -153,7 +153,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
     <input type="range" id="folha-op" min="0.1" max="1" step="0.05" value="0.5" hidden aria-label="Opacidade da folha" title="Opacidade da folha">
     <button class="sm" type="button" id="btn-alinhar" hidden title="Clique um ponto do molde e o ponto igual na folha, duas vezes">Alinhar folha</button>
     <button class="sm" type="button" id="btn-digit" title="Abre a digitalização de moldes">Digitalizar</button>
-    <button class="sm" type="button" id="btn-grade" title="Grade, tamanho base e foto da ficha técnica">Grade e foto</button>
+    <button class="sm" type="button" id="btn-grade" title="Grade, tamanho base, quanto aumenta por tamanho e foto da ficha técnica">Grade e medidas</button>
     <button type="button" id="foto-mini" hidden title="Ver a foto da ficha técnica"><img alt="Foto da ficha técnica"></button>
     <button class="sm" type="button" id="btn-refs" title="Produtos que usam este molde">Referências <span id="refs-n"></span></button>
     <span class="grupo" role="group" aria-label="Zoom">
@@ -242,6 +242,11 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
   <label class="campo">Grade <select id="g-grade"><option value="app">P–G4 do app</option><option value="pgg">P–GG</option><option value="numerica">36–56</option><option value="">Definir depois</option></select></label>
   <label class="campo">Tamanho base <select id="g-base"></select></label>
   <p class="vazio" id="g-dica" hidden></p>
+  <div id="g-auto">
+    <label class="campo">Aumenta por tamanho — X cm (→) <input id="g-auto-x" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+    <label class="campo">Aumenta por tamanho — Y cm (↓) <input id="g-auto-y" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+    <p class="vazio">Vale para todas as peças, em volta do centro de cada uma. Depois dá para acertar ponto a ponto na aba Gradação.</p>
+  </div>
   <label class="campo">Foto da ficha técnica (opcional) <input id="g-foto" type="file" accept="image/*"></label>
   <div class="row"><button class="ghost" type="submit" value="">Cancelar</button><button class="pri" type="submit" value="ok">OK</button></div>
   </form>
@@ -608,10 +613,10 @@ toast(t);abrirGrade(t);
 }
 }
 
-// diálogo Novo molde / Grade e foto; devolve {nome,grade,base,foto} ou null (cancelado). Não mexe em m.
+// diálogo Novo molde / Grade e medidas; devolve {nome,grade,base,foto,auto} ou null (cancelado). Não mexe em m.
 async function dlgGrade(m,novo,aviso=''){
 const d=$('#dlg-grade'),gs=$('#g-grade'),bs=$('#g-base'),f=$('#g-foto'),av=$('#g-aviso');
-$('#dlg-grade-t').textContent=novo?'Novo molde':'Grade e foto';
+$('#dlg-grade-t').textContent=novo?'Novo molde':'Grade e medidas';
 $('#g-nome-l').hidden=!novo;$('#g-nome').value=m.nome;
 av.textContent=aviso;av.hidden=!aviso;
 // grade fora dos padrões (doc editado à mão): opção "Atual" mantém a grade como está
@@ -627,10 +632,19 @@ bs.textContent='';for(const t of l){const o=document.createElement('option');o.v
 dicaSZ($('#g-dica'),novo||m.produtoIds.length,l);
 };
 bs.textContent='';encher();gs.onchange=encher;f.value='';
+const ga=m.gradAuto||{x:0,y:0};
+$('#g-auto').hidden=novo; // molde novo ainda não tem peça para graduar
+$('#g-auto-x').value=ga.x?cm2(ga.x):'';$('#g-auto-y').value=ga.y?cm2(ga.y):'';
 d.returnValue='';d.showModal();
 await new Promise(r=>d.addEventListener('close',r,{once:true}));
 if(d.returnValue!=='ok')return null;
 const r={nome:novo?$('#g-nome').value.trim()||m.nome:null,grade:[...gradeDe(gs.value)],base:bs.value,foto:null};
+const ax=novo?0:lerCm('#g-auto-x'),ay=novo?0:lerCm('#g-auto-y');
+if(ax===null||ay===null){toast('Medida inválida. Ex.: 1 ou 0,5');return null}
+r.auto={x:ax,y:ay};
+// gradação feita à mão: avisa antes de refazer tudo
+const temMao=!m.gradAuto&&Object.values(m.grad).some(g=>Object.values(g).some(v=>v.dx||v.dy));
+if((ax||ay)&&temMao&&!confirm('Isto refaz a gradação de todos os pontos e substitui o que você ajustou na aba Gradação. Continuar?'))return null;
 // aplicarDlg apaga a gradação dos tamanhos que saem da grade
 const perde=Object.values(m.grad).filter(g=>Object.entries(g).some(([t,v])=>!r.grade.includes(t)&&(v.dx||v.dy))).length;
 if(perde&&!confirm(`${perde} ponto(s) perdem a regra de gradação dos tamanhos que saem da grade. Continuar?`))return null;
@@ -648,8 +662,14 @@ m.grade=r.grade;m.base=r.base;
 // mantém a gradação dos tamanhos que continuam
 for(const g of Object.values(m.grad))for(const t in g)if(!r.grade.includes(t))delete g[t];
 if(r.foto)m.foto=r.foto;
+// medidas por tamanho: refaz a gradação das peças, já com a grade e o base aplicados acima
+if(r.auto&&(r.auto.x||r.auto.y||m.gradAuto)){m.gradAuto=(r.auto.x||r.auto.y)?r.auto:null;MM.graduarTudo(m,r.auto.x,r.auto.y)}
 }
-async function abrirGrade(aviso){const r=await dlgGrade(M,false,aviso);if(r){aplicarDlg(M,r);tamVer=M.base;alterou()}}
+async function abrirGrade(aviso){
+const r=await dlgGrade(M,false,aviso);if(!r)return;
+aplicarDlg(M,r);tamVer=M.base;alterou();
+toast(r.auto&&(r.auto.x||r.auto.y)?`Gradação aplicada: cada tamanho aumenta ${cm2(r.auto.x)} cm em X e ${cm2(r.auto.y)} cm em Y. Troque o tamanho nos botões de cima para ver.`:`Grade: ${MM.tamanhos(M).join(', ')} · base ${M.base}.`);
+}
 
 // seletor de tamanho exibido + fantasma + miniatura da foto; refeito só quando muda
 function desenharTams(tams){
@@ -1117,7 +1137,7 @@ function desenharGrad(){
 if(!M)return;
 if(gradPt&&!M.pontos[gradPt])gradPt=null;
 const tams=MM.tamanhos(M),semGrade=tams.length<2,fora=foraBase();
-$('#g-vazio').textContent=semGrade?'Defina a grade em "Grade e foto" para graduar.':fora?'Edite no tamanho base.':!gradPt?'Escolha Graduar ponto (G) e clique num ponto do diagrama.':'';
+$('#g-vazio').textContent=semGrade?'Defina a grade em "Grade e medidas" para graduar.':fora?'Edite no tamanho base.':!gradPt?'Escolha Graduar ponto (G) e clique num ponto do diagrama.':'';
 $('#grad').disabled=semGrade||fora||!gradPt;$('#grad-tudo').disabled=semGrade||fora;
 $('#grad').hidden=!gradPt;
 $('#g-pt').textContent=gradPt?'Ponto '+gradPt:'';

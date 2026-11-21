@@ -260,6 +260,9 @@ const cvG = M.noTamanho(cv, 'G').tracos[0];
 const gr = M.normalizar({ ...structuredClone(ret), grade: M.GRADES.app, base: 'M' });
 gr.pecas[0].fio = { a: P(0, 0), b: P(100, 0) };
 M.graduarPasso(gr, 'b', 10, 0); M.graduarPasso(gr, 'c', 10, 0);
+const gt = M.normalizar({ ...structuredClone(ret), grade: ['P', 'M', 'G'], base: 'M' });
+M.graduarTudo(gt, 10, 20);
+const gtG = G.bbox(M.costura(M.noTamanho(gt, 'G'), gt.pecas[0]));
 const prodGr = M.molParaProduto(gr);
 const sp = structuredClone(gr); sp.grade = ['P', 'M', 'G'];
 const areaG = G.area(M.costura(M.noTamanho(sp, 'G'), sp.pecas[0]));
@@ -292,6 +295,8 @@ testes.push(
   ['tamanhos com grade', M.tamanhos(gp), M.GRADES.app],
   ['GRADES numerica', M.GRADES.numerica, ['36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56']],
   // brief dizia G4=35, mas (índice(G4) − índice(M)) × 5 = 6 × 5 = 30, e o caso com salto (G4=50) também conta 6 passos
+  ['graduarTudo: cantos do G e do P', [gt.grad.a.G.dx, gt.grad.a.G.dy, gt.grad.b.G.dx, gt.grad.c.G.dy, gt.grad.a.P.dx], [-5, -10, 5, 10, 5]],
+  ['graduarTudo: base em zero e peca do G com 110 x 220', [gt.grad.a.M.dx, gt.grad.a.M.dy, gtG.w, gtG.h], [0, 0, 110, 220]],
   ['graduarPasso P M G G4', [gp.grad.p1.P.dx, gp.grad.p1.M.dx, gp.grad.p1.G.dx, gp.grad.p1.G4.dx], [-5, 0, 5, 30]],
   ['graduarPasso salto GG G1 G4', [gs.grad.p1.GG.dx, gs.grad.p1.G1.dx, gs.grad.p1.G4.dx, gs.grad.p1.P.dx], [10, 20, 50, -5]],
   ['review2 c2 segue b, c1 fica', [cvG.c1, cvG.c2], [P(30, -30), P(90, -30)]],
