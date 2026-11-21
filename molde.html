@@ -80,7 +80,7 @@ dialog h3{margin:0 0 12px}
 #tela .pc .fio,#tela .pc .piq{fill:none;stroke:var(--tx);stroke-width:1.2px;vector-effect:non-scaling-stroke}
 #tela .pc-tx{fill:var(--tx);font-family:'Inter',sans-serif}
 #tela .ponta-erro{fill:none;stroke:var(--bad);stroke-width:2.5px;vector-effect:non-scaling-stroke}
-#btn-extrair{width:100%;margin-bottom:8px}
+#btn-extrair,#btn-bolso{width:100%;margin-bottom:8px}
 .pc-item{display:flex;align-items:center;gap:4px;padding:4px;border:1px solid var(--bd);border-radius:8px;margin-bottom:6px}
 .pc-item.sel{border-color:var(--ac);box-shadow:inset 0 0 0 1px var(--ac)}
 .pc-item .mini{width:36px;height:36px;flex:none}
@@ -98,8 +98,8 @@ dialog h3{margin:0 0 12px}
 #props p{margin:8px 0 0}
 select{font:inherit;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
 select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.leitura #btn-enfesto,body.leitura #btn-desfazer,body.leitura #btn-refazer,body.leitura #btn-extrair,body.leitura #m-add{display:none}
-#ferramentas button:disabled,#btn-extrair:disabled,#props button:disabled,#topo button:disabled{opacity:.4;cursor:not-allowed}
+body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.leitura #btn-enfesto,body.leitura #btn-desfazer,body.leitura #btn-refazer,body.leitura #btn-extrair,body.leitura #btn-bolso,body.leitura #m-add{display:none}
+#ferramentas button:disabled,#btn-extrair:disabled,#btn-bolso:disabled,#props button:disabled,#topo button:disabled{opacity:.4;cursor:not-allowed}
 #tams button{border-color:var(--c);color:var(--tx);min-width:34px}
 #tams button[aria-pressed="true"]{background:var(--c);color:var(--card)}
 #tams button.base{font-weight:700;text-decoration:underline}
@@ -207,6 +207,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
     </section>
     <section id="aba-moldes" role="tabpanel" aria-label="Moldes">
     <button class="sm" type="button" id="btn-extrair" title="Cria uma peça com os traços selecionados (contorno fechado)">Extrair molde</button>
+    <button class="sm" type="button" id="btn-bolso" title="Cria uma peça retangular (bolso, vista, etiqueta) com a medida que você digitar, ao lado do que já está desenhado">Inserir bolso (retângulo)</button>
     <div id="lista-pecas"></div>
     <fieldset id="props" hidden>
       <legend>Propriedades</legend>
@@ -698,7 +699,7 @@ box.append(b);
 });
 if(foco)[...box.children].find(b=>b.textContent===foco)?.focus();
 $('#btn-fantasma').setAttribute('aria-pressed',fantasma);
-document.querySelectorAll('#ferramentas button,#btn-extrair,#props [data-modo]').forEach(b=>b.disabled=fora);
+document.querySelectorAll('#ferramentas button,#btn-extrair,#btn-bolso,#props [data-modo]').forEach(b=>b.disabled=fora);
 if(fora){op=null;modoPeca=null}
 desenharGrad();
 const fm=$('#foto-mini');fm.hidden=!u;if(u)fm.firstElementChild.src=u;
@@ -989,6 +990,24 @@ const r=MD.novaPeca(M,[...sel]);
 if(!r.ok){toast(r.erro);pontaErro=r.ponta||null;desenhar();return}
 sel.clear();pecaSel=r.peca.id;alterou();
 }
+// peça retangular pronta (bolso, vista, etiqueta): desenha 5 cm à direita do que já existe e já vira peça
+function inserirBolso(){
+if(foraBase())return toast('Edite no tamanho base');
+const t=prompt('Bolso: largura e altura em cm','20;23');
+if(t==null)return;
+const v=MD.medida(t);
+if(!v||!(v[0]>0))return toast('Medida inválida. Ex.: 20;23');
+const l=v[0]*10,a=(v.length>1&&v[1]>0?v[1]:v[0])*10;
+const ps=Object.values(M.pontos),b=ps.length?G.bbox(ps):{x0:0,y0:0,w:0,h:0};
+const A={x:b.x0+b.w+50,y:b.y0},r=MD.retangulo(M,A,{x:A.x+l,y:A.y+a});
+if(r.erro)return toast(r.erro);
+const n=MD.novaPeca(M,r.ids);
+if(!n.ok)return toast(n.erro);
+let nome='Bolso',i=1;while(M.pecas.some(p=>p!==n.peca&&p.nome===nome))nome='Bolso '+(++i);
+Object.assign(n.peca,{nome,margem:0}); // a medida digitada é a do corte; margem em cima dela só se o dono puser
+sel.clear();pecaSel=n.peca.id;alterou();
+toast(`${nome} de ${MD.cm(l)} × ${MD.cm(a)} cm criado, já no corte. Se essa for a linha de costura, ponha a margem nas propriedades.`);
+}
 // ponta da seta do fio da peça selecionada sob o cursor
 function fioSob(p){const pc=pecaAtual();if(!pc||!pc.visivel||pc.travada||!MD.geoPeca(M,pc))return null;return ['a','b'].find(k=>dist(p,pc.fio[k])<=6/zoom)||null}
 function seta(a,b){const l=dist(a,b)||1,ux=(b.x-a.x)/l,uy=(b.y-a.y)/l,k=8/zoom;return `M${n2(b.x-ux*k-uy*k/2)} ${n2(b.y-uy*k+ux*k/2)}L${n2(b.x)} ${n2(b.y)}L${n2(b.x-ux*k+uy*k/2)} ${n2(b.y-uy*k-ux*k/2)}`}
@@ -1112,7 +1131,7 @@ $('#p-esp').addEventListener('change',campo((pc,i)=>{pc.espelhar=i.checked}));
 $('#p-tub').addEventListener('change',campo((pc,i)=>{pc.tubular=i.checked}));
 $('#p-tec').addEventListener('change',campo((pc,i)=>{pc.tecido=i.value}));
 document.querySelectorAll('#props [data-modo]').forEach(b=>b.onclick=()=>{modoPeca=modoPeca===b.dataset.modo?null:b.dataset.modo;op=null;preencherProps();desenhar()});
-$('#btn-extrair').onclick=extrair;
+$('#btn-extrair').onclick=extrair;$('#btn-bolso').onclick=inserirBolso;
 // clique na tela com um modo de peça ligado
 function cliquePeca(p,e){
 const pc=pecaAtual();if(!pc||pc.travada)return;

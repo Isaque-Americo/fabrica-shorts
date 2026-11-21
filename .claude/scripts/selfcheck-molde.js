@@ -234,6 +234,8 @@ testes.push(
   ['novaPeca segunda PEÇA 2 id novo', [np2.peca.nome, np2.peca.id !== pc1.id, pm.pecas.length], ['PEÇA 2', true, 2]],
   ['novaPeca aberta da ponta', [solta.ok, !!solta.ponta], [false, true]],
   ['novaPeca sem traco', D.novaPeca(structuredClone(dr), []).ok, false],
+  ['novaPeca sem tam quando nenhuma peca tem', pc1.tam, undefined],
+  ['novaPeca herda o tam das outras pecas', D.novaPeca((m => (m.pecas.forEach(p => p.tam = 'p'), m))(structuredClone(pm)), rr).peca.tam, 'p'],
   ['geoPeca corte 1 cm', G.bbox(D.geoPeca(pm, pc1).corte), { x0: -10, y0: -10, w: 320, h: 520 }],
   ['geoPeca traco apagado quebra', D.geoPeca(pmQ, pmQ.pecas[0]), null],
   ['pique 5 mm para dentro do corte', D.pique(pm, pc1, { tracoId: rr[0], t: 0.5 }), [P(150, -10), P(150, -5)]],
@@ -277,6 +279,9 @@ const prodRt = M.molParaProduto(rt);
 const nPeca = M.normalizar({ pecas: [{ id: 'a' }] });
 // final 1: depois de separar, cada tamanho só leva a sua peça
 const prodSp = M.molParaProduto(sp);
+// peça nova (bolso) depois de separar: sem herdar o tam ela seria a única de P e G e esconderia as peças de lá
+const spNova = structuredClone(sp), novoRet = D.retangulo(spNova, P(500, 0), P(700, 230)).ids;
+const spNovaPc = D.novaPeca(spNova, novoRet).peca, prodSpNova = M.molParaProduto(spNova);
 // final 2: traço lápis não anda com a gradação; no G o contorno quebra e vai a peça do base com aviso
 const lp = M.normalizar({ grade: ['P', 'M', 'G'], base: 'M', pontos: { a: P(0, 0), b: P(100, 0), c: P(100, 100) },
   tracos: [{ id: 'l1', tipo: 'reta', a: 'a', b: 'b' }, { id: 'l2', tipo: 'reta', a: 'b', b: 'c' }, { id: 'l3', tipo: 'livre', pts: [P(100, 100), P(0, 100), P(0, 0)] }] });
@@ -316,6 +321,7 @@ testes.push(
   ['final1 separar porTam G 1 peca com largura do G', [prodSp.porTam.G.length, prodSp.porTam.G[0].w, prodSp.pecas.length, prodSp.porTam.P.length], [1, prodGr.porTam.G[0].w, 1, 1]],
   ['final1 separar G e a copia', prodSp.porTam.G[0].w - prodSp.pecas[0].w, 10, 1],
   ['final1 separar tam nas pecas', sp.pecas.map(p => p.tam).sort(), ['G', 'M', 'P']],
+  ['peca nova depois de separar herda o base e nao some dos outros tamanhos', [spNovaPc.tam, prodSpNova.porTam.M.length, prodSpNova.porTam.G.length], ['M', 2, 1]],
   ['final2 G quebrado usa a peca do base', [prodLp.porTam.G.length, prodLp.porTam.G[0].w], [1, prodLp.pecas[0].w]],
   ['final2 avisos', prodLp.avisos, [{ peca: 'Lapis', tam: 'P' }, { peca: 'Lapis', tam: 'G' }]],
   ['final2 sem quebra sem aviso', prodGr.avisos, []],

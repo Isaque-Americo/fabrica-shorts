@@ -230,7 +230,9 @@
     if (!r.ok) return r;
     let n = m.pecas.length + 1;
     while (m.pecas.some(p => p.nome === 'PEÇA ' + n)) n++;
-    const peca = { id: uid(m, 'pc'), nome: 'PEÇA ' + n, cortar: 1, par: false, tracos: r.tracos, dobra: null, fio: null,
+    // mesmo tam das outras: molParaProduto só manda para porTam[T] a peça sem tam ou com tam T, então uma peça nova sem tam esconderia as outras nos demais tamanhos
+    const tam = (m.pecas.find(p => p.tam) || {}).tam;
+    const peca = { id: uid(m, 'pc'), nome: 'PEÇA ' + n, tam, cortar: 1, par: false, tracos: r.tracos, dobra: null, fio: null,
       margem: 10, margemTraco: {}, piques: [], pences: [], visivel: true, travada: false,
       rotacao: '180', espelhar: false, tubular: false, tecido: '', bainhas: {} }; // mesmos padrões do normalizar
     const b = G.bbox(MM.costura(m, peca)), x = b.x0 + b.w / 2;
