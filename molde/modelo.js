@@ -237,7 +237,7 @@
       const c = tam === n.base ? nb : noTamanho(n, tam);
       porTam[tam] = [];
       for (const p of vis) {
-        if (p.tam && p.tam !== tam) continue;
+        if (p.tam && p.tam.toUpperCase() !== String(tam).toUpperCase()) continue; // molde antigo pode ter tamanho em minuscula
         let r = tam === n.base ? doBase[p.id] : pecaProduto(c, c.pecas.find(x => x.id === p.id));
         if (!r && doBase[p.id]) { r = doBase[p.id]; avisos.push({ peca: p.nome, tam }); }
         if (r) porTam[tam].push(r);

@@ -319,6 +319,7 @@ testes.push(
   ['final2 G quebrado usa a peca do base', [prodLp.porTam.G.length, prodLp.porTam.G[0].w], [1, prodLp.pecas[0].w]],
   ['final2 avisos', prodLp.avisos, [{ peca: 'Lapis', tam: 'P' }, { peca: 'Lapis', tam: 'G' }]],
   ['final2 sem quebra sem aviso', prodGr.avisos, []],
+  ['peca com tamanho em minuscula entra no tamanho da grade', (() => { const mn = M.normalizar(structuredClone(gr)); mn.pecas[0].tam = 'm'; const r = M.molParaProduto(mn); return [r.porTam.M.length, r.porTam.G.length]; })(), [1, 0]],
   ['GRADES pgg', M.GRADES.pgg, ['P', 'M', 'G', 'GG']],
 );
 

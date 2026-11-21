@@ -700,7 +700,7 @@ return r.peca;
 async function levar(){
 if(!PODE||!CT)return;
 const d=dado(DIG),f=d.folha,modo=$('#c-modo').value,mid=$('#c-molde').value,res=modo==='c'?null:CT.res;
-let tam=$('#c-tam').value.trim();
+let tam=$('#c-tam').value.trim().toUpperCase(); // tamanho digitado em minuscula nao casava com a grade (P-G4) e a peca sumia do molde
 const av=f.avisos||[];
 if(av.length&&!confirm('Fotos com aviso na montagem da folha: '+av.join('; ')+'. Levar para o molde mesmo assim?'))return;
 if(res&&CT.fora.some(Boolean)&&!confirm('Parte do contorno encosta na beirada da folha ou em quadrado sem 4 cruzes (faltou foto ou cruz aqui). Levar para o molde mesmo assim?'))return;
@@ -819,7 +819,7 @@ esp=Math.max(ret.w,ret.h); // o contorno usa esp como lado da célula única que
 }else esp=cm('#n-esp');
 if(!nome||!(esp>0))return;
 try{
-const id=await B.criar({nome,tam:$('#n-tam').value.trim(),esp,ret,fotos:[],folha:null,criadaEm:new Date().toISOString(),v:1});
+const id=await B.criar({nome,tam:$('#n-tam').value.trim().toUpperCase(),esp,ret,fotos:[],folha:null,criadaEm:new Date().toISOString(),v:1});
 $('#nova').reset();$('#nova').hidden=true;
 await abrir(id);
 }catch(x){toast(ptErro(x))}
