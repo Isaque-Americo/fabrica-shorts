@@ -700,7 +700,7 @@ $('#foto-mini').onclick=()=>{$('#foto-g').src=B.fotoUrl(M.foto);$('#dlg-foto').s
 $('#refs-ok').onclick=()=>$('#dlg-refs').close();
 $('#ref-busca').addEventListener('input',e=>{const t=e.target.value.toLowerCase();document.querySelectorAll('#refs label').forEach(l=>l.hidden=!l.dataset.busca.includes(t))});
 document.addEventListener('keydown',e=>{
-if(!M||!(e.ctrlKey||e.metaKey)||e.target.closest('input,textarea,dialog'))return;
+if(!M||!(e.ctrlKey||e.metaKey)||(e.target.closest&&e.target.closest('input,textarea,dialog')))return;
 const k=e.key.toLowerCase();
 if(k==='z'&&!e.shiftKey){e.preventDefault();$('#btn-desfazer').click()}
 else if(k==='y'||(k==='z'&&e.shiftKey)){e.preventDefault();$('#btn-refazer').click()}
@@ -1218,7 +1218,7 @@ $('#m-add').onclick=()=>{M.medidas.push({id:'md'+(1+Math.max(0,...M.medidas.map(
 let ultCli={x:0,y:0};
 tela.addEventListener('pointerdown',e=>{
 if(!M)return;
-if(e.button===1||(e.button===0&&(espaco||ferr==='mao'))){pan={x:e.clientX,y:e.clientY,vx,vy};tela.setPointerCapture(e.pointerId);e.preventDefault();return}
+if(e.button===1||(e.button===0&&(espaco||ferr==='mao'))){pan={x:e.clientX,y:e.clientY,vx,vy};try{tela.setPointerCapture(e.pointerId)}catch(_){}e.preventDefault();return}
 if(e.button===2){fimGrad();op=null;desenhar();return}
 if(e.button!==0||!PODE)return;
 if(alin){cliqueAlin(mm(e));e.preventDefault();return}
@@ -1248,7 +1248,7 @@ tela.addEventListener('wheel',e=>{if(!M)return;e.preventDefault();zoomEm(e.clien
 function zoomEm(cx,cy,f){const r=tela.getBoundingClientRect(),px=cx-r.left,py=cy-r.top,mx=vx+px/zoom,my=vy+py/zoom;zoom=Math.min(20,Math.max(.1,zoom*f));vx=mx-px/zoom;vy=my-py/zoom;desenhar()}
 function zoomMeio(f){const r=tela.getBoundingClientRect();zoomEm(r.left+r.width/2,r.top+r.height/2,f)}
 document.addEventListener('keydown',e=>{
-if(!M||e.target.closest('input,textarea,dialog,select'))return;
+if(!M||(e.target.closest&&e.target.closest('input,textarea,dialog,select')))return;
 if(e.key==='Control'&&!e.repeat&&!ferrCtrl){if(ferr!=='mao'){ferrCtrl=ferr;opCtrl=op;escolher('mao',true)}return}
 if(e.ctrlKey||e.metaKey||e.altKey)return;
 if(!PODE&&e.key!==' ')return;
@@ -1257,7 +1257,7 @@ if(foraBase()&&k!==' '&&k!=='Escape')return;
 if(op&&T[ferr].digitado&&/^[0-9,.\-]$/.test(k)){e.preventDefault();abrirMedida(k,ultCli.x,ultCli.y);return}
 if(k==='Escape'){fimGrad();alin=null;op=null;modoPeca=null;preencherProps();desenhar();return}
 if(k==='Delete'||k==='Backspace'){e.preventDefault();if(sel.size)edicao('apagar');return}
-if(k===' '){if(!e.target.closest('button,a')){espaco=true;e.preventDefault()}return}
+if(k===' '){if(!e.target.closest||!e.target.closest('button,a')){espaco=true;e.preventDefault()}return}
 const l=k.toLowerCase();
 if(l==='m'){alternarIma();return}
 const f=FERRS.find(x=>x[3].toLowerCase()===l);if(f)escolher(f[0]);
