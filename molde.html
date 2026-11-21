@@ -54,6 +54,10 @@ dialog h3{margin:0 0 12px}
 #refs label:last-child{border-bottom:0}
 #refs small{color:var(--mut)}
 #ref-busca{width:100%}
+#ref-nova{display:flex;gap:6px;margin-top:8px}
+#ref-nova input{min-width:0}
+#ref-n-ref{flex:0 0 34%}
+#ref-n-nome{flex:1}
 #toast{display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:20px;background:var(--hd);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:99;max-width:90vw}
 #dica{font-size:13px;color:var(--mut);flex-basis:100%;order:9;min-height:1.5em}
 #ferramentas button{font:inherit;font-size:18px;line-height:1;width:38px;height:38px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--tx);cursor:pointer}
@@ -233,6 +237,8 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
   <input id="ref-busca" type="search" placeholder="Buscar referência ou nome" aria-label="Buscar produto" style="margin-top:10px">
   <p class="vazio" id="refs-dica" hidden></p>
   <div id="refs"><p class="vazio" style="padding:10px">Carregando…</p></div>
+  <div id="ref-nova"><input id="ref-n-ref" placeholder="Referência (ex.: 5080)" autocomplete="off" aria-label="Referência da nova referência"><input id="ref-n-nome" placeholder="Nome do produto" autocomplete="off" aria-label="Nome da nova referência"><button class="sm" type="button" id="ref-n-ok">Criar e ligar</button></div>
+  <small style="color:var(--mut)">A referência nova entra sem preço, tecido nem consumo: complete esses dados no App.</small>
   <div class="row"><button class="pri" type="button" id="refs-ok">Fechar</button></div>
 </dialog>
 <dialog id="dlg-grade" aria-labelledby="dlg-grade-t">
@@ -311,6 +317,7 @@ async gravar(id,d){rede();const t=moldes();t[id]=d;gravarK('moldes',t)},
 async produtos(){rede();return Object.entries(ler('produtos')).map(([id,data])=>({id,data}))},
 async produto(id){rede();return ler('produtos')[id]||null},
 async gravarProduto(id,d){rede();const t=ler('produtos');t[id]=d;gravarK('produtos',t)},
+async criarProduto(d){rede();const id='p'+Date.now(),t=ler('produtos');t[id]=d;gravarK('produtos',t);return id},
 // foto: dataURL pequena (o localStorage é curto)
 async subirFoto(file){rede();return (await imgCanvas(file,600)).toDataURL('image/jpeg',.7)},
 async tecidos(){rede();return [{id:'tec-forro',nome:'Forro tactel'},{id:'tec-ribana',nome:'Ribana'}]},
@@ -333,6 +340,7 @@ gravar:atualizar,
 async produtos(){await sessaoOk();return ok(await sb.from('docs').select('id,data').eq('col','produtos').order('created_at'))},
 async produto(id){await sessaoOk();const r=ok(await sb.from('docs').select('data').eq('id',id).eq('col','produtos').maybeSingle());return r?r.data:null},
 gravarProduto:atualizar,
+async criarProduto(d){await sessaoOk();return ok(await sb.from('docs').insert({col:'produtos',data:d}).select('id').single()).id},
 // tecidos da matéria-prima (a RLS só deixa o admin ler 'materiais')
 async tecidos(){await sessaoOk();return ok(await sb.from('docs').select('id,data').eq('col','materiais')).filter(r=>r.data&&r.data.tipo==='tecido').map(r=>({id:r.id,nome:[r.data.nome,r.data.cor].filter(Boolean).join(' · ')||'(sem nome)'}))},
 // mesmo caminho do subirFoto do index.html: bucket público 'produtos'. A foto antiga fica no storage: desfazer ou um salvar que falhou ainda apontam para ela
@@ -530,13 +538,16 @@ const l=Object.entries(por).map(([p,t])=>p+' ('+t.join(', ')+')');
 el.textContent=l.length?'Contorno não fecha no tamanho; o enfesto usa a forma do base: '+l.join('; '):'';el.hidden=!l.length;
 }
 
+const dicaRefs=()=>dicaSZ($('#refs-dica'),M.produtoIds.length,MM.tamanhos(M));
 async function abrirRefs(){
-const dlg=$('#dlg-refs'),box=$('#refs'),dica=()=>dicaSZ($('#refs-dica'),M.produtoIds.length,MM.tamanhos(M));
-$('#ref-busca').value='';dica();dlg.showModal();
+$('#ref-busca').value='';$('#ref-n-ref').value='';$('#ref-n-nome').value='';dicaRefs();$('#dlg-refs').showModal();await listarRefs()}
+async function listarRefs(){
+const box=$('#refs');
+box.innerHTML='<p class="vazio" style="padding:10px">Carregando…</p>';
 try{
 const lista=await B.produtos();
 box.textContent='';
-if(!lista.length){box.innerHTML='<p class="vazio" style="padding:10px">Nenhum produto cadastrado.</p>';return}
+if(!lista.length){box.innerHTML='<p class="vazio" style="padding:10px">Nenhuma referência cadastrada ainda. Crie a primeira aí embaixo.</p>';return}
 for(const {id,data:p} of lista){
 const l=document.createElement('label'),c=document.createElement('input'),s=document.createElement('span');
 c.type='checkbox';c.checked=M.produtoIds.includes(id);
@@ -546,7 +557,7 @@ c.onchange=()=>{
 if(c.checked&&!podeLigar(p)){c.checked=false;return}
 if(!c.checked&&M.produtoIds.length===1&&!confirm('Sem produto ligado, este molde só abre pelo endereço desta página. Desligar mesmo assim?')){c.checked=true;return}
 M.produtoIds=c.checked?[...M.produtoIds,id]:M.produtoIds.filter(x=>x!==id);
-alterou();dica();
+alterou();dicaRefs();
 };
 l.dataset.busca=s.textContent.toLowerCase();l.append(c,s);box.append(l);
 }
@@ -734,6 +745,21 @@ $('#btn-alinhar').onclick=()=>{if(!PODE)return toast('Sem permissão para editar
 $('#btn-digit').onclick=()=>{location.href='digitalizar.html'+(LOCAL?'?local=1':'')};
 $('#foto-mini').onclick=()=>{$('#foto-g').src=B.fotoUrl(M.foto);$('#dlg-foto').showModal()};
 $('#refs-ok').onclick=()=>$('#dlg-refs').close();
+$('#ref-n-ok').onclick=async()=>{
+const ref=$('#ref-n-ref').value.trim(),nome=$('#ref-n-nome').value.trim(),b=$('#ref-n-ok');
+if(!ref&&!nome)return toast('Escreva a referência ou o nome da nova referência.');
+b.disabled=true;
+try{
+const lista=await B.produtos();
+if(ref&&lista.some(({data:p})=>String(p.ref||'').trim().toLowerCase()===ref.toLowerCase()))return toast('Já existe uma referência '+ref+'. Marque ela na lista.');
+const id=await B.criarProduto({ref,nome,min:0,custo:0,preco:0,precoG:0,est:{},tecidoId:'',cons:0,extra:0});
+M.produtoIds=[...M.produtoIds,id];alterou();
+$('#ref-n-ref').value='';$('#ref-n-nome').value='';$('#ref-busca').value='';
+await listarRefs();dicaRefs();
+toast('Referência criada e ligada a este molde. Complete preço, tecido e consumo no App.');
+}catch(e){console.error(e);toast('Não deu para criar a referência: '+ptErro(e))}
+finally{b.disabled=false}
+};
 $('#ref-busca').addEventListener('input',e=>{const t=e.target.value.toLowerCase();document.querySelectorAll('#refs label').forEach(l=>l.hidden=!l.dataset.busca.includes(t))});
 document.addEventListener('keydown',e=>{
 if(!M||!(e.ctrlKey||e.metaKey)||(e.target.closest&&e.target.closest('input,textarea,dialog')))return;
