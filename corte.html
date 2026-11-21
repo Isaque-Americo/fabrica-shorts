@@ -450,8 +450,10 @@ const linhas=O.enfestos.map((e,k)=>{const c=cs[k];return `<tr><td>${esc(e.nome)}
 const grades=O.enfestos.map(e=>{
 const ts=[...new Set(e.itens.flatMap(it=>Object.keys(it.grade).filter(t=>it.grade[t])))].sort(ordTam);
 if(!ts.length)return '';
-return `<h3>${esc(e.nome)} <small>${esc(tecDe(e))} · ${e.camadas} camada(s) · quantidade por camada (total cortado)</small></h3><table class="lst"><thead><tr><th>Produto</th><th>Cor</th>${ts.map(t=>`<th class="n">${esc(t)}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>`+
-e.itens.map(it=>{const s=ts.reduce((a,t)=>a+(it.grade[t]||0),0);return `<tr><td>${esc(nomeProd(prod(it.produtoId)))}</td><td>${esc(it.cor||'—')}</td>${ts.map(t=>{const q=it.grade[t]||0;return `<td class="n">${q?`${q} (${q*e.camadas})`:'—'}</td>`}).join('')}<td class="n">${s} (${s*e.camadas})</td></tr>`}).join('')+'</tbody></table>';
+return `<h3>${esc(e.nome)} <small>${esc(tecDe(e))} · ${e.camadas} camada(s) · quantidade na grade (roupas cortadas)</small></h3><table class="lst"><thead><tr><th>Produto</th><th>Cor</th>${ts.map(t=>`<th class="n">${esc(t)}</th>`).join('')}<th class="n">Total</th></tr></thead><tbody>`+
+e.itens.map(it=>{const cpr=t=>MO.camadasPorRoupa(e,O,prod(it.produtoId),t,MATS),tot=t=>(it.grade[t]||0)*e.camadas/cpr(t);
+const s=ts.reduce((a,t)=>a+(it.grade[t]||0),0),st=ts.reduce((a,t)=>a+tot(t),0);
+return `<tr><td>${esc(nomeProd(prod(it.produtoId)))}</td><td>${esc(it.cor||'—')}</td>${ts.map(t=>{const q=it.grade[t]||0;return `<td class="n">${q?`${q} (${nf(tot(t),0)})`:'—'}</td>`}).join('')}<td class="n">${s} (${nf(st,0)})</td></tr>`}).join('')+'</tbody></table>';
 }).join('');
 el.innerHTML=`<h1>${esc(O.nome||'Ordem de corte')}</h1><p class="vazio">Criada em ${dataBR(O.criadaEm)} · impresso em ${new Date().toLocaleString('pt-BR')}${estado==='salvo'?'':' · há alterações ainda não salvas'}</p>`+
 (O.obs?`<p>${esc(O.obs)}</p>`:'')+'<h2>Resultados da ordem</h2>'+htmlRes(cs)+
@@ -464,7 +466,7 @@ function restaurar(foco){if(!PODE)document.querySelectorAll('#enf-corpo input,#e
 
 function itemHtml(e,it,i,aba){
 const p=prod(it.produtoId),pn=pecasDe(p,aba),k=`${i}-`;
-const grade=tamsDe(p,it).map(t=>{const q=it.grade[t]||0,tot=q*e.camadas,ped=it.falta[t];return `<div class="tam" role="group" aria-label="Tamanho ${esc(t)}"><span class="t">${esc(t)}</span>
+const grade=tamsDe(p,it).map(t=>{const q=it.grade[t]||0,tot=q*e.camadas/MO.camadasPorRoupa(e,O,p,t,MATS),ped=it.falta[t];return `<div class="tam" role="group" aria-label="Tamanho ${esc(t)}"><span class="t">${esc(t)}</span>
 <button type="button" data-acao="menos" data-i="${i}" data-t="${esc(t)}" data-foco="${k}m${esc(t)}" aria-label="Menos uma ${esc(t)} por camada"${q?'':' disabled'}>−</button>
 <output aria-label="${esc(t)} por camada">${q}</output>
 <button type="button" data-acao="mais" data-i="${i}" data-t="${esc(t)}" data-foco="${k}p${esc(t)}" aria-label="Mais uma ${esc(t)} por camada">+</button>

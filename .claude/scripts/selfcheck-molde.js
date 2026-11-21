@@ -425,6 +425,10 @@ const dobraT = pe([pc({ w: 200, h: 300, pts: [[0, 0], [200, 0], [200, 300], [0, 
 const parE = pc({ qtd: 2, par: true, espelhar: true });
 const parU = pe([parE], tec(), { sentido: 'unico' }), cParU = ce([parE], tec(), { sentido: 'unico' }), parD = pe([parE], tec(), { camadas: 2 }), parD1 = pe([parE], tec());
 const parN = pc({ nome: 'Bolso', qtd: 2, par: true }), parSemE = pe([parN], tec(), { sentido: 'unico' }), cParSemE = ce([parN], tec(), { sentido: 'unico' });
+// cada par de camadas rende 1 roupa: peça em par, sentido duplo, camadas pares
+const cParD = ce([parE], tec(), { camadas: 2 }), parD4 = pe([parE], tec(), { camadas: 4 }), cParD4 = ce([parE], tec(), { camadas: 4 });
+const resPar = (cam, c) => fn(() => O.resultados(O.normalizar(ordemO({ camadas: cam })), [c], [tec()]), null);
+const cpr = (pecas, t, o) => fn(() => { const ord = O.normalizar(ordemO(o)); return O.camadasPorRoupa(ord.enfestos[0], ord, prodO(pecas), 'M', [t]); }, null);
 const pesoDe = t => { const o = { camadas: 3 }, c = ce([pc()], t, o); return [c, c && fn(() => O.resultados(O.normalizar(ordemO(o)), [c], [t]), null)]; };
 const [cPeso, rPeso] = pesoDe(tec()), [cPesoT, rPesoT] = pesoDe(tec({ tubular: true }));
 // produto com peça do principal e do forro, uma aba e um enfesto por tecido: a roupa conta uma vez só
@@ -461,7 +465,11 @@ testes.push(
   ['review5 aberto duplo: 4 posicoes', aberto.length, 4],
   ['review5 tubular: 2 posicoes, 4 pecas', [tub.length, tub.reduce((a, x) => a + x.rende, 0), cTub && cTub.posicoes.length, cTub && cTub.pecasTotal], [2, 4, 2, 4]],
   ['review5 unico par espelhar: normais = espelhadas', [parU.length, parU.filter(x => x.espelho).length, cParU && cParU.posicoes.filter(p => cParU.itens[p.i].espelho).length], [8, 4, 4]],
-  ['review5 duplo par (camadas pares): 8 posicoes, todas normais', [parD.length, parD.every(x => !x.espelho && !x.espelhar && x.rende === 1), (parD.avisos || []).length], [8, true, 0]],
+  ['review5 duplo par (camadas pares): 4 posicoes, todas normais', [parD.length, parD.every(x => !x.espelho && !x.espelhar && x.rende === 1), (parD.avisos || []).length], [4, true, 0]],
+  ['par duplo camadas pares: 1 posicao por roupa, 2 camadas por roupa', [parD.length, cParD && cParD.grade.R1.M, (r => r && r.pecas)(resPar(2, cParD))], [4, 2, 4]],
+  ['par duplo 4 camadas: mesmas posicoes, o dobro de roupas', [parD4.length, (r => r && [r.pecas, r.grade.R1.M])(resPar(4, cParD4))], [4, [8, 8]]],
+  ['sem par: roupas continuam grade x camadas', (r => r && r.pecas)(resPar(2, ce([pc()], tec(), { camadas: 2 }))), 8],
+  ['camadasPorRoupa 2 so no par duplo com camadas pares', [cpr([parE], tec(), { camadas: 2 }), cpr([parE], tec()), cpr([parE], tec(), { sentido: 'unico', camadas: 2 }), cpr([parE], tec({ tubular: true }), { camadas: 2 }), cpr([pc()], tec(), { camadas: 2 })], [2, 1, 1, 1, 1]],
   ['review5 unico par sem espelhar: 8 normais e 1 aviso', [parSemE.length, parSemE.filter(x => x.espelho).length, parSemE.avisos, cParSemE && (cParSemE.avisos || []).length],
     [8, 0, [{ peca: 'Bolso', tam: 'M', motivo: 'par sem espelhar no sentido único' }], 1]],
   ['I3 duplo camadas impares, par que espelha: como no unico, 4 normais + 4 espelhadas e aviso', [parD1.length, parD1.filter(x => x.espelho).length, parD1.avisos],

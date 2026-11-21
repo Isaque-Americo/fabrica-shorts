@@ -112,6 +112,12 @@
   };
   // tecido principal do produto na ordem: o da aba com p.tecidoId, senão o da aba [0]
   const principalDe = (p, ordem) => { const abas = (ordem.tecidos || []).map(t => t.materiaId); return abas.includes(p.tecidoId) ? p.tecidoId : abas[0]; };
+  // camadas gastas por roupa: peça em par cortada face a face (sentido duplo, camadas pares) tira o par das duas camadas,
+  // então cada posição rende meia roupa por camada e a roupa gasta 2 camadas. Nos outros casos (único, camadas ímpares, tubular) = 1
+  function camadasPorRoupa(enf, ordem, p, tam, tecidos) {
+    const { mat } = contexto(enf, ordem, tecidos), q0 = pecasTam(p, tam)[0];
+    return q0 && q0.par && !(mat && mat.tubular) && enf.sentido !== 'unico' && Math.max(1, nn(enf.camadas)) % 2 === 0 ? 2 : 1;
+  }
 
   // itens para MoldeEncaixe.encaixar, um por posição no risco. Cada item leva o que o desenho precisa:
   // {pecaIdx (índice em porTam[tam]/pecas), rasters, borda0, a, produtoId, cor, tam, nome, pts (já meia/espelhada),
@@ -144,7 +150,8 @@
           const rot = su ? 'nenhuma' : q.rot, esp = !!q.espelhar;
           if (tub && q.tubular) { const m = meiaPeca(q.pts); repete(N, () => item(base, m, { rot: 'nenhuma', espelhar: false, meia: true, rende: 1 })); } // girar/espelhar tiraria a dobra de Y=0
           else if (tub) repete(Math.ceil(N / 2), () => item(base, q.pts, { rot, espelhar: esp, rende: 2 })); // dois panos por camada
-          else if (q.par && !unico && !(impar && esp)) repete(N, () => item(base, q.pts, { rot, espelhar: false, rende: 1 })); // face a face: metade das camadas já sai espelhada
+          else if (q.par && !unico && !impar) repete(N / 2, () => item(base, q.pts, { rot, espelhar: false, rende: 1 })); // face a face: cada posição rende o par em duas camadas (metade das camadas já sai espelhada)
+          else if (q.par && !unico && !esp) repete(N, () => item(base, q.pts, { rot, espelhar: false, rende: 1 })); // camadas ímpares, par simétrico: o par vem de duas posições
           else if (q.par) { // único, ou duplo com camadas ímpares (a camada a mais ficaria sem o par)
             const n = gr * Math.ceil(qtd / 2), espelhada = esp ? q.pts.map(([x, y]) => [x, -y]) : q.pts;
             if (!esp) avisos.push({ peca: nome, tam, motivo: 'par sem espelhar no sentido único' });
@@ -172,7 +179,7 @@
       const gr = grade[p.ref || p.id] = grade[p.ref || p.id] || {};
       for (const [t, q] of Object.entries(it.grade || {})) {
         const q0 = pecasTam(p, t)[0]; // peças divididas entre enfestos: a roupa conta só no item que leva a peça 0
-        if (nn(q) && (!it.pecas || (q0 && it.pecas.includes(q0.nome || '0')))) gr[t] = (gr[t] || 0) + nn(q);
+        if (nn(q) && (!it.pecas || (q0 && it.pecas.includes(q0.nome || '0')))) gr[t] = (gr[t] || 0) + nn(q) / camadasPorRoupa(enf, ordem, p, t, tecidos);
       }
     }
     return { comp, largUtil, posicoes: r.posicoes, itens, pecasTotal: itens.reduce((a, x) => a + x.rende, 0), areaPecas,
@@ -181,7 +188,8 @@
 
   // calculos[k] = calcularEnfesto de ordem.enfestos[k] (null = fica fora). Pesos em kg; tubular conta os dois panos
   // (peças cortadas = posições × camadas × (tubular ? 2 : 1); a meia peça da dobra abre numa peça inteira, rende 1).
-  // pecas = peças de roupa (soma da grade, contada só no tecido principal de cada produto);
+  // pecas = peças de roupa (soma da grade × camadas, contada só no tecido principal de cada produto; c.grade já vem dividida
+  // por camadasPorRoupa, então peça em par no sentido duplo com camadas pares conta 1 roupa por par de camadas);
   // consumoLinear = metros dos enfestos que contam roupa (tecido principal) ÷ peças de roupa
   function resultados(ordem, calculos, tecidos) {
     const r = { metros: 0, pesoTecido: 0, pesoPecas: 0, pesoDesperdicio: 0, consumoLinear: 0, custo: 0, pecas: 0, grade: {} };
@@ -221,7 +229,7 @@
     return cons == null && consG == null ? null : { cons, consG };
   }
 
-  const MoldeOrdem = { normalizar, nova, deFabricar, dePedido, semMolde, ajustarGrade, pecasEnfesto, calcularEnfesto, resultados, matCusto, meiaPeca, consumoPeloMolde };
+  const MoldeOrdem = { normalizar, nova, deFabricar, dePedido, semMolde, ajustarGrade, pecasEnfesto, calcularEnfesto, camadasPorRoupa, resultados, matCusto, meiaPeca, consumoPeloMolde };
   g.MoldeOrdem = MoldeOrdem;
   if (typeof module !== 'undefined') module.exports = MoldeOrdem;
 })(typeof window !== 'undefined' ? window : globalThis);
