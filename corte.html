@@ -185,7 +185,8 @@ const num=v=>{const n=parseFloat(String(v??'').replace(',','.'));return Number.i
 const nf=(v,d=2)=>(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
 const campo=v=>v?String(+v.toFixed(3)).replace('.',','):''; // valor de input com vírgula; 0 fica vazio
 const brl=v=>(+v||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
-const urlEnf=enf=>{const u=new URLSearchParams(LOCAL?'local=1':'');u.set('ordem',ordId);u.set('enf',enf);return 'enfesto.html?'+u};
+const urlEnfDe=(oid,enf)=>{const u=new URLSearchParams(LOCAL?'local=1':'');u.set('ordem',oid);u.set('enf',enf);return 'enfesto.html?'+u};
+const urlEnf=enf=>urlEnfDe(ordId,enf);
 const urlCom=(k,v)=>{const u=new URLSearchParams(LOCAL?'local=1':'');if(k)u.set(k,v);const s=String(u);return 'corte.html'+(s?'?'+s:'')};
 
 function ptErro(e){
@@ -320,6 +321,18 @@ if(dentro){clearTimeout(timer);estado='salvo';try{localStorage.removeItem('ordem
 if(!dentro)abrirLista().catch(e=>console.error(e));
 }
 async function criarEIr(doc){if(!PODE)return;doc.resumo=resumoDe(doc);const id=await B.criar(doc);location.href=urlCom('id',id)}
+// molde -> enfesto sem pedido: ?prod=<produtoId> cria a ordem avulsa com 1 peca de cada tamanho e vai direto para o risco
+async function ordemDoProduto(pid){
+const p=prod(pid);
+if(!p)return bloquear('Produto não encontrado. Ligue o molde a uma referência e tente de novo.');
+if(!p.mol)return bloquear('Este produto ainda não tem molde com peças. Salve o molde e tente de novo.');
+const pt=p.mol.porTam,tams=pt?Object.keys(pt).filter(t=>pt[t]&&pt[t].length):[];
+const doc=MO.deFabricar((tams.length?tams:['M']).map(t=>({id:pid,t,f:1})),{produtos:PRODS});
+doc.nome='Enfesto de prova · '+(p.ref||p.nome||'');doc.refs=p.ref?[p.ref]:[];doc.resumo=resumoDe(doc);
+const oid=await B.criar(doc),enf=doc.enfestos[0];
+// replace: voltar no navegador não cria outra ordem. Sem matéria-prima no produto não há risco: abre a ordem para escolher o tecido
+location.replace(enf&&p.tecidoId?urlEnfDe(oid,enf.id):urlCom('id',oid));
+}
 
 // ---- ordem ----
 async function abrirOrdem(id,doc){
@@ -568,6 +581,8 @@ if(!Acesso.pode(perfil,'moldes','ver'))return bloquear('Só administradores veem
 PODE=LOCAL||Acesso.pode(perfil,'moldes','mexer');PODE_PED=LOCAL||Acesso.pode(perfil,'pedidos','mexer');document.body.classList.toggle('leitura',!PODE);
 const [ps,ms]=await Promise.all([B.produtos(),B.materiais()]);
 PRODS=ps.map(r=>({...r.data,id:r.id}));MATS=ms.map(r=>({...r.data,id:r.id}));
+const pid=Q.get('prod');
+if(pid)return PODE?ordemDoProduto(pid):bloquear('Só quem pode mexer nos moldes abre o enfesto de prova.');
 const id=Q.get('id');
 if(!id)return abrirLista();
 const doc=await B.ordem(id);

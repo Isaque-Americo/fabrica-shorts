@@ -94,7 +94,7 @@ dialog h3{margin:0 0 12px}
 #props p{margin:8px 0 0}
 select{font:inherit;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
 select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.leitura #btn-desfazer,body.leitura #btn-refazer,body.leitura #btn-extrair,body.leitura #m-add{display:none}
+body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.leitura #btn-enfesto,body.leitura #btn-desfazer,body.leitura #btn-refazer,body.leitura #btn-extrair,body.leitura #m-add{display:none}
 #ferramentas button:disabled,#btn-extrair:disabled,#props button:disabled,#topo button:disabled{opacity:.4;cursor:not-allowed}
 #tams button{border-color:var(--c);color:var(--tx);min-width:34px}
 #tams button[aria-pressed="true"]{background:var(--c);color:var(--card)}
@@ -156,6 +156,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
     <button class="sm" type="button" id="btn-grade" title="Grade, tamanho base, quanto aumenta por tamanho e foto da ficha técnica">Grade e medidas</button>
     <button type="button" id="foto-mini" hidden title="Ver a foto da ficha técnica"><img alt="Foto da ficha técnica"></button>
     <button class="sm" type="button" id="btn-refs" title="Produtos que usam este molde">Referências <span id="refs-n"></span></button>
+    <button class="sm" type="button" id="btn-enfesto" title="Cria uma ordem avulsa com uma peça de cada tamanho e abre o risco do enfesto">Enfesto</button>
     <span class="grupo" role="group" aria-label="Zoom">
       <button class="sm" type="button" id="zoom-menos" title="Diminuir zoom" aria-label="Diminuir zoom">−</button>
       <button class="sm" type="button" id="zoom-v" title="Voltar a 100%">100%</button>
@@ -715,6 +716,13 @@ $('#zoom-menos').onclick=()=>zoomMeio(1/1.25);
 $('#zoom-mais').onclick=()=>zoomMeio(1.25);
 $('#zoom-v').onclick=()=>zoomMeio(1/zoom);
 $('#btn-refs').onclick=abrirRefs;
+// enfesto sem pedido: o corte.html monta a ordem avulsa a partir do produto e abre o risco
+$('#btn-enfesto').onclick=async()=>{
+if(!M.produtoIds.length)return toast('Ligue este molde a uma referência primeiro (botão Referências): o enfesto é por produto.');
+await salvar();
+if(estado!=='salvo')return toast('O molde ainda não foi salvo. Confira a conexão e tente de novo.');
+location.href='corte.html?prod='+encodeURIComponent(M.produtoIds[0])+(LOCAL?'&local=1':'');
+};
 $('#btn-grade').onclick=()=>abrirGrade('');
 $('#btn-fantasma').onclick=()=>{fantasma=!fantasma;desenhar()};
 $('#btn-folha').onclick=()=>{folhaOn=!folhaOn;if(!folhaOn)alin=null;preencherProps();desenhar()};
