@@ -112,10 +112,16 @@
   };
   // tecido principal do produto na ordem: o da aba com p.tecidoId, senão o da aba [0]
   const principalDe = (p, ordem) => { const abas = (ordem.tecidos || []).map(t => t.materiaId); return abas.includes(p.tecidoId) ? p.tecidoId : abas[0]; };
+  // peça principal de um tamanho: quem define a contagem de roupas e o fator de camadas.
+  // Peça em par vence; senão a que não é bolso; senão a primeira
+  const pecaPrincipal = (p, tam) => {
+    const l = pecasTam(p, tam);
+    return l.find(q => q && q.par) || l.find(q => q && !/bolso/i.test(q.nome)) || l[0];
+  };
   // camadas gastas por roupa: peça em par cortada face a face (sentido duplo, camadas pares) tira o par das duas camadas,
   // então cada posição rende meia roupa por camada e a roupa gasta 2 camadas. Nos outros casos (único, camadas ímpares, tubular) = 1
   function camadasPorRoupa(enf, ordem, p, tam, tecidos) {
-    const { mat } = contexto(enf, ordem, tecidos), q0 = pecasTam(p, tam)[0];
+    const { mat } = contexto(enf, ordem, tecidos), q0 = pecaPrincipal(p, tam);
     return q0 && q0.par && !(mat && mat.tubular) && enf.sentido !== 'unico' && Math.max(1, nn(enf.camadas)) % 2 === 0 ? 2 : 1;
   }
 
@@ -180,7 +186,7 @@
       if (!p || principalDe(p, ordem) !== aba.materiaId) continue; // a roupa conta só no enfesto do tecido principal; forro etc. não repetem
       const gr = grade[p.ref || p.id] = grade[p.ref || p.id] || {};
       for (const [t, q] of Object.entries(it.grade || {})) {
-        const q0 = pecasTam(p, t)[0]; // peças divididas entre enfestos: a roupa conta só no item que leva a peça 0
+        const q0 = pecaPrincipal(p, t); // peças divididas entre enfestos: a roupa conta só no item que leva a peça principal
         if (nn(q) && (!it.pecas || (q0 && it.pecas.includes(q0.nome || '0')))) gr[t] = (gr[t] || 0) + nn(q) / camadasPorRoupa(enf, ordem, p, t, tecidos);
       }
     }

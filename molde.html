@@ -250,6 +250,15 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
   <label class="campo">Grade <select id="g-grade"><option value="app">P–G4 do app</option><option value="pgg">P–GG</option><option value="numerica">36–56</option><option value="">Definir depois</option></select></label>
   <label class="campo">Tamanho base <select id="g-base"></select></label>
   <p class="vazio" id="g-dica" hidden></p>
+  <div id="g-bolso-sec">
+    <label style="display:flex;align-items:center;gap:8px;font-size:14px;margin:8px 0 6px;cursor:pointer">
+      <input type="checkbox" id="g-bolso"> Incluir bolso traseiro (retângulo)
+    </label>
+    <div id="g-bolso-meds" hidden style="display:flex;gap:10px;margin-bottom:8px">
+      <label class="campo" style="flex:1;margin:0">Largura (cm) <input id="g-bolso-l" inputmode="decimal" autocomplete="off" value="20"></label>
+      <label class="campo" style="flex:1;margin:0">Altura (cm) <input id="g-bolso-a" inputmode="decimal" autocomplete="off" value="23"></label>
+    </div>
+  </div>
   <div id="g-auto">
     <label class="campo">Aumenta por tamanho — X cm (→) <input id="g-auto-x" inputmode="decimal" autocomplete="off" placeholder="0"></label>
     <label class="campo">Aumenta por tamanho — Y cm (↓) <input id="g-auto-y" inputmode="decimal" autocomplete="off" placeholder="0"></label>
@@ -645,6 +654,9 @@ bs.textContent='';for(const t of l){const o=document.createElement('option');o.v
 dicaSZ($('#g-dica'),novo||m.produtoIds.length,l);
 };
 bs.textContent='';encher();gs.onchange=encher;f.value='';
+$('#g-bolso-sec').hidden=!novo;$('#g-bolso').checked=false;$('#g-bolso-meds').hidden=true;
+$('#g-bolso-l').value='20';$('#g-bolso-a').value='23';
+$('#g-bolso').onchange=()=>{$('#g-bolso-meds').hidden=!$('#g-bolso').checked};
 const ga=m.gradAuto||{x:0,y:0};
 $('#g-auto').hidden=novo; // molde novo ainda não tem peça para graduar
 $('#g-auto-x').value=ga.x?cm2(ga.x):'';$('#g-auto-y').value=ga.y?cm2(ga.y):'';
@@ -652,6 +664,11 @@ d.returnValue='';d.showModal();
 await new Promise(r=>d.addEventListener('close',r,{once:true}));
 if(d.returnValue!=='ok')return null;
 const r={nome:novo?$('#g-nome').value.trim()||m.nome:null,grade:[...gradeDe(gs.value)],base:bs.value,foto:null};
+if(novo&&$('#g-bolso').checked){
+const bl=lerCm('#g-bolso-l'),ba=lerCm('#g-bolso-a');
+if(bl===null||ba===null||bl<=0||ba<=0){toast('Medida do bolso inválida. Ex.: 20 e 23');return null}
+r.bolso={l:bl,a:ba};
+}
 const ax=novo?0:lerCm('#g-auto-x'),ay=novo?0:lerCm('#g-auto-y');
 if(ax===null||ay===null){toast('Medida inválida. Ex.: 1 ou 0,5');return null}
 r.auto={x:ax,y:ay};
@@ -677,6 +694,18 @@ for(const g of Object.values(m.grad))for(const t in g)if(!r.grade.includes(t))de
 if(r.foto)m.foto=r.foto;
 // medidas por tamanho: refaz a gradação das peças, já com a grade e o base aplicados acima
 if(r.auto&&(r.auto.x||r.auto.y||m.gradAuto)){m.gradAuto=(r.auto.x||r.auto.y)?r.auto:null;MM.graduarTudo(m,r.auto.x,r.auto.y)}
+if(r.bolso){
+const ps=Object.values(m.pontos),b=ps.length?G.bbox(ps):{x0:0,y0:0,w:0,h:0};
+const A={x:b.x0+b.w+(ps.length?50:800),y:b.y0};
+const ret=MD.retangulo(m,A,{x:A.x+r.bolso.l,y:A.y+r.bolso.a});
+if(!ret.erro){
+const n=MD.novaPeca(m,ret.ids);
+if(n.ok){
+let nome='Bolso',i=1;while(m.pecas.some(p=>p!==n.peca&&p.nome===nome))nome='Bolso '+(++i);
+Object.assign(n.peca,{nome,margem:0,tam:m.base,cortar:1,par:false,rotacao:'180'});
+}
+}
+}
 }
 async function abrirGrade(aviso){
 const r=await dlgGrade(M,false,aviso);if(!r)return;
@@ -988,6 +1017,7 @@ function extrair(){
 if(foraBase())return toast('Edite no tamanho base');
 const r=MD.novaPeca(M,[...sel]);
 if(!r.ok){toast(r.erro);pontaErro=r.ponta||null;desenhar();return}
+M.pecas.sort((a,b)=>(/bolso/i.test(a.nome)?1:0)-(/bolso/i.test(b.nome)?1:0));
 sel.clear();pecaSel=r.peca.id;alterou();
 }
 // peça retangular pronta (bolso, vista, etiqueta): desenha 5 cm à direita do que já existe e já vira peça
