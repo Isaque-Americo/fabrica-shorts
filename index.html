@@ -625,7 +625,7 @@ if(tab==='moldes'&&!moldesCarregado&&!moldesCarregando)carregarListaMoldes();
 let moldesLista=[],moldesCarregando=false,moldesCarregado=false,moldesErro='';
 async function carregarListaMoldes(){
 moldesCarregando=true;moldesErro='';if(tab==='moldes')render();
-const {data,error}=await sb.from('docs').select('id,nome:data->>nome,salvo:data->>salvoEm').eq('col','moldes');
+const {data,error}=await sb.from('docs').select('id,nome:data->>nome,salvo:data->>salvoEm,prods:data->produtoIds').eq('col','moldes');
 moldesCarregando=false;moldesCarregado=true;
 if(error){moldesErro='Não foi possível carregar os moldes: '+ptErro(error);moldesLista=[]}
 else moldesLista=(data||[]).sort((a,b)=>String(a.nome||'').localeCompare(String(b.nome||'')));
@@ -633,11 +633,29 @@ if(tab==='moldes')render();
 }
 function moldesPage(){
 const mexer=pode('moldes');
-const linhas=moldesLista.map(m=>`<tr><td>${esc(m.nome||'(sem nome)')}</td><td>${m.salvo&&+m.salvo?esc(new Date(+m.salvo).toLocaleString('pt-BR')):'—'}</td><td><button class="sm" onclick="window.open('molde.html?id=${encodeURIComponent(m.id)}','_blank')">Abrir</button></td></tr>`).join('');
+const linhas=moldesLista.map(m=>{const n=(m.prods||[]).length;return `<tr><td>${esc(m.nome||'(sem nome)')}</td><td>${m.salvo&&+m.salvo?esc(new Date(+m.salvo).toLocaleString('pt-BR')):'—'}</td><td><button class="sm" onclick="window.open('molde.html?id=${encodeURIComponent(m.id)}','_blank')">${mexer?'Editar':'Abrir'}</button>${mexer?` <button class="sm" onclick="apagarMolde('${esc(m.id)}')"${n?` disabled title="Ligado a ${n} produto(s): abra o molde e desligue em “Referências” antes de apagar."`:''}>Apagar</button>`:''}</td></tr>`}).join('');
 return `<div class="bar end"><div class="row"><button class="ghost" onclick="carregarListaMoldes()">Atualizar</button>${mexer?`<button class="ghost" onclick="location.href='digitalizar.html'">Digitalizar molde</button>`:''}${mexer&&pode('produtos')?`<button class="pri" onclick="window.open('molde.html?novo=1','_blank')">Criar molde</button>`:''}</div></div>
-<p class="mut">“Criar molde” abre o editor em branco. “Digitalizar molde” monta o molde a partir de fotos do papel. Abaixo, os moldes que já existem.</p>
+<p class="mut">“Criar molde” abre o editor em branco. “Digitalizar molde” monta o molde a partir de fotos do papel. Abaixo, os moldes que já existem: “${mexer?'Editar':'Abrir'}” abre o editor${mexer?' (é lá que se muda o nome e as peças), e só dá para apagar molde que não está ligado a nenhum produto':''}.</p>
 ${moldesErro?`<div class="alert">${esc(moldesErro)}</div>`:''}${moldesCarregando?'<p class="mut">Carregando moldes…</p>':''}
 <div class="tw"><table><tr><th>Molde</th><th>Última alteração</th><th>Ações</th></tr>${linhas||(moldesCarregando||moldesErro?'':'<tr><td colspan="3">Nenhum molde criado ainda.</td></tr>')}</table></div>`;
+}
+// o produto guarda molId e as peças copiadas do molde: apagar um molde ligado deixaria o produto apontando para nada.
+// A lista da tela pode estar velha, então relê o molde antes de apagar em vez de confiar no que está desenhado
+async function apagarMolde(id){
+const m=moldesLista.find(x=>x.id===id),nome=(m&&m.nome)||'sem nome';
+if(!await confirma('Apagar o molde “'+nome+'”? Não tem como desfazer.'))return;
+try{
+await sessaoOk();
+const {data:r,error:e1}=await sb.from('docs').select('data').eq('id',id).eq('col','moldes').maybeSingle();
+if(e1)throw e1;
+if(!r){moldesLista=moldesLista.filter(x=>x.id!==id);render();aviso('Esse molde já não existe.');return}
+const n=((r.data||{}).produtoIds||[]).length;
+if(n){aviso('Este molde está ligado a '+n+' produto(s). Abra o molde, desligue em “Referências” e tente de novo.');return}
+const {data:fora,error}=await sb.from('docs').delete().eq('id',id).eq('col','moldes').select('id'); // select: sem ele o RLS barra em silêncio e a tela diria que apagou
+if(error)throw error;
+if(!(fora||[]).length){aviso('Sem permissão para apagar este molde.');return}
+moldesLista=moldesLista.filter(x=>x.id!==id);render();aviso('Molde “'+nome+'” apagado.');
+}catch(e){aviso('Não foi possível apagar o molde: '+ptErro(e))}
 }
 
 let adminAccounts=[],adminAccountsLoading=false,adminAccountsError='';
