@@ -1,0 +1,24 @@
+name: Ping Supabase
+
+# O plano free do Supabase pausa o projeto depois de ~7 dias sem atividade no
+# banco. Esta consulta semanal (seg e qui, com folga) mantem ele acordado.
+# Se o ping falhar, a Action falha e o GitHub te avisa por e-mail.
+
+on:
+  schedule:
+    - cron: '0 12 * * 1,4'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Consultar o banco
+        # Chave anon: ja e publica, esta dentro dos HTMLs do site.
+        env:
+          SB_URL: https://kgikdyqyoaqrhsshpmcw.supabase.co
+          SB_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnaWtkeXF5b2Fxcmhzc2hwbWN3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTMxOTMzODAsImV4cCI6MjEwODc2OTM4MH0.z90ogNsOkfReKLD8le_q9O6N8QxsqvevZH7SUHbqAnI
+        run: |
+          curl -sS --fail-with-body --retry 3 --retry-all-errors --max-time 30 \
+            -H "apikey: $SB_KEY" -H "Authorization: Bearer $SB_KEY" \
+            "$SB_URL/rest/v1/docs?select=id&limit=1"
