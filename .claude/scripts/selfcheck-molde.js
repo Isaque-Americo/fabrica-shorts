@@ -174,6 +174,13 @@ const corte = D.cortar(cz, [czh, czv]);
 const es = M.novo('e'); D.reta(es, D.ponto(es, P(0, 0)), D.ponto(es, P(40, 0)));
 const esv = D.reta(es, D.ponto(es, P(100, -50)), D.ponto(es, P(100, 50)));
 const esr = D.estender(es, [es.tracos[0].id]);
+// endireitar: contorno com a base ondulada (3 traços) e peça; o lado curto é a base
+const en = M.novo('en');
+const enQ = [P(0, 0), P(100, 20), P(200, -20), P(300, 0), P(300, 500), P(0, 500)].map(p => D.ponto(en, p));
+const enT = enQ.map((id, i) => D.reta(en, id, enQ[(i + 1) % enQ.length]));
+D.novaPeca(en, enT);
+const enR = D.endireitar(en, [enQ[0], enQ[3]]);
+const enNova = en.tracos.find(t => t.id === enR.ids[0]);
 // espelho: meia peça pelo eixo x=0
 const ep = M.novo('ep'), e0 = D.ponto(ep, P(0, 0)), e1 = D.ponto(ep, P(0, 100)), e2 = D.ponto(ep, P(50, 50));
 const eixo = D.reta(ep, e0, e1), lado = [D.reta(ep, e0, e2), D.reta(ep, e2, e1)];
@@ -210,6 +217,11 @@ testes.push(
   ['cortar cruz 4 retas', [corte.ids.length, cz.tracos.length], [4, 4]],
   ['cortar ponto comum', Object.values(cz.pontos).filter(q => Math.abs(q.x - 50) < 1e-6 && Math.abs(q.y) < 1e-6).length, 1],
   ['cortar sem cruzar', !!D.cortar(dr, [rr[0]]).erro, true],
+  ['endireitar troca 3 tracos por 1', [en.tracos.length, enNova.a, enNova.b], [4, enQ[0], enQ[3]]],
+  ['endireitar leva os pontos do meio', Object.keys(en.pontos).length, 4],
+  ['endireitar deixa a peca inteira', [en.pecas[0].tracos.length, !!D.geoPeca(en, en.pecas[0])], [4, true]],
+  ['endireitar pontos soltos nao ligam', !!D.endireitar(M.novo('x2'), ['p1', 'p2']).erro, true],
+  ['endireitar o mesmo ponto duas vezes', !!D.endireitar(en, [enQ[0], enQ[0]]).erro, true],
   ['estender ate x=100', es.pontos[es.tracos[0].b], P(100, 0)],
   ['estender ok', !!esr.ids, true],
   ['espelhar reusa pontos do eixo', [espe.ids.length, Object.keys(ep.pontos).length], [2, 4]],

@@ -102,6 +102,49 @@
 
   const retasDe = (m, ids) => m.tracos.filter(t => ids.includes(t.id) && t.tipo === 'reta');
 
+  // caminho de traços entre dois pontos, o mais curto em comprimento (Dijkstra; num contorno fechado dá o lado curto)
+  function caminhoEntre(m, a, b) {
+    const viz = {};
+    for (const t of m.tracos) {
+      if (!t.a || !t.b || t.a === t.b || !m.pontos[t.a] || !m.pontos[t.b]) continue;
+      const c = G.comprimento(MM.tracoPts(m, t)) || PERTO;
+      (viz[t.a] = viz[t.a] || []).push([t.b, t.id, c]);
+      (viz[t.b] = viz[t.b] || []).push([t.a, t.id, c]);
+    }
+    const d = { [a]: 0 }, de = {}, feito = new Set();
+    for (;;) {
+      let p = null;
+      for (const k of Object.keys(d)) if (!feito.has(k) && (p === null || d[k] < d[p])) p = k;
+      if (p === null || p === b) break;
+      feito.add(p);
+      for (const [q, id, c] of viz[p] || []) if (d[q] === undefined || d[p] + c < d[q]) { d[q] = d[p] + c; de[q] = { p, id }; }
+    }
+    if (!de[b]) return null;
+    const ids = [];
+    for (let p = b; de[p]; p = de[p].p) ids.push(de[p].id);
+    return ids;
+  }
+
+  // troca o pedaço torto entre dois pontos por uma reta só (contorno digitalizado sai ondulado)
+  function endireitar(m, ids) {
+    const [a, b] = ids;
+    if (ids.length !== 2 || a === b || !m.pontos[a] || !m.pontos[b]) return { erro: 'Clique em dois pontos diferentes do desenho.' };
+    const tr = caminhoEntre(m, a, b);
+    if (!tr) return { erro: 'Esses dois pontos não estão ligados por traços.' };
+    const nova = reta(m, a, b);
+    for (const pc of m.pecas) {
+      if (!pc.tracos.some(t => tr.includes(t.id))) continue;
+      pc.tracos = [{ id: nova, inv: false }, ...pc.tracos.filter(t => !tr.includes(t.id))];
+      const r = MM.encadear(m, pc.tracos.map(t => t.id)); // encadear acerta a ordem e o sentido: a peça continua inteira
+      if (r.ok) pc.tracos = r.tracos;
+      pc.pences = (pc.pences || []).filter(x => !tr.includes(x.tracoId));
+      pc.piques = (pc.piques || []).filter(x => !tr.includes(x.tracoId));
+      for (const id of tr) if (pc.margemTraco) delete pc.margemTraco[id];
+    }
+    apagar(m, tr);
+    return { ids: [nova] };
+  }
+
   // divide cada reta selecionada onde ela cruza outro traço; cruzamento vira ponto comum
   function cortar(m, ids) {
     const sel = retasDe(m, ids), novos = [];
@@ -252,7 +295,7 @@
     return [{ x: p.x + nx * d, y: p.y + ny * d }, { x: p.x + nx * (d - 5), y: p.y + ny * (d - 5) }];
   }
 
-  const MoldeDesenho = { distSeg, medida, cm, polar, angulo, noRaio, simplificar, uid, ponto, usados, reta, retangulo, medir, naCaixa, transformar, girar, apagar, cortar, estender, arredondar, espelhar,
+  const MoldeDesenho = { distSeg, medida, cm, polar, angulo, noRaio, simplificar, uid, ponto, usados, reta, retangulo, medir, naCaixa, transformar, girar, apagar, cortar, endireitar, estender, arredondar, espelhar,
     noTraco, naPeca, geoPeca, novaPeca, pique };
   g.MoldeDesenho = MoldeDesenho;
   if (typeof module !== 'undefined') module.exports = MoldeDesenho;
