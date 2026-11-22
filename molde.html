@@ -827,7 +827,17 @@ if(!M||!(e.ctrlKey||e.metaKey)||(e.target.closest&&e.target.closest('input,texta
 const k=e.key.toLowerCase();
 if(k==='z'&&!e.shiftKey){e.preventDefault();$('#btn-desfazer').click()}
 else if(k==='y'||(k==='z'&&e.shiftKey)){e.preventDefault();$('#btn-refazer').click()}
+else if(k==='a'){e.preventDefault();selecionarTudo()}
 });
+// Ctrl+A: marca o molde inteiro (pontos presos a traço vão junto por tabela)
+function selecionarTudo(){
+const u=MD.usados(M);
+sel.clear();
+for(const id of [...M.tracos.map(t=>t.id),...Object.keys(M.pontos).filter(id=>!u.has(id)),...M.textos.map(x=>x.id)])sel.add(id);
+if(!sel.size)return toast('Nada para selecionar.');
+escolher('mover'); // já deixa pronto para arrastar: selecionar tudo é quase sempre para mudar de lugar
+toast('Molde inteiro marcado ('+sel.size+'). Arraste para mover de lugar.');
+}
 window.addEventListener('resize',()=>M&&desenhar());
 window.addEventListener('online',()=>{if(M&&estado!=='salvo')salvar()});
 window.addEventListener('beforeunload',e=>{if(M&&estado!=='salvo'){e.preventDefault();e.returnValue=''}});
@@ -946,11 +956,13 @@ if(id===op.pid)return;
 const a=op.pid;op=null;sel.clear();sel.add(a);sel.add(id);edicao(n)}});
 const T={
 mao:{dica:'Arraste para mover a tela. Roda do mouse ou − / + para ampliar. (Também: botão do meio ou barra de espaço + arrastar, em qualquer ferramenta.)'},
-mover:{dica:'Arraste em qualquer lugar para levar o molde inteiro de lugar: traços, textos, o fio das peças e a folha de fundo vão juntos. As linhas e as medidas não mudam. Não precisa selecionar nada.',
+mover:{dica:'Arraste em qualquer lugar da tela para mover. Com algo selecionado (Ctrl+A marca o molde inteiro, ou faça uma caixa com a seta), move só o que está marcado. Sem nada marcado, move o molde todo junto com a folha de fundo. As linhas e as medidas não mudam.',
 down(p){op={tipo:'mtudo',ult:p,mov:false}},
-move(p){if(!op)return;MD.moverTudo(M,p.x-op.ult.x,p.y-op.ult.y);op.ult=p;op.mov=true},
+move(p){if(!op)return;const dx=p.x-op.ult.x,dy=p.y-op.ult.y;
+if(sel.size)MD.transformar(M,[...sel],q=>G.mover(q,dx,dy));else MD.moverTudo(M,dx,dy);
+op.ult=p;op.mov=true},
 up(){if(!op)return;const o=op;op=null;if(o.mov)alterou()}},
-sel:{dica:'Clique para selecionar (Shift soma). Arraste no vazio para selecionar por caixa, sobre um traço para mover, sobre um ponto para mudá-lo de lugar.',
+sel:{dica:'Clique para selecionar (Shift soma), Ctrl+A marca o molde inteiro. Arraste no vazio para selecionar por caixa, sobre um traço para mover, sobre um ponto para mudá-lo de lugar.',
 down(p,e){const fk=fioSob(p);if(fk){op={tipo:'fio',k:fk};return}const a=alcaSob(p);op=a?{tipo:'alca',...a}:{tipo:'talvez',ini:p,ult:p,pid:pontoSob(p),id:achar(p),shift:e.shiftKey}},
 move(p,e){
 if(!op)return;

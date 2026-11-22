@@ -78,6 +78,8 @@
     }
     for (const id of ids) if (m.pontos[id]) out.add(m.pontos[id]);
     for (const x of m.textos) if (s.has(x.id)) out.add(x);
+    // o fio tem lugar fixo: vai junto quando a peça inteira vai, senão ficaria para trás
+    for (const pc of m.pecas) if (pc.fio && pc.tracos.length && pc.tracos.every(t => s.has(t.id))) { out.add(pc.fio.a); out.add(pc.fio.b); }
     return [...out];
   }
   function transformar(m, ids, f) { const a = alvos(m, ids), n = f(a); a.forEach((p, i) => { p.x = n[i].x; p.y = n[i].y; }); }
@@ -94,7 +96,6 @@
   // de fundo andam juntos, então as linhas e as medidas continuam iguais — só muda o lugar
   function moverTudo(m, dx, dy) {
     transformar(m, [...m.tracos.map(t => t.id), ...Object.keys(m.pontos), ...m.textos.map(x => x.id)], p => G.mover(p, dx, dy));
-    for (const pc of m.pecas) if (pc.fio) { const [a, b] = G.mover([pc.fio.a, pc.fio.b], dx, dy); pc.fio = { a, b }; }
     for (const f of Object.values(m.fundos || {})) { f.tx = (f.tx || 0) + dx; f.ty = (f.ty || 0) + dy; } // a folha é a foto deste molde: vai junto
   }
 
