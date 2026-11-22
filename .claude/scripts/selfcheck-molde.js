@@ -203,7 +203,19 @@ const espe = D.espelhar(ep, [...lado, eixo]);
 const espTodos = [...lado, ...espe.ids];
 const ap = structuredClone(dr); D.apagar(ap, [rr[0]]);
 const gi = structuredClone(dr); D.girar(gi, rr, 90);
+// mover o molde inteiro: peça (que tem fio), texto, ponto solto e folha de fundo
+const mv = structuredClone(dr);
+D.novaPeca(mv, rr);
+mv.textos.push({ id: 'x1', x: 10, y: 20, texto: 'oi', tam: 10 });
+mv.fundos = { M: { tx: 5, ty: 7 } };
+const mvSolto = D.ponto(mv, P(-50, -50)), mvAntes = structuredClone(mv);
+const comps = m => m.tracos.map(t => G.comprimento(M.tracoPts(m, t)));
+D.moverTudo(mv, 30, -40);
 testes.push(
+  ['mover tudo nao muda as linhas', comps(mv), comps(mvAntes)],
+  ['mover tudo leva pontos, ponto solto e texto', [mv.pontos[mv.tracos[0].a], mv.pontos[mvSolto], P(mv.textos[0].x, mv.textos[0].y)], [G.mover([mvAntes.pontos[mvAntes.tracos[0].a]], 30, -40)[0], P(-20, -90), P(40, -20)]],
+  ['mover tudo leva o fio da peca', [mv.pecas[0].fio.a, mv.pecas[0].fio.b], G.mover([mvAntes.pecas[0].fio.a, mvAntes.pecas[0].fio.b], 30, -40)],
+  ['mover tudo leva a folha de fundo', [mv.fundos.M.tx, mv.fundos.M.ty], [35, -33]],
   ['medida 11,5;90', D.medida('11,5;90'), [11.5, 90]],
   ['medida so comprimento', D.medida(' 30 '), [30]],
   ['medida ; final', D.medida('30;'), [30]],

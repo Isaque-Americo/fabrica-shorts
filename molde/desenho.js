@@ -90,6 +90,14 @@
     return { ids };
   }
 
+  // leva o molde inteiro para outro lugar: traços, pontos soltos, textos, o fio das peças e a folha
+  // de fundo andam juntos, então as linhas e as medidas continuam iguais — só muda o lugar
+  function moverTudo(m, dx, dy) {
+    transformar(m, [...m.tracos.map(t => t.id), ...Object.keys(m.pontos), ...m.textos.map(x => x.id)], p => G.mover(p, dx, dy));
+    for (const pc of m.pecas) if (pc.fio) { const [a, b] = G.mover([pc.fio.a, pc.fio.b], dx, dy); pc.fio = { a, b }; }
+    for (const f of Object.values(m.fundos || {})) { f.tx = (f.tx || 0) + dx; f.ty = (f.ty || 0) + dy; } // a folha é a foto deste molde: vai junto
+  }
+
   function apagar(m, ids) {
     const s = new Set(ids), soltos = new Set();
     m.tracos.forEach(t => { if (s.has(t.id)) [t.a, t.b, t.c].forEach(p => p && soltos.add(p)); });
@@ -371,7 +379,7 @@
     return [{ x: p.x + nx * d, y: p.y + ny * d }, { x: p.x + nx * (d - 5), y: p.y + ny * (d - 5) }];
   }
 
-  const MoldeDesenho = { distSeg, medida, cm, polar, angulo, noRaio, simplificar, uid, ponto, usados, reta, retangulo, medir, naCaixa, transformar, girar, apagar, cortar, endireitar, suavizar, estender, arredondar, espelhar,
+  const MoldeDesenho = { distSeg, medida, cm, polar, angulo, noRaio, simplificar, uid, ponto, usados, reta, retangulo, medir, naCaixa, transformar, girar, moverTudo, apagar, cortar, endireitar, suavizar, estender, arredondar, espelhar,
     noTraco, naPeca, geoPeca, novaPeca, pique };
   g.MoldeDesenho = MoldeDesenho;
   if (typeof module !== 'undefined') module.exports = MoldeDesenho;

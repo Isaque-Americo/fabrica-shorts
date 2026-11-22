@@ -836,7 +836,7 @@ const G=window.MoldeGeo,MD=window.MoldeDesenho,tela=$('#tela');
 const dist=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y),lerp=(a,b,k)=>({x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k});
 const esc=s=>String(s).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';'),n2=v=>+v.toFixed(2);
 const caminho=(pts,z)=>'M'+pts.map(p=>n2(p.x)+' '+n2(p.y)).join('L')+(z?'Z':'');
-const FERRS=[['sel','↖','Selecionar','V'],['mao','✋','Mover a tela','H'],['ponto','•','Ponto','P'],['reta','╱','Reta','L'],['endireitar','═','Endireitar entre dois pontos','E'],['suavizar','⌒','Ajeitar a curva entre dois pontos','U'],['ret','▭','Retângulo','R'],['circ','◯','Círculo','C'],['curva','∿','Curva','B'],['lapis','✎','Lápis','F'],['texto','T','Texto','T'],['grad','⇲','Graduar ponto','G']];
+const FERRS=[['sel','↖','Selecionar','V'],['mao','✋','Mover a tela','H'],['mover','✥','Mover o molde inteiro','D'],['ponto','•','Ponto','P'],['reta','╱','Reta','L'],['endireitar','═','Endireitar entre dois pontos','E'],['suavizar','⌒','Ajeitar a curva entre dois pontos','U'],['ret','▭','Retângulo','R'],['circ','◯','Círculo','C'],['curva','∿','Curva','B'],['lapis','✎','Lápis','F'],['texto','T','Texto','T'],['grad','⇲','Graduar ponto','G']];
 const EDICOES=[['apagar','✕','Apagar (Delete)'],['cortar','✂','Cortar no cruzamento'],['estender','⇥','Estender até o próximo traço'],['arredondar','◠','Arredondar canto entre duas retas'],['girar','⟲','Girar'],['espelhar','⇋','Espelhar pela última reta selecionada'],['medir','↔','Medir os traços selecionados']];
 
 function tracoSeguro(t,m=M){try{const p=MM.tracoPts(m,t);return p&&p.every(Boolean)?p:null}catch(e){return null}}
@@ -946,6 +946,10 @@ if(id===op.pid)return;
 const a=op.pid;op=null;sel.clear();sel.add(a);sel.add(id);edicao(n)}});
 const T={
 mao:{dica:'Arraste para mover a tela. Roda do mouse ou − / + para ampliar. (Também: botão do meio ou barra de espaço + arrastar, em qualquer ferramenta.)'},
+mover:{dica:'Arraste em qualquer lugar para levar o molde inteiro de lugar: traços, textos, o fio das peças e a folha de fundo vão juntos. As linhas e as medidas não mudam. Não precisa selecionar nada.',
+down(p){op={tipo:'mtudo',ult:p,mov:false}},
+move(p){if(!op)return;MD.moverTudo(M,p.x-op.ult.x,p.y-op.ult.y);op.ult=p;op.mov=true},
+up(){if(!op)return;const o=op;op=null;if(o.mov)alterou()}},
 sel:{dica:'Clique para selecionar (Shift soma). Arraste no vazio para selecionar por caixa, sobre um traço para mover, sobre um ponto para mudá-lo de lugar.',
 down(p,e){const fk=fioSob(p);if(fk){op={tipo:'fio',k:fk};return}const a=alcaSob(p);op=a?{tipo:'alca',...a}:{tipo:'talvez',ini:p,ult:p,pid:pontoSob(p),id:achar(p),shift:e.shiftKey}},
 move(p,e){
@@ -1424,7 +1428,7 @@ if(pan){vx=pan.vx-(e.clientX-pan.x)/zoom;vy=pan.vy-(e.clientY-pan.y)/zoom;desenh
 const p=mm(e);
 if(op&&op.tipo==='gpt'){arrastaGrad(p);desenhar();return}
 if(alin||foraBase()||!PODE)return;
-rato=ferr==='sel'||ferr==='grad'?null:grudar(p);prenderAng(e.shiftKey);
+rato=ferr==='sel'||ferr==='grad'||ferr==='mover'?null:grudar(p);prenderAng(e.shiftKey);
 T[ferr].move&&T[ferr].move(p,e);desenhar();
 });
 // apertar ou soltar Shift sem mexer o mouse também muda a prévia da reta
