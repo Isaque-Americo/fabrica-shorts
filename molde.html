@@ -382,7 +382,7 @@ let PODE=false; // moldes:mexer; sem PODE o editor é só leitura
 let M=null,H=null,estado='salvo',molId=null;
 let ver=0,salvando=false,timer=null,erroSalvar='',ligadosSalvos=[],zoom=1;
 // desenho: vx,vy = canto da vista em mm; sel = ids de traços/pontos soltos/textos selecionados (Task 6 usa); op = ação em curso
-let vx=-20,vy=-20,ferr='sel',op=null,rato=null,imaLigado=true,espaco=false,pan=null,ferrCtrl=null,opCtrl=null;
+let vx=-20,vy=-20,ferr='sel',op=null,rato=null,imaLigado=true,espaco=false,pan=null,ferrCtrl=null,opCtrl=null,shiftOn=false;
 const sel=new Set();
 // peças: pecaSel = id da peça no painel; modoPeca = clique no contorno marca bainha/pique/pence; pontaErro = ponta solta do último Extrair
 let pecaSel=null,modoPeca=null,pontaErro=null;
@@ -866,7 +866,8 @@ desenharRegua(w,h);
 function previa(){
 let s='';const r=rato&&rato.p;
 if(op&&r){
-if(op.tipo==='reta'||(op.tipo==='curva'&&!op.arr))s+=`<path class="prev" d="${caminho([op.A,r])}"/>`;
+if(op.tipo==='reta')s+=`<path class="prev" d="${caminho([op.A,shiftOn?MD.noEixo(op.A,r):r])}"/>`;
+else if(op.tipo==='curva'&&!op.arr)s+=`<path class="prev" d="${caminho([op.A,r])}"/>`;
 if(op.tipo==='ret')s+=`<path class="prev" d="${caminho([op.A,{x:r.x,y:op.A.y},r,{x:op.A.x,y:r.y}],1)}"/>`;
 if(op.tipo==='circ')s+=`<circle class="prev" cx="${op.C.x}" cy="${op.C.y}" r="${dist(op.C,r)}"/>`;
 }
@@ -944,8 +945,8 @@ else if(o.tipo==='caixa'){if(!o.shift)sel.clear();MD.naCaixa(M,o.ini,o.fim).forE
 else alterou();
 }},
 ponto:{dica:'Clique para marcar um ponto.',up(p){const n=Object.keys(M.pontos).length;MD.ponto(M,grudar(p).p);if(Object.keys(M.pontos).length>n)alterou()}},
-reta:{dica:'Clique o início e as próximas pontas. Digite "comprimento cm; ângulo°" (ex.: 11,5;90) e Enter para medida exata. Esc ou botão direito encerra.',medida:'comprimento cm; ângulo°',
-up(p){const B=grudar(p).p;if(!op)op={tipo:'reta',A:{...B},ini:{...B}};else seguirReta(B)},
+reta:{dica:'Clique o início e as próximas pontas. Segure Shift para a linha sair reta (em pé ou deitada). Digite "comprimento cm; ângulo°" (ex.: 11,5;90) e Enter para medida exata. Esc ou botão direito encerra.',medida:'comprimento cm; ângulo°',
+up(p,e){const B=grudar(p).p;if(!op)op={tipo:'reta',A:{...B},ini:{...B}};else seguirReta(e.shiftKey?MD.noEixo(op.A,B):B)},
 digitado(v){const ang=v.length>1?v[1]:rato?MD.angulo(op.A,rato.p):0;seguirReta(MD.polar(op.A,v[0]*10,ang))}},
 ret:{dica:'Clique dois cantos opostos, ou um canto e digite "largura cm; altura cm" (ex.: 30;50).',medida:'largura cm; altura cm',
 up(p){const B=grudar(p).p;if(!op)op={tipo:'ret',A:{...B}};else criarRet(B)},
@@ -1395,9 +1396,11 @@ if(pan){vx=pan.vx-(e.clientX-pan.x)/zoom;vy=pan.vy-(e.clientY-pan.y)/zoom;desenh
 const p=mm(e);
 if(op&&op.tipo==='gpt'){arrastaGrad(p);desenhar();return}
 if(alin||foraBase()||!PODE)return;
-rato=ferr==='sel'||ferr==='grad'?null:grudar(p);
+rato=ferr==='sel'||ferr==='grad'?null:grudar(p);shiftOn=e.shiftKey;
 T[ferr].move&&T[ferr].move(p,e);desenhar();
 });
+// apertar ou soltar Shift sem mexer o mouse também muda a prévia da reta
+for(const ev of ['keydown','keyup'])document.addEventListener(ev,e=>{if(e.key!=='Shift'||shiftOn===e.shiftKey)return;shiftOn=e.shiftKey;if(M&&op&&op.tipo==='reta')desenhar()});
 // arrasto de gradação interrompido (Esc, botão direito, toque cancelado): M.grad já mudou, grava como passo
 function fimGrad(){if(op&&op.tipo==='gpt'&&op.mov)alterou()}
 tela.addEventListener('pointercancel',()=>{if(op&&op.tipo==='gpt'){fimGrad();op=null;desenhar()}});
