@@ -253,8 +253,8 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
   <p class="vazio" id="g-dica" hidden></p>
   <div id="g-bolso-sec" hidden style="margin-bottom:8px">
     <div style="display:flex;gap:10px">
-      <label class="campo" style="flex:1;margin:0">Largura (cm) <input id="g-bolso-l" inputmode="decimal" autocomplete="off" value="20"></label>
-      <label class="campo" style="flex:1;margin:0">Altura (cm) <input id="g-bolso-a" inputmode="decimal" autocomplete="off" value="23"></label>
+      <label class="campo" style="flex:1;margin:0">Largura (cm) <input id="g-bolso-l" inputmode="decimal" autocomplete="off" placeholder="0"></label>
+      <label class="campo" style="flex:1;margin:0">Altura (cm) <input id="g-bolso-a" inputmode="decimal" autocomplete="off" placeholder="0"></label>
     </div>
   </div>
   <div id="g-auto">
@@ -655,7 +655,7 @@ bs.textContent='';encher();gs.onchange=encher;f.value='';
 // molde ou bolso: o bolso é um molde com uma peça retangular só, e as grades numéricas não servem para ele
 const tp=$('#g-tipo'),semBolso=['numerica',''];
 $('#g-tipo-l').hidden=!novo;tp.value='molde';
-$('#g-bolso-sec').hidden=true;$('#g-bolso-l').value='20';$('#g-bolso-a').value='23';
+$('#g-bolso-sec').hidden=true;$('#g-bolso-l').value='';$('#g-bolso-a').value='';
 tp.onchange=()=>{const b=novo&&tp.value==='bolso',nm=$('#g-nome');
 $('#dlg-grade-t').textContent=!novo?'Grade e medidas':b?'Novo bolso':'Novo molde';
 $('#g-bolso-sec').hidden=!b;
