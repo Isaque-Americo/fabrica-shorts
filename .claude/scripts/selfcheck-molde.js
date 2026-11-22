@@ -483,6 +483,7 @@ testes.push(
   ['camadasPorRoupa 2 so no par duplo com camadas pares', [cpr([parE], tec(), { camadas: 2 }), cpr([parE], tec()), cpr([parE], tec(), { sentido: 'unico', camadas: 2 }), cpr([parE], tec({ tubular: true }), { camadas: 2 }), cpr([pc()], tec(), { camadas: 2 })], [2, 1, 1, 1, 1]],
   ['camadasPorRoupa reconhece peca par mesmo se bolso vier primeiro', cpr([bolso, parE], tec(), { camadas: 2 }), 2],
   ['calcularEnfesto com bolso em primeiro lugar conta roupas pela peca par', (r => r && r.pecas)(resPar(2, ce([bolso, parE], tec(), { camadas: 2 }))), 4],
+  ['pecaPrincipal ignora Cos como auxiliar', cpr([pc({ nome: 'Cós' }), parE], tec(), { camadas: 2 }), 2],
   ['review5 unico par sem espelhar: 8 normais e 1 aviso', [parSemE.length, parSemE.filter(x => x.espelho).length, parSemE.avisos, cParSemE && (cParSemE.avisos || []).length],
     [8, 0, [{ peca: 'Bolso', tam: 'M', motivo: 'par sem espelhar no sentido único' }], 1]],
   ['I3 duplo camadas impares, par que espelha: como no unico, 4 normais + 4 espelhadas e aviso', [parD1.length, parD1.filter(x => x.espelho).length, parD1.avisos],

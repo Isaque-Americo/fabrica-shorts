@@ -251,12 +251,18 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
   <label class="campo">Tamanho base <select id="g-base"></select></label>
   <p class="vazio" id="g-dica" hidden></p>
   <div id="g-bolso-sec">
-    <label style="display:flex;align-items:center;gap:8px;font-size:14px;margin:8px 0 6px;cursor:pointer">
-      <input type="checkbox" id="g-bolso"> Incluir bolso traseiro (retângulo)
-    </label>
-    <div id="g-bolso-meds" hidden style="display:flex;gap:10px;margin-bottom:8px">
-      <label class="campo" style="flex:1;margin:0">Largura (cm) <input id="g-bolso-l" inputmode="decimal" autocomplete="off" value="20"></label>
-      <label class="campo" style="flex:1;margin:0">Altura (cm) <input id="g-bolso-a" inputmode="decimal" autocomplete="off" value="23"></label>
+    <label class="campo">Peça auxiliar (retângulo) <select id="g-bolso">
+      <option value="">Nenhuma</option>
+      <option value="bolso" data-l="20" data-a="23">Bolso traseiro</option>
+      <option value="cos" data-l="4" data-a="70">Cós / Elástico</option>
+      <option value="livre">Livre (digitar)</option>
+    </select></label>
+    <div id="g-bolso-meds" hidden style="margin-bottom:8px">
+      <label class="campo" id="g-bolso-nome-l" hidden>Nome <input id="g-bolso-nome" autocomplete="off"></label>
+      <div style="display:flex;gap:10px">
+        <label class="campo" style="flex:1;margin:0">Largura (cm) <input id="g-bolso-l" inputmode="decimal" autocomplete="off" value="20"></label>
+        <label class="campo" style="flex:1;margin:0">Altura (cm) <input id="g-bolso-a" inputmode="decimal" autocomplete="off" value="23"></label>
+      </div>
     </div>
   </div>
   <div id="g-auto">
@@ -654,9 +660,12 @@ bs.textContent='';for(const t of l){const o=document.createElement('option');o.v
 dicaSZ($('#g-dica'),novo||m.produtoIds.length,l);
 };
 bs.textContent='';encher();gs.onchange=encher;f.value='';
-$('#g-bolso-sec').hidden=!novo;$('#g-bolso').checked=false;$('#g-bolso-meds').hidden=true;
-$('#g-bolso-l').value='20';$('#g-bolso-a').value='23';
-$('#g-bolso').onchange=()=>{$('#g-bolso-meds').hidden=!$('#g-bolso').checked};
+$('#g-bolso-sec').hidden=!novo;$('#g-bolso').value='';$('#g-bolso-meds').hidden=true;$('#g-bolso-nome-l').hidden=true;
+$('#g-bolso-l').value='20';$('#g-bolso-a').value='23';$('#g-bolso-nome').value='';
+$('#g-bolso').onchange=()=>{const o=$('#g-bolso').selectedOptions[0],v=$('#g-bolso').value;
+$('#g-bolso-meds').hidden=!v;$('#g-bolso-nome-l').hidden=v!=='livre';
+if(o&&o.dataset.l){$('#g-bolso-l').value=o.dataset.l;$('#g-bolso-a').value=o.dataset.a}
+};
 const ga=m.gradAuto||{x:0,y:0};
 $('#g-auto').hidden=novo; // molde novo ainda não tem peça para graduar
 $('#g-auto-x').value=ga.x?cm2(ga.x):'';$('#g-auto-y').value=ga.y?cm2(ga.y):'';
@@ -664,10 +673,12 @@ d.returnValue='';d.showModal();
 await new Promise(r=>d.addEventListener('close',r,{once:true}));
 if(d.returnValue!=='ok')return null;
 const r={nome:novo?$('#g-nome').value.trim()||m.nome:null,grade:[...gradeDe(gs.value)],base:bs.value,foto:null};
-if(novo&&$('#g-bolso').checked){
+if(novo&&$('#g-bolso').value){
 const bl=lerCm('#g-bolso-l'),ba=lerCm('#g-bolso-a');
-if(bl===null||ba===null||bl<=0||ba<=0){toast('Medida do bolso inválida. Ex.: 20 e 23');return null}
-r.bolso={l:bl,a:ba};
+if(bl===null||ba===null||bl<=0||ba<=0){toast('Medida da peça auxiliar inválida. Ex.: 20 e 23');return null}
+const nomes={bolso:'Bolso',cos:'Cós'};
+const nome=$('#g-bolso').value==='livre'?($('#g-bolso-nome').value.trim()||'Peça'):nomes[$('#g-bolso').value]||'Peça';
+r.bolso={l:bl,a:ba,nome};
 }
 const ax=novo?0:lerCm('#g-auto-x'),ay=novo?0:lerCm('#g-auto-y');
 if(ax===null||ay===null){toast('Medida inválida. Ex.: 1 ou 0,5');return null}
@@ -701,7 +712,7 @@ const ret=MD.retangulo(m,A,{x:A.x+r.bolso.l,y:A.y+r.bolso.a});
 if(!ret.erro){
 const n=MD.novaPeca(m,ret.ids);
 if(n.ok){
-let nome='Bolso',i=1;while(m.pecas.some(p=>p!==n.peca&&p.nome===nome))nome='Bolso '+(++i);
+let nome=r.bolso.nome||'Bolso',i=1;while(m.pecas.some(p=>p!==n.peca&&p.nome===nome))nome=(r.bolso.nome||'Bolso')+' '+(++i);
 Object.assign(n.peca,{nome,margem:0,tam:m.base,cortar:1,par:false,rotacao:'180'});
 }
 }
@@ -1017,7 +1028,8 @@ function extrair(){
 if(foraBase())return toast('Edite no tamanho base');
 const r=MD.novaPeca(M,[...sel]);
 if(!r.ok){toast(r.erro);pontaErro=r.ponta||null;desenhar();return}
-M.pecas.sort((a,b)=>(/bolso/i.test(a.nome)?1:0)-(/bolso/i.test(b.nome)?1:0));
+const _aux=/bolso|c[oó]s|vista|forro|etiqueta|ribana/i;
+M.pecas.sort((a,b)=>(_aux.test(a.nome)?1:0)-(_aux.test(b.nome)?1:0));
 sel.clear();pecaSel=r.peca.id;alterou();
 }
 // peça retangular pronta (bolso, vista, etiqueta): desenha 5 cm à direita do que já existe e já vira peça

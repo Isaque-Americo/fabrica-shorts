@@ -113,10 +113,11 @@
   // tecido principal do produto na ordem: o da aba com p.tecidoId, senão o da aba [0]
   const principalDe = (p, ordem) => { const abas = (ordem.tecidos || []).map(t => t.materiaId); return abas.includes(p.tecidoId) ? p.tecidoId : abas[0]; };
   // peça principal de um tamanho: quem define a contagem de roupas e o fator de camadas.
-  // Peça em par vence; senão a que não é bolso; senão a primeira
+  // Peça em par vence; senão a que não é auxiliar (bolso, cós, vista…); senão a primeira
+  const auxRe = /bolso|c[oó]s|vista|forro|etiqueta|ribana/i;
   const pecaPrincipal = (p, tam) => {
     const l = pecasTam(p, tam);
-    return l.find(q => q && q.par) || l.find(q => q && !/bolso/i.test(q.nome)) || l[0];
+    return l.find(q => q && q.par) || l.find(q => q && !auxRe.test(q.nome)) || l[0];
   };
   // camadas gastas por roupa: peça em par cortada face a face (sentido duplo, camadas pares) tira o par das duas camadas,
   // então cada posição rende meia roupa por camada e a roupa gasta 2 camadas. Nos outros casos (único, camadas ímpares, tubular) = 1
