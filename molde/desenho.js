@@ -352,6 +352,21 @@
     } catch (e) { return null; }
   }
 
+  // peça sob o ponto: por dentro do contorno de corte, ou com um traço dela a tol do ponto
+  // (é o que permite pegar a peça inteira com um clique, sem fazer caixa de seleção)
+  function pecaSob(m, p, tol = 0) {
+    for (const pc of m.pecas) {
+      const c = (geoPeca(m, pc) || {}).corte;
+      let dentro = false;
+      if (c) for (let i = 0, j = c.length - 1; i < c.length; j = i++)
+        if ((c[i].y > p.y) !== (c[j].y > p.y) && p.x < (c[j].x - c[i].x) * (p.y - c[i].y) / (c[j].y - c[i].y) + c[i].x) dentro = !dentro;
+      if (dentro) return pc;
+      const h = naPeca(m, pc, p);
+      if (h && h.d <= tol) return pc;
+    }
+    return null;
+  }
+
   // peça nova "PEÇA n" com os traços (os que não são traço ficam de fora); fio vertical no centro
   function novaPeca(m, ids) {
     const tr = ids.filter(id => m.tracos.some(t => t.id === id));
@@ -381,7 +396,7 @@
   }
 
   const MoldeDesenho = { distSeg, medida, cm, polar, angulo, noRaio, simplificar, uid, ponto, usados, reta, retangulo, medir, naCaixa, transformar, girar, moverTudo, apagar, cortar, endireitar, suavizar, estender, arredondar, espelhar,
-    noTraco, naPeca, geoPeca, novaPeca, pique };
+    noTraco, naPeca, geoPeca, pecaSob, novaPeca, pique };
   g.MoldeDesenho = MoldeDesenho;
   if (typeof module !== 'undefined') module.exports = MoldeDesenho;
 })(typeof window !== 'undefined' ? window : globalThis);

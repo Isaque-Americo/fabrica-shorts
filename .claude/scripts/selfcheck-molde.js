@@ -219,6 +219,7 @@ testes.push(
   ['mover tudo leva o fio da peca', [mv.pecas[0].fio.a, mv.pecas[0].fio.b], G.mover([mvAntes.pecas[0].fio.a, mvAntes.pecas[0].fio.b], 30, -40)],
   ['mover tudo leva a folha de fundo', [mv.fundos.M.tx, mv.fundos.M.ty], [35, -33]],
   ['mover um traco so nao leva o fio', [mp.pecas[0].fio.a, mp.pecas[0].fio.b], [mvAntes.pecas[0].fio.a, mvAntes.pecas[0].fio.b]],
+  ['peca sob o ponto: por dentro, na linha e fora', [D.pecaSob(mvAntes, P(150, 250)), D.pecaSob(mvAntes, P(300, 250), 8), D.pecaSob(mvAntes, P(900, 250), 8)], [mvAntes.pecas[0], mvAntes.pecas[0], null]],
   ['medida 11,5;90', D.medida('11,5;90'), [11.5, 90]],
   ['medida so comprimento', D.medida(' 30 '), [30]],
   ['medida ; final', D.medida('30;'), [30]],

@@ -956,8 +956,11 @@ if(id===op.pid)return;
 const a=op.pid;op=null;sel.clear();sel.add(a);sel.add(id);edicao(n)}});
 const T={
 mao:{dica:'Arraste para mover a tela. Roda do mouse ou − / + para ampliar. (Também: botão do meio ou barra de espaço + arrastar, em qualquer ferramenta.)'},
-mover:{dica:'Arraste em qualquer lugar da tela para mover. Com algo selecionado (Ctrl+A marca o molde inteiro, ou faça uma caixa com a seta), move só o que está marcado. Sem nada marcado, move o molde todo junto com a folha de fundo. As linhas e as medidas não mudam.',
-down(p){op={tipo:'mtudo',ult:p,mov:false}},
+mover:{dica:'Arraste a peça para o lugar que quiser: clique em cima dela e puxe, que ela vai inteira. Ctrl+A pega o molde todo; no vazio, arrasta o que já estiver marcado. As linhas e as medidas não mudam.',
+down(p){
+const pc=MD.pecaSob(M,p,8/zoom),ids=pc?pc.tracos.map(t=>t.id):[];
+if(ids.length&&!ids.every(id=>sel.has(id))){sel.clear();ids.forEach(id=>sel.add(id));toast('Peça '+pc.nome+' marcada.')} // clicou numa peça de fora da seleção: pega ela inteira
+op={tipo:'mtudo',ult:p,mov:false}},
 move(p){if(!op)return;const dx=p.x-op.ult.x,dy=p.y-op.ult.y;
 if(sel.size)MD.transformar(M,[...sel],q=>G.mover(q,dx,dy));else MD.moverTudo(M,dx,dy);
 op.ult=p;op.mov=true},
