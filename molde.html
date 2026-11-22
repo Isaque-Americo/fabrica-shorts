@@ -836,7 +836,7 @@ const G=window.MoldeGeo,MD=window.MoldeDesenho,tela=$('#tela');
 const dist=(a,b)=>Math.hypot(b.x-a.x,b.y-a.y),lerp=(a,b,k)=>({x:a.x+(b.x-a.x)*k,y:a.y+(b.y-a.y)*k});
 const esc=s=>String(s).replace(/[&<>"]/g,c=>'&#'+c.charCodeAt(0)+';'),n2=v=>+v.toFixed(2);
 const caminho=(pts,z)=>'M'+pts.map(p=>n2(p.x)+' '+n2(p.y)).join('L')+(z?'Z':'');
-const FERRS=[['sel','↖','Selecionar','V'],['mao','✋','Mover a tela','H'],['ponto','•','Ponto','P'],['reta','╱','Reta','L'],['endireitar','═','Endireitar entre dois pontos','E'],['ret','▭','Retângulo','R'],['circ','◯','Círculo','C'],['curva','∿','Curva','B'],['lapis','✎','Lápis','F'],['texto','T','Texto','T'],['grad','⇲','Graduar ponto','G']];
+const FERRS=[['sel','↖','Selecionar','V'],['mao','✋','Mover a tela','H'],['ponto','•','Ponto','P'],['reta','╱','Reta','L'],['endireitar','═','Endireitar entre dois pontos','E'],['suavizar','⌒','Ajeitar a curva entre dois pontos','U'],['ret','▭','Retângulo','R'],['circ','◯','Círculo','C'],['curva','∿','Curva','B'],['lapis','✎','Lápis','F'],['texto','T','Texto','T'],['grad','⇲','Graduar ponto','G']];
 const EDICOES=[['apagar','✕','Apagar (Delete)'],['cortar','✂','Cortar no cruzamento'],['estender','⇥','Estender até o próximo traço'],['arredondar','◠','Arredondar canto entre duas retas'],['girar','⟲','Girar'],['espelhar','⇋','Espelhar pela última reta selecionada'],['medir','↔','Medir os traços selecionados']];
 
 function tracoSeguro(t,m=M){try{const p=MM.tracoPts(m,t);return p&&p.every(Boolean)?p:null}catch(e){return null}}
@@ -887,7 +887,7 @@ function previa(){
 let s='';const r=rato&&rato.p;
 if(op&&r){
 if(op.tipo==='reta')s+=`<path class="prev" d="${caminho([op.A,naTrava(r)])}"/>`;
-else if((op.tipo==='curva'&&!op.arr)||op.tipo==='endireitar')s+=`<path class="prev" d="${caminho([op.A,r])}"/>`;
+else if((op.tipo==='curva'&&!op.arr)||op.tipo==='dois')s+=`<path class="prev" d="${caminho([op.A,r])}"/>`;
 if(op.tipo==='ret')s+=`<path class="prev" d="${caminho([op.A,{x:r.x,y:op.A.y},r,{x:op.A.x,y:r.y}],1)}"/>`;
 if(op.tipo==='circ')s+=`<circle class="prev" cx="${op.C.x}" cy="${op.C.y}" r="${dist(op.C,r)}"/>`;
 }
@@ -938,6 +938,12 @@ alterou();
 }
 function criarRet(B){const r=MD.retangulo(M,op.A,B);op=null;if(r.erro){toast(r.erro);desenhar();return}alterou()}
 function criarCirc(r){if(!(r>0))return toast('Raio inválido.');M.tracos.push({id:MD.uid(M,'t'),tipo:'circulo',c:MD.ponto(M,op.C),r});op=null;alterou()}
+// dois cliques em pontos do desenho: o que estiver entre eles vira um traço só (edicao recebe os dois pontos pela seleção)
+const doisPontos=(n,dica)=>({dica,up(p){
+const id=pontoSob(p);if(!id)return toast('Clique sobre um ponto.');
+if(!op){op={tipo:'dois',A:{...M.pontos[id]},pid:id};sel.clear();sel.add(id);desenhar();return}
+if(id===op.pid)return;
+const a=op.pid;op=null;sel.clear();sel.add(a);sel.add(id);edicao(n)}});
 const T={
 mao:{dica:'Arraste para mover a tela. Roda do mouse ou − / + para ampliar. (Também: botão do meio ou barra de espaço + arrastar, em qualquer ferramenta.)'},
 sel:{dica:'Clique para selecionar (Shift soma). Arraste no vazio para selecionar por caixa, sobre um traço para mover, sobre um ponto para mudá-lo de lugar.',
@@ -968,12 +974,8 @@ ponto:{dica:'Clique para marcar um ponto.',up(p){const n=Object.keys(M.pontos).l
 reta:{dica:'Clique o início e as próximas pontas. Aponte a direção e segure Shift para travar nela: a linha não entorta mais, só muda de comprimento. Digite "comprimento cm; ângulo°" (ex.: 11,5;90) e Enter para medida exata. Esc ou botão direito encerra.',medida:'comprimento cm; ângulo°',
 up(p,e){const B=grudar(p).p;if(!op)op={tipo:'reta',A:{...B},ini:{...B},trava:null};else{prenderAng(e.shiftKey);seguirReta(naTrava(B));if(op)op.trava=null}},
 digitado(v){const ang=v.length>1?v[1]:rato?MD.angulo(op.A,rato.p):0;seguirReta(MD.polar(op.A,v[0]*10,ang))}},
-endireitar:{dica:'Clique num ponto e depois em outro: o caminho torto entre os dois vira uma reta só, e os pontos do meio saem. Pega sempre o caminho mais curto entre eles. Esc cancela.',
-up(p){
-const id=pontoSob(p);if(!id)return toast('Clique sobre um ponto.');
-if(!op){op={tipo:'endireitar',A:{...M.pontos[id]},pid:id};sel.clear();sel.add(id);desenhar();return}
-if(id===op.pid)return;
-const a=op.pid;op=null;sel.clear();sel.add(a);sel.add(id);edicao('endireitar')}},
+endireitar:doisPontos('endireitar','Clique num ponto e depois em outro: o caminho torto entre os dois vira uma reta só, e os pontos do meio saem. Pega sempre o caminho mais curto entre eles. Esc cancela.'),
+suavizar:doisPontos('suavizar','Clique num ponto e depois em outro: o app lê o trecho torto entre os dois e põe no lugar uma curva lisa, que segue a sua linha com até 3 mm de folga. Esc cancela.'),
 ret:{dica:'Clique dois cantos opostos, ou um canto e digite "largura cm; altura cm" (ex.: 30;50).',medida:'largura cm; altura cm',
 up(p){const B=grudar(p).p;if(!op)op={tipo:'ret',A:{...B}};else criarRet(B)},
 // o lado para onde está o cursor dá o sentido

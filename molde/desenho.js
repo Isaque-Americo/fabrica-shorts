@@ -125,16 +125,90 @@
     return ids;
   }
 
-  // troca o pedaço torto entre dois pontos por uma reta só (contorno digitalizado sai ondulado)
-  function endireitar(m, ids) {
+  // pontos do caminho tr, em ordem, começando no ponto a
+  function linhaDe(m, tr, a) {
+    const resto = tr.map(id => m.tracos.find(t => t.id === id)), out = [m.pontos[a]];
+    let p = a;
+    while (resto.length) {
+      const k = resto.findIndex(t => t.a === p || t.b === p);
+      if (k < 0) break;
+      const t = resto.splice(k, 1)[0], inv = t.b === p, q = MM.tracoPts(m, t);
+      out.push(...(inv ? q.slice().reverse() : q).slice(1));
+      p = inv ? t.a : t.b;
+    }
+    return out;
+  }
+
+  // direção da linha na ponta i (0 = começo, 1 = fim), olhando 10% do comprimento adiante: ponta a ponta o traço digitalizado treme
+  function tangente(linha, fim) {
+    const q = fim ? linha.slice().reverse() : linha, L = G.comprimento(q) * 0.1;
+    let s = 0, j = 1;
+    while (j < q.length - 1 && s < L) { s += dist(q[j - 1], q[j]); j++; }
+    const v = { x: q[j].x - q[0].x, y: q[j].y - q[0].y }, n = Math.hypot(v.x, v.y) || 1;
+    return { x: v.x / n, y: v.y / n };
+  }
+
+  // alças de uma Bézier ajustada à linha, com as direções t1 e t2 dadas nas pontas:
+  // o tamanho sai por mínimos quadrados sobre os pontos da linha (Graphics Gems, generateBezier)
+  function alcas(linha, t1, t2) {
+    const P0 = linha[0], P3 = linha[linha.length - 1], corda = dist(P0, P3);
+    let s = 0;
+    const L = G.comprimento(linha) || 1, u = linha.map((p, i) => (i ? s += dist(linha[i - 1], p) : 0, s / L));
+    let c11 = 0, c12 = 0, c22 = 0, x1 = 0, x2 = 0;
+    linha.forEach((p, i) => {
+      const t = u[i], w = 1 - t, b0 = w * w * w, b1 = 3 * t * w * w, b2 = 3 * t * t * w, b3 = t * t * t;
+      const a1 = { x: t1.x * b1, y: t1.y * b1 }, a2 = { x: t2.x * b2, y: t2.y * b2 };
+      const d = { x: p.x - (P0.x * (b0 + b1) + P3.x * (b2 + b3)), y: p.y - (P0.y * (b0 + b1) + P3.y * (b2 + b3)) };
+      c11 += a1.x * a1.x + a1.y * a1.y; c12 += a1.x * a2.x + a1.y * a2.y; c22 += a2.x * a2.x + a2.y * a2.y;
+      x1 += d.x * a1.x + d.y * a1.y; x2 += d.x * a2.x + d.y * a2.y;
+    });
+    const det = c11 * c22 - c12 * c12;
+    let al1 = det ? (x1 * c22 - c12 * x2) / det : 0, al2 = det ? (c11 * x2 - x1 * c12) / det : 0;
+    // alça negativa ou exagerada = ajuste ruim (linha quase reta, ou que volta por cima de si): cai no padrão de 1/3 da corda
+    const mau = v => !Number.isFinite(v) || v <= corda * 1e-3 || v > corda * 3;
+    if (mau(al1) || mau(al2)) al1 = al2 = corda / 3;
+    return { c1: { x: P0.x + t1.x * al1, y: P0.y + t1.y * al1 }, c2: { x: P3.x + t2.x * al2, y: P3.y + t2.y * al2 } };
+  }
+
+  // curvas no lugar da linha torta: uma só, ou partida no ponto mais longe enquanto a curva
+  // passar de tol mm da linha (um Bézier só não dá conta de meia volta inteira)
+  function curvasPor(linha, t1, t2, tol, prof = 0) {
+    const P0 = linha[0], P3 = linha[linha.length - 1], { c1, c2 } = alcas(linha, t1, t2), uma = [{ P0, c1, c2, P3 }];
+    if (prof >= 3 || linha.length < 7) return uma;
+    const q = G.bezier(P0, c1, c2, P3);
+    let k = -1, md = tol;
+    linha.forEach((p, i) => {
+      if (i === 0 || i === linha.length - 1) return;
+      const d = Math.min(...q.slice(1).map((r, j) => distSeg(p, q[j], r)));
+      if (d > md) { md = d; k = i; }
+    });
+    if (k < 0) return uma;
+    const v = { x: linha[k + 1].x - linha[k - 1].x, y: linha[k + 1].y - linha[k - 1].y }, n = Math.hypot(v.x, v.y) || 1;
+    const tm = { x: v.x / n, y: v.y / n }; // mesma direção dos dois lados: a emenda não faz bico
+    return [...curvasPor(linha.slice(0, k + 1), t1, { x: -tm.x, y: -tm.y }, tol, prof + 1),
+      ...curvasPor(linha.slice(k), tm, t2, tol, prof + 1)];
+  }
+
+  function curvaPor(m, a, b, linha, tol) {
+    const out = [];
+    for (const c of curvasPor(linha, tangente(linha, false), tangente(linha, true), tol)) {
+      const id = uid(m, 't');
+      m.tracos.push({ id, tipo: 'curva', a: ponto(m, c.P0), b: ponto(m, c.P3), c1: c.c1, c2: c.c2 });
+      out.push(id);
+    }
+    return out;
+  }
+
+  // troca o pedaço torto entre dois pontos por uma reta, ou por curvas que seguem a linha até tol mm
+  function trocarTrecho(m, ids, curvo, tol = 3) {
     const [a, b] = ids;
     if (ids.length !== 2 || a === b || !m.pontos[a] || !m.pontos[b]) return { erro: 'Clique em dois pontos diferentes do desenho.' };
     const tr = caminhoEntre(m, a, b);
     if (!tr) return { erro: 'Esses dois pontos não estão ligados por traços.' };
-    const nova = reta(m, a, b);
+    const nova = curvo ? curvaPor(m, a, b, linhaDe(m, tr, a), tol) : [reta(m, a, b)];
     for (const pc of m.pecas) {
       if (!pc.tracos.some(t => tr.includes(t.id))) continue;
-      pc.tracos = [{ id: nova, inv: false }, ...pc.tracos.filter(t => !tr.includes(t.id))];
+      pc.tracos = [...nova.map(id => ({ id, inv: false })), ...pc.tracos.filter(t => !tr.includes(t.id))];
       const r = MM.encadear(m, pc.tracos.map(t => t.id)); // encadear acerta a ordem e o sentido: a peça continua inteira
       if (r.ok) pc.tracos = r.tracos;
       pc.pences = (pc.pences || []).filter(x => !tr.includes(x.tracoId));
@@ -142,8 +216,10 @@
       for (const id of tr) if (pc.margemTraco) delete pc.margemTraco[id];
     }
     apagar(m, tr);
-    return { ids: [nova] };
+    return { ids: nova };
   }
+  const endireitar = (m, ids) => trocarTrecho(m, ids, false);
+  const suavizar = (m, ids) => trocarTrecho(m, ids, true);
 
   // divide cada reta selecionada onde ela cruza outro traço; cruzamento vira ponto comum
   function cortar(m, ids) {
@@ -295,7 +371,7 @@
     return [{ x: p.x + nx * d, y: p.y + ny * d }, { x: p.x + nx * (d - 5), y: p.y + ny * (d - 5) }];
   }
 
-  const MoldeDesenho = { distSeg, medida, cm, polar, angulo, noRaio, simplificar, uid, ponto, usados, reta, retangulo, medir, naCaixa, transformar, girar, apagar, cortar, endireitar, estender, arredondar, espelhar,
+  const MoldeDesenho = { distSeg, medida, cm, polar, angulo, noRaio, simplificar, uid, ponto, usados, reta, retangulo, medir, naCaixa, transformar, girar, apagar, cortar, endireitar, suavizar, estender, arredondar, espelhar,
     noTraco, naPeca, geoPeca, novaPeca, pique };
   g.MoldeDesenho = MoldeDesenho;
   if (typeof module !== 'undefined') module.exports = MoldeDesenho;

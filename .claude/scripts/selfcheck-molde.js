@@ -181,6 +181,21 @@ const enT = enQ.map((id, i) => D.reta(en, id, enQ[(i + 1) % enQ.length]));
 D.novaPeca(en, enT);
 const enR = D.endireitar(en, [enQ[0], enQ[3]]);
 const enNova = en.tracos.find(t => t.id === enR.ids[0]);
+// suavizar: meia elipse (0,0)→(300,0) desenhada com 12 retinhas tortas (ruído de 2 mm)
+const sv = M.novo('sv');
+const svQ = Array.from({ length: 13 }, (_, i) => {
+  const th = Math.PI * i / 12, r = i > 0 && i < 12 ? (i % 2 ? 2 : -2) : 0;
+  return D.ponto(sv, P(150 - 150 * Math.cos(th), -100 * Math.sin(th) + r));
+});
+svQ.slice(1).forEach((id, i) => D.reta(sv, svQ[i], id));
+const svOrig = svQ.map(id => ({ ...sv.pontos[id] }));
+const svR = D.suavizar(sv, [svQ[0], svQ[12]]), svL = sv.tracos.flatMap(t => M.tracoPts(sv, t));
+// maior desvio dos pontos originais até as curvas novas (as curvas seguem a linha, sem os tremores)
+const svDesvio = Math.max(...svOrig.map(p => Math.min(...svL.slice(1).map((r, j) => distSeg(p, svL[j], r)))));
+// quase reta: mínimos quadrados não acha alça, cai no padrão de 1/3 da corda
+const sr = M.novo('sr'), srQ = [P(0, 0), P(100, 0), P(200, 0), P(300, 0)].map(p => D.ponto(sr, p));
+srQ.slice(1).forEach((id, i) => D.reta(sr, srQ[i], id));
+D.suavizar(sr, [srQ[0], srQ[3]]);
 // espelho: meia peça pelo eixo x=0
 const ep = M.novo('ep'), e0 = D.ponto(ep, P(0, 0)), e1 = D.ponto(ep, P(0, 100)), e2 = D.ponto(ep, P(50, 50));
 const eixo = D.reta(ep, e0, e1), lado = [D.reta(ep, e0, e2), D.reta(ep, e2, e1)];
@@ -220,6 +235,12 @@ testes.push(
   ['endireitar troca 3 tracos por 1', [en.tracos.length, enNova.a, enNova.b], [4, enQ[0], enQ[3]]],
   ['endireitar leva os pontos do meio', Object.keys(en.pontos).length, 4],
   ['endireitar deixa a peca inteira', [en.pecas[0].tracos.length, !!D.geoPeca(en, en.pecas[0])], [4, true]],
+  ['suavizar troca 12 retas por poucas curvas', [sv.tracos.length <= 4, sv.tracos.every(t => t.tipo === 'curva'), sv.tracos.map(t => t.id)], [true, true, svR.ids]],
+  ['suavizar mantem as duas pontas', [sv.tracos[0].a, sv.tracos[sv.tracos.length - 1].b], [svQ[0], svQ[12]]],
+  ['suavizar tira os pontos que nao usa', Object.keys(sv.pontos).length <= 5, true],
+  ['suavizar segue a linha de perto', svDesvio < 5, true],
+  ['suavizar alcas para fora do arco', [sv.tracos[0].c1.y < -20, sv.tracos[sv.tracos.length - 1].c2.y < -20], [true, true]],
+  ['suavizar quase reta: alcas a 1/3 da corda', [sr.tracos[0].c1, sr.tracos[0].c2], [P(100, 0), P(200, 0)]],
   ['endireitar pontos soltos nao ligam', !!D.endireitar(M.novo('x2'), ['p1', 'p2']).erro, true],
   ['endireitar o mesmo ponto duas vezes', !!D.endireitar(en, [enQ[0], enQ[0]]).erro, true],
   ['estender ate x=100', es.pontos[es.tracos[0].b], P(100, 0)],
