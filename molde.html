@@ -48,6 +48,9 @@ dialog h3{margin:0 0 12px}
 #tela{grid-area:tela;width:100%;height:100%;display:block;background:var(--bg);touch-action:none}
 #tela.mao{cursor:grab}#tela.mao:active{cursor:grabbing}
 #painel{grid-area:painel;background:var(--card);border-left:1px solid var(--bd);padding:12px;overflow:auto}
+/* painel encolhido: a coluna vai a zero e a tela ocupa o espaço (no celular a linha some sozinha, que é auto) */
+#editor.painel-off{grid-template-columns:auto 1fr 0}
+#editor.painel-off #painel{display:none}
 .vazio{color:var(--mut);font-size:13px}
 #refs{max-height:50vh;overflow:auto;margin:8px 0;border:1px solid var(--bd);border-radius:8px}
 #refs label{display:flex;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--bd);cursor:pointer}
@@ -161,6 +164,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
     <button type="button" id="foto-mini" hidden title="Ver a foto da ficha técnica"><img alt="Foto da ficha técnica"></button>
     <button class="sm" type="button" id="btn-refs" title="Produtos que usam este molde">Referências <span id="refs-n"></span></button>
     <button class="sm" type="button" id="btn-enfesto" title="Cria uma ordem avulsa com uma peça de cada tamanho e abre o risco do enfesto">Enfesto</button>
+    <button class="sm" type="button" id="btn-painel" aria-pressed="true" aria-controls="painel" title="Encolhe ou mostra o painel da direita, para a tela de desenho ficar maior">⇥ <span class="rot">Painel</span></button>
     <span class="grupo" role="group" aria-label="Zoom">
       <button class="sm" type="button" id="zoom-menos" title="Diminuir zoom" aria-label="Diminuir zoom">−</button>
       <button class="sm" type="button" id="zoom-v" title="Voltar a 100%">100%</button>
@@ -787,6 +791,8 @@ location.href='corte.html?prod='+encodeURIComponent(M.produtoIds[0])+(LOCAL?'&lo
 };
 $('#btn-grade').onclick=()=>abrirGrade('');
 $('#btn-fantasma').onclick=()=>{fantasma=!fantasma;desenhar()};
+// a tela cresce junto, então tem de redesenhar (a régua é feita pelo tamanho medido)
+$('#btn-painel').onclick=e=>{const off=$('#editor').classList.toggle('painel-off');e.currentTarget.setAttribute('aria-pressed',!off);desenhar()};
 $('#btn-folha').onclick=()=>{folhaOn=!folhaOn;if(!folhaOn)alin=null;preencherProps();desenhar()};
 $('#folha-op').oninput=()=>desenhar();
 $('#btn-alinhar').onclick=()=>{if(!PODE)return toast('Sem permissão para editar.');if(alin)alin=null;else{folhaOn=true;op=null;modoPeca=null;alin={n:0,v:[]}}preencherProps();desenhar()};
