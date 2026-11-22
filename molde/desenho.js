@@ -22,8 +22,8 @@
   const cm = mm => (mm / 10).toFixed(1).replace('.', ',');
   const polar = (a, mm, graus) => { const r = graus * Math.PI / 180; return { x: a.x + mm * Math.cos(r), y: a.y - mm * Math.sin(r) }; };
   const angulo = (a, b) => Math.atan2(a.y - b.y, b.x - a.x) * 180 / Math.PI;
-  // Shift na reta: prende a ponta no nível (mesmo y) ou no prumo (mesmo x) de a, pelo lado em que o cursor andou mais
-  const noEixo = (a, p) => Math.abs(p.x - a.x) >= Math.abs(p.y - a.y) ? { x: p.x, y: a.y } : { x: a.x, y: p.y };
+  // Shift na reta: joga p em cima do raio que sai de a no ângulo travado, só mudando o comprimento (t < 0 cai do outro lado da mesma linha)
+  const noRaio = (a, graus, p) => { const r = graus * Math.PI / 180, ux = Math.cos(r), uy = -Math.sin(r), t = (p.x - a.x) * ux + (p.y - a.y) * uy; return { x: a.x + t * ux, y: a.y + t * uy }; };
 
   // Douglas-Peucker: tira os pontos a ≤ tol da corda
   function simplificar(pts, tol) {
@@ -252,7 +252,7 @@
     return [{ x: p.x + nx * d, y: p.y + ny * d }, { x: p.x + nx * (d - 5), y: p.y + ny * (d - 5) }];
   }
 
-  const MoldeDesenho = { distSeg, medida, cm, polar, angulo, noEixo, simplificar, uid, ponto, usados, reta, retangulo, medir, naCaixa, transformar, girar, apagar, cortar, estender, arredondar, espelhar,
+  const MoldeDesenho = { distSeg, medida, cm, polar, angulo, noRaio, simplificar, uid, ponto, usados, reta, retangulo, medir, naCaixa, transformar, girar, apagar, cortar, estender, arredondar, espelhar,
     noTraco, naPeca, geoPeca, novaPeca, pique };
   g.MoldeDesenho = MoldeDesenho;
   if (typeof module !== 'undefined') module.exports = MoldeDesenho;
