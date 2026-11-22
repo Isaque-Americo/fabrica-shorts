@@ -35,7 +35,7 @@ dialog h3{margin:0 0 12px}
 .row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 #aviso{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
 #aviso .c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:24px;max-width:420px}
-#editor{height:100%;display:grid;grid-template:auto 1fr/auto 1fr 240px;grid-template-areas:"topo topo topo" "ferr tela painel"}
+#editor{height:100%;display:grid;grid-template:auto 1fr/auto 1fr 240px;grid-template-areas:"topo topo topo" "ferr tela painel";position:relative}
 #topo{grid-area:topo;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--bd)}
 #topo a.volta{text-decoration:none;font-size:14px;margin-right:4px}
 #nome{font-weight:600;min-width:160px;max-width:320px;flex:1}
@@ -51,6 +51,9 @@ dialog h3{margin:0 0 12px}
 /* painel encolhido: a coluna vai a zero e a tela ocupa o espaço (no celular a linha some sozinha, que é auto) */
 #editor.painel-off{grid-template-columns:auto 1fr 0}
 #editor.painel-off #painel{display:none}
+/* alça colada na beirada do painel: é por ela que se encolhe e se traz de volta */
+#btn-painel{position:absolute;top:50%;right:240px;transform:translateY(-50%);z-index:20;min-width:0;padding:18px 3px;border-radius:8px 0 0 8px;border-right:0;font-size:15px;line-height:1;box-shadow:-1px 0 4px rgba(0,0,0,.12)}
+#editor.painel-off #btn-painel{right:0}
 .vazio{color:var(--mut);font-size:13px}
 #refs{max-height:50vh;overflow:auto;margin:8px 0;border:1px solid var(--bd);border-radius:8px}
 #refs label{display:flex;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--bd);cursor:pointer}
@@ -141,6 +144,8 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
 #editor{grid-template:auto auto 1fr auto/1fr;grid-template-areas:"topo" "ferr" "tela" "painel"}
 #ferramentas{flex-direction:row;border-right:0;border-bottom:1px solid var(--bd)}
 #painel{border-left:0;border-top:1px solid var(--bd);max-height:30vh}
+/* no celular o painel fica embaixo: a alça vira um botão solto no canto, que serve nos dois estados */
+#btn-painel,#editor.painel-off #btn-painel{top:auto;bottom:8px;right:8px;transform:none;border:1px solid var(--bd);border-radius:8px;padding:7px 13px}
 .rot{display:none} /* no celular a barra já enche de botão: fica só a seta, o aria-label diz o resto */
 }
 </style>
@@ -164,7 +169,6 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
     <button type="button" id="foto-mini" hidden title="Ver a foto da ficha técnica"><img alt="Foto da ficha técnica"></button>
     <button class="sm" type="button" id="btn-refs" title="Produtos que usam este molde">Referências <span id="refs-n"></span></button>
     <button class="sm" type="button" id="btn-enfesto" title="Cria uma ordem avulsa com uma peça de cada tamanho e abre o risco do enfesto">Enfesto</button>
-    <button class="sm" type="button" id="btn-painel" aria-pressed="true" aria-controls="painel" title="Encolhe ou mostra o painel da direita, para a tela de desenho ficar maior">⇥ <span class="rot">Painel</span></button>
     <span class="grupo" role="group" aria-label="Zoom">
       <button class="sm" type="button" id="zoom-menos" title="Diminuir zoom" aria-label="Diminuir zoom">−</button>
       <button class="sm" type="button" id="zoom-v" title="Voltar a 100%">100%</button>
@@ -235,6 +239,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
     </fieldset>
     </section>
   </aside>
+  <button class="sm" type="button" id="btn-painel" aria-expanded="true" aria-controls="painel" title="Encolher o painel" aria-label="Encolher o painel">›</button>
 </div>
 <dialog id="dlg-refs" aria-labelledby="dlg-refs-t">
   <h3 id="dlg-refs-t">Referências deste molde</h3>
@@ -792,7 +797,8 @@ location.href='corte.html?prod='+encodeURIComponent(M.produtoIds[0])+(LOCAL?'&lo
 $('#btn-grade').onclick=()=>abrirGrade('');
 $('#btn-fantasma').onclick=()=>{fantasma=!fantasma;desenhar()};
 // a tela cresce junto, então tem de redesenhar (a régua é feita pelo tamanho medido)
-$('#btn-painel').onclick=e=>{const off=$('#editor').classList.toggle('painel-off');e.currentTarget.setAttribute('aria-pressed',!off);desenhar()};
+$('#btn-painel').onclick=e=>{const off=$('#editor').classList.toggle('painel-off'),b=e.currentTarget,t=(off?'Mostrar':'Encolher')+' o painel';
+b.textContent=off?'‹':'›';b.title=t;b.setAttribute('aria-label',t);b.setAttribute('aria-expanded',!off);desenhar()};
 $('#btn-folha').onclick=()=>{folhaOn=!folhaOn;if(!folhaOn)alin=null;preencherProps();desenhar()};
 $('#folha-op').oninput=()=>desenhar();
 $('#btn-alinhar').onclick=()=>{if(!PODE)return toast('Sem permissão para editar.');if(alin)alin=null;else{folhaOn=true;op=null;modoPeca=null;alin={n:0,v:[]}}preencherProps();desenhar()};
