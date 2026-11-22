@@ -330,6 +330,34 @@ testes.push(
   ['GRADES g14', M.GRADES.g14, ['G1', 'G2', 'G3', 'G4']],
 );
 
+// copiarPecas entre moldes: é o que o "Inserir bolso" usa para trazer um bolso salvo
+{
+  const bolso = M.normalizar({ nome: 'Bolso', base: 'M' });
+  const r = D.retangulo(bolso, { x: 0, y: 0 }, { x: 200, y: 230 });
+  const np = D.novaPeca(bolso, r.ids);
+  np.peca.nome = 'Bolso'; np.peca.margem = 0;
+  np.peca.piques = [{ tracoId: r.ids[0], t: 0.5 }];
+  np.peca.margemTraco = { [r.ids[0]]: 7 };
+
+  const dest = M.normalizar({ nome: 'Calção', base: 'M' });
+  const r2 = D.retangulo(dest, { x: 0, y: 0 }, { x: 600, y: 700 });
+  D.novaPeca(dest, r2.ids).peca.tam = 'M';
+  const antesP = Object.keys(dest.pontos).length, antesT = dest.tracos.length;
+  const novas = M.copiarPecas(dest, bolso, bolso.pecas, { dx: 650, dy: 0 });
+  const cx = G.bbox(M.costura(dest, novas[0]));
+  const idsNovos = novas[0].tracos.map(t => t.id);
+
+  testes.push(
+    ['copiarPecas devolve uma peça por peça de origem', novas.length, 1],
+    ['copiarPecas não mexe no molde de origem', [Object.keys(bolso.pontos).length, bolso.pecas.length], [4, 1]],
+    ['copiarPecas acrescenta pontos e traços no destino', [Object.keys(dest.pontos).length - antesP, dest.tracos.length - antesT], [4, 4]],
+    ['copiarPecas dá ids novos, sem repetir os do destino', idsNovos.some(id => r2.ids.includes(id)), false],
+    ['copiarPecas desloca a cópia pelo d pedido', [cx.x0, cx.y0, Math.round(cx.w), Math.round(cx.h)], [650, 0, 200, 230]],
+    ['copiarPecas remapeia tracoId de piques e margemTraco', [novas[0].piques[0].tracoId === idsNovos[0], Object.keys(novas[0].margemTraco)[0] === idsNovos[0]], [true, true]],
+    ['copiarPecas mantém o contorno fechado no destino', M.corte(dest, novas[0]).length > 3, true],
+  );
+}
+
 
 // encaixe (molde/encaixe.js). Review 2: números tirados do index.html em 9f5b2e0 antes de mover o código;
 // tri mudou com o raster conservador (C1): os triângulos de antes se encaixavam sobrepondo a hipotenusa

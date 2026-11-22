@@ -207,7 +207,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
     </section>
     <section id="aba-moldes" role="tabpanel" aria-label="Moldes">
     <button class="sm" type="button" id="btn-extrair" title="Cria uma peça com os traços selecionados (contorno fechado)">Extrair molde</button>
-    <button class="sm" type="button" id="btn-bolso" title="Cria uma peça retangular (bolso, vista, etiqueta) com a medida que você digitar, ao lado do que já está desenhado">Inserir bolso (retângulo)</button>
+    <button class="sm" type="button" id="btn-bolso" title="Traz um bolso já criado em “Novo molde → Bolso”, ou desenha um retângulo com a medida que você digitar">Inserir bolso</button>
     <div id="lista-pecas"></div>
     <fieldset id="props" hidden>
       <legend>Propriedades</legend>
@@ -266,6 +266,14 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
   <div class="row"><button class="ghost" type="submit" value="">Cancelar</button><button class="pri" type="submit" value="ok">OK</button></div>
   </form>
 </dialog>
+<dialog id="dlg-ibolso" aria-labelledby="dlg-ibolso-t">
+  <form method="dialog">
+  <h3 id="dlg-ibolso-t">Inserir bolso</h3>
+  <label class="campo">Qual bolso <select id="ib-qual"></select></label>
+  <p class="vazio" id="ib-vazio" hidden>Nenhum bolso salvo ainda. Crie um em “Moldes → Criar molde”, escolhendo Bolso.</p>
+  <div class="row"><button class="ghost" type="submit" value="">Cancelar</button><button class="pri" type="submit" value="ok">OK</button></div>
+  </form>
+</dialog>
 <dialog id="dlg-bainha" aria-labelledby="dlg-bainha-t">
   <form method="dialog">
   <h3 id="dlg-bainha-t">Bainha</h3>
@@ -319,6 +327,7 @@ if(!ler('produtos'))gravarK('produtos',{
 const moldes=()=>ler('moldes')||{};
 return {
 async molde(id){rede();return moldes()[id]||null},
+async bolsos(){rede();return Object.entries(moldes()).filter(([,d])=>d&&d.tipo==='bolso').map(([id,d])=>({id,nome:d.nome}))},
 async moldePorProduto(pid){rede();const e=Object.entries(moldes()).find(([,d])=>(d.produtoIds||[]).includes(pid));return e?{id:e[0],data:e[1]}:null},
 async criar(d){rede();const id='m'+Date.now(),t=moldes();t[id]=d;gravarK('moldes',t);return id},
 async gravar(id,d){rede();const t=moldes();t[id]=d;gravarK('moldes',t)},
@@ -342,6 +351,8 @@ async function sessaoOk(){const {data:{session}}=await sb.auth.getSession();if(!
 const atualizar=async(id,d)=>{await sessaoOk();if(!ok(await sb.from('docs').update({data:d}).eq('id',id).select('id')).length)throw new Error('Sem permissão para salvar.')};
 return {
 async molde(id){await sessaoOk();const r=ok(await sb.from('docs').select('data').eq('id',id).eq('col','moldes').maybeSingle());return r?r.data:null},
+// só nome e id: o doc inteiro de cada bolso seria peso à toa na lista
+async bolsos(){await sessaoOk();return ok(await sb.from('docs').select('id,nome:data->>nome').eq('col','moldes').eq('data->>tipo','bolso').order('created_at'))},
 async moldePorProduto(pid){await sessaoOk();return ok(await sb.from('docs').select('id,data').eq('col','moldes').contains('data',{produtoIds:[pid]}).order('created_at').limit(1))[0]||null},
 async criar(d){await sessaoOk();return ok(await sb.from('docs').insert({col:'moldes',data:d}).select('id').single()).id},
 gravar:atualizar,
@@ -702,6 +713,7 @@ if(r.foto)m.foto=r.foto;
 // medidas por tamanho: refaz a gradação das peças, já com a grade e o base aplicados acima
 if(r.auto&&(r.auto.x||r.auto.y||m.gradAuto)){m.gradAuto=(r.auto.x||r.auto.y)?r.auto:null;MM.graduarTudo(m,r.auto.x,r.auto.y)}
 if(r.bolso){
+m.tipo='bolso'; // é o que faz o molde aparecer em "Inserir bolso" nos outros moldes
 const ps=Object.values(m.pontos),b=ps.length?G.bbox(ps):{x0:0,y0:0,w:0,h:0};
 const A={x:b.x0+b.w+(ps.length?50:800),y:b.y0};
 const ret=MD.retangulo(m,A,{x:A.x+r.bolso.l,y:A.y+r.bolso.a});
@@ -1028,16 +1040,46 @@ const _aux=/bolso|c[oó]s|vista|forro|etiqueta|ribana/i;
 M.pecas.sort((a,b)=>(_aux.test(a.nome)?1:0)-(_aux.test(b.nome)?1:0));
 sel.clear();pecaSel=r.peca.id;alterou();
 }
-// peça retangular pronta (bolso, vista, etiqueta): desenha 5 cm à direita do que já existe e já vira peça
-function inserirBolso(){
+// canto de cima à esquerda do espaço livre: 5 cm à direita do que já está desenhado
+function aoLado(){const ps=Object.values(M.pontos),b=ps.length?G.bbox(ps):{x0:0,y0:0,w:0,h:0};return {x:b.x0+b.w+50,y:b.y0}}
+// "Inserir bolso": traz um bolso já salvo (molde com tipo:'bolso') ou cai no retângulo digitado
+async function inserirBolso(){
 if(foraBase())return toast('Edite no tamanho base');
+const s=$('#ib-qual');s.textContent='';
+let lista=[];
+try{lista=await B.bolsos()}catch(e){toast('Não deu para ler os bolsos salvos: '+ptErro(e))}
+for(const b of lista){const o=document.createElement('option');o.value=b.id;o.textContent=b.nome||'(sem nome)';s.append(o)}
+const o=document.createElement('option');o.value='';o.textContent='Retângulo novo (digitar medida)';s.append(o);
+s.value=lista.length?lista[0].id:'';
+$('#ib-vazio').hidden=!!lista.length;
+const d=$('#dlg-ibolso');d.returnValue='';d.showModal();
+await new Promise(r=>d.addEventListener('close',r,{once:true}));
+if(d.returnValue!=='ok')return;
+if(!s.value)return inserirRetangulo();
+let src;
+try{src=await B.molde(s.value)}catch(e){return toast(ptErro(e))}
+if(!src)return toast('Bolso não encontrado.');
+src=MM.normalizar(src);
+if(!src.pecas.length)return toast('Esse bolso ainda não tem peça desenhada.');
+const bb=G.bbox(Object.values(src.pontos)),A=aoLado();
+// o bolso entra no tamanho base dele; a gradação dele não vem junto porque a grade daqui pode ser outra
+const tam=(M.pecas.find(p=>p.tam)||{}).tam;
+const novas=MM.copiarPecas(M,src,src.pecas,{dx:A.x-bb.x0,dy:A.y-bb.y0});
+for(const n of novas){
+let nome=n.nome||'Bolso',i=1;while(M.pecas.some(p=>p!==n&&p.nome===nome))nome=(n.nome||'Bolso')+' '+(++i);
+n.nome=nome;n.tam=tam; // sem o mesmo tam das outras, a peça some dos demais tamanhos no produto
+}
+sel.clear();pecaSel=novas[0].id;alterou();
+toast(`${novas.map(n=>n.nome).join(', ')} de "${src.nome||'bolso'}" (tamanho ${src.base}) entrou no molde.`);
+}
+// peça retangular pronta (bolso, vista, etiqueta): desenha 5 cm à direita do que já existe e já vira peça
+function inserirRetangulo(){
 const t=prompt('Bolso: largura e altura em cm','20;23');
 if(t==null)return;
 const v=MD.medida(t);
 if(!v||!(v[0]>0))return toast('Medida inválida. Ex.: 20;23');
 const l=v[0]*10,a=(v.length>1&&v[1]>0?v[1]:v[0])*10;
-const ps=Object.values(M.pontos),b=ps.length?G.bbox(ps):{x0:0,y0:0,w:0,h:0};
-const A={x:b.x0+b.w+50,y:b.y0},r=MD.retangulo(M,A,{x:A.x+l,y:A.y+a});
+const A=aoLado(),r=MD.retangulo(M,A,{x:A.x+l,y:A.y+a});
 if(r.erro)return toast(r.erro);
 const n=MD.novaPeca(M,r.ids);
 if(!n.ok)return toast(n.erro);

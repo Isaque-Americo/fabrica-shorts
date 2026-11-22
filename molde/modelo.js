@@ -171,32 +171,41 @@
   }
   const removerGradacao = m => { m.grad = {}; };
 
+  // copia peças de `src` para `dest` (podem ser o mesmo molde) com ids novos e deslocadas de d; devolve as peças novas na ordem de `pecas`.
+  // Traço usado por duas peças da mesma chamada é copiado uma vez só. A gradação não vem junto: o destino pode ter outra grade.
+  function copiarPecas(dest, src, pecas, d) {
+    const pid = {}, tid = {}, novas = [];
+    const ponto = id => { if (!pid[id]) { pid[id] = uid(dest, 'p'); dest.pontos[pid[id]] = somar(src.pontos[id], d); } return pid[id]; };
+    for (const peca of pecas) {
+      for (const { id } of peca.tracos) {
+        const t0 = src.tracos.find(x => x.id === id);
+        if (tid[id] || !t0) continue;
+        const t = structuredClone(t0);
+        for (const q of ['a', 'b', 'c']) if (t[q]) t[q] = ponto(t[q]);
+        for (const q of ['c1', 'c2']) if (t[q]) t[q] = somar(t[q], d);
+        if (t.pts) t.pts = t.pts.map(p => somar(p, d));
+        t.id = tid[id] = uid(dest, 't');
+        dest.tracos.push(t);
+      }
+      const n = structuredClone(peca), novoId = id => tid[id] || id;
+      const chaves = o => Object.fromEntries(Object.entries(o || {}).map(([id, v]) => [novoId(id), v]));
+      const comTraco = l => (l || []).map(x => ({ ...x, tracoId: novoId(x.tracoId) }));
+      Object.assign(n, { id: uid(dest, 'pc'), tracos: peca.tracos.map(t => ({ ...t, id: novoId(t.id) })),
+        fio: n.fio && { a: somar(n.fio.a, d), b: somar(n.fio.b, d) }, dobra: n.dobra && { ...n.dobra, tracoId: novoId(n.dobra.tracoId) },
+        margemTraco: chaves(n.margemTraco), bainhas: chaves(n.bainhas), piques: comTraco(n.piques), pences: comTraco(n.pences) });
+      dest.pecas.push(n);
+      novas.push(n);
+    }
+    return novas;
+  }
+
   // cada tamanho ≠ base vira cópia das peças visíveis, à direita do molde; depois a gradação some
   function separarTamanhos(m, espaco = 50) {
     const tams = tamanhos(m).filter(t => t !== m.base), pecas = m.pecas.filter(p => p.visivel !== false);
     const bb = G.bbox(tamanhos(m).flatMap(tam => { const c = noTamanho(m, tam); return c.tracos.flatMap(t => tracoPts(c, t)); }));
     tams.forEach((tam, k) => {
-      const c = noTamanho(m, tam), d = { dx: (k + 1) * (bb.w + espaco), dy: 0 }, pid = {}, tid = {};
-      const ponto = id => { if (!pid[id]) { pid[id] = uid(m, 'p'); m.pontos[pid[id]] = somar(c.pontos[id], d); } return pid[id]; };
-      for (const peca of pecas) {
-        for (const { id } of peca.tracos) {
-          const t0 = c.tracos.find(x => x.id === id);
-          if (tid[id] || !t0) continue;
-          const t = structuredClone(t0);
-          for (const q of ['a', 'b', 'c']) if (t[q]) t[q] = ponto(t[q]);
-          for (const q of ['c1', 'c2']) if (t[q]) t[q] = somar(t[q], d);
-          if (t.pts) t.pts = t.pts.map(p => somar(p, d));
-          t.id = tid[id] = uid(m, 't');
-          m.tracos.push(t);
-        }
-        const n = structuredClone(peca), novoId = id => tid[id] || id;
-        const chaves = o => Object.fromEntries(Object.entries(o || {}).map(([id, v]) => [novoId(id), v]));
-        const comTraco = l => (l || []).map(x => ({ ...x, tracoId: novoId(x.tracoId) }));
-        Object.assign(n, { id: uid(m, 'pc'), tam, nome: peca.nome + ' · ' + tam, tracos: peca.tracos.map(t => ({ ...t, id: novoId(t.id) })),
-          fio: n.fio && { a: somar(n.fio.a, d), b: somar(n.fio.b, d) }, dobra: n.dobra && { ...n.dobra, tracoId: novoId(n.dobra.tracoId) },
-          margemTraco: chaves(n.margemTraco), bainhas: chaves(n.bainhas), piques: comTraco(n.piques), pences: comTraco(n.pences) });
-        m.pecas.push(n);
-      }
+      const c = noTamanho(m, tam), d = { dx: (k + 1) * (bb.w + espaco), dy: 0 };
+      copiarPecas(m, c, pecas, d).forEach((n, i) => { n.tam = tam; n.nome = pecas[i].nome + ' · ' + tam; });
     });
     for (const peca of pecas) peca.tam = m.base; // molParaProduto põe em porTam[t] só as peças de tam t (e as sem tam)
     removerGradacao(m);
@@ -258,7 +267,7 @@
   }
 
   const MoldeModelo = { GRADES, novo, normalizar, uid, tracoPts, encadear, costura, corte, tamanhos, noTamanho, graduarPasso, graduarTudo, copiarRegra,
-    removerGradacao, separarTamanhos, medir, aplicarBainha, molParaProduto, historico };
+    removerGradacao, copiarPecas, separarTamanhos, medir, aplicarBainha, molParaProduto, historico };
   g.MoldeModelo = MoldeModelo;
   if (typeof module !== 'undefined') module.exports = MoldeModelo;
 })(typeof window !== 'undefined' ? window : globalThis);
