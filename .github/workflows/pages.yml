@@ -10,9 +10,11 @@ permissions:
   pages: write
   id-token: write
 
+# cancelar no meio deixava a publicacao do Pages pendurada e a proxima falhava
+# no passo "Deploy to GitHub Pages"; com false as publicacoes entram na fila
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   deploy:
