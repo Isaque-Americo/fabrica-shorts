@@ -4,7 +4,7 @@
   const dist = (a, b) => Math.hypot(b.x - a.x, b.y - a.y);
   const TOL = 0.5; // folga entre pontas de traços encadeados
 
-  const GRADES = { app: ['P', 'M', 'G', 'GG', 'G1', 'G2', 'G3', 'G4'], pgg: ['P', 'M', 'G', 'GG'], numerica: ['36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56'] };
+  const GRADES = { app: ['P', 'M', 'G', 'GG', 'G1', 'G2', 'G3', 'G4'], pgg: ['P', 'M', 'G', 'GG'], g14: ['G1', 'G2', 'G3', 'G4'], numerica: ['36', '38', '40', '42', '44', '46', '48', '50', '52', '54', '56'] };
   const novo = nome => normalizar({ nome });
 
   function uid(m, pre) {

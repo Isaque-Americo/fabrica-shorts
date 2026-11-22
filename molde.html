@@ -246,23 +246,15 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
   <form method="dialog">
   <h3 id="dlg-grade-t">Novo molde</h3>
   <p id="g-aviso" hidden></p>
+  <label class="campo" id="g-tipo-l">O que criar <select id="g-tipo"><option value="molde">Molde</option><option value="bolso">Bolso</option></select></label>
   <label class="campo" id="g-nome-l">Nome <input id="g-nome" autocomplete="off"></label>
-  <label class="campo">Grade <select id="g-grade"><option value="app">P–G4 do app</option><option value="pgg">P–GG</option><option value="numerica">36–56</option><option value="">Definir depois</option></select></label>
+  <label class="campo">Grade <select id="g-grade"><option value="app">P–G4 (todos)</option><option value="pgg">P–GG</option><option value="g14">G1–G4</option><option value="numerica">36–56</option><option value="">Definir depois</option></select></label>
   <label class="campo">Tamanho base <select id="g-base"></select></label>
   <p class="vazio" id="g-dica" hidden></p>
-  <div id="g-bolso-sec">
-    <label class="campo">Peça auxiliar <select id="g-bolso">
-      <option value="">Nenhuma</option>
-      <option value="bolso" data-l="20" data-a="23">Bolso traseiro</option>
-      <option value="cos" data-l="4" data-a="70">Cós / Elástico</option>
-      <option value="livre">Livre (digitar)</option>
-    </select></label>
-    <div id="g-bolso-meds" hidden style="margin-bottom:8px">
-      <label class="campo" id="g-bolso-nome-l" hidden>Nome <input id="g-bolso-nome" autocomplete="off"></label>
-      <div style="display:flex;gap:10px">
-        <label class="campo" style="flex:1;margin:0">Largura (cm) <input id="g-bolso-l" inputmode="decimal" autocomplete="off" value="20"></label>
-        <label class="campo" style="flex:1;margin:0">Altura (cm) <input id="g-bolso-a" inputmode="decimal" autocomplete="off" value="23"></label>
-      </div>
+  <div id="g-bolso-sec" hidden style="margin-bottom:8px">
+    <div style="display:flex;gap:10px">
+      <label class="campo" style="flex:1;margin:0">Largura (cm) <input id="g-bolso-l" inputmode="decimal" autocomplete="off" value="20"></label>
+      <label class="campo" style="flex:1;margin:0">Altura (cm) <input id="g-bolso-a" inputmode="decimal" autocomplete="off" value="23"></label>
     </div>
   </div>
   <div id="g-auto">
@@ -660,12 +652,18 @@ bs.textContent='';for(const t of l){const o=document.createElement('option');o.v
 dicaSZ($('#g-dica'),novo||m.produtoIds.length,l);
 };
 bs.textContent='';encher();gs.onchange=encher;f.value='';
-$('#g-bolso-sec').hidden=!novo;$('#g-bolso').value='';$('#g-bolso-meds').hidden=true;$('#g-bolso-nome-l').hidden=true;
-$('#g-bolso-l').value='20';$('#g-bolso-a').value='23';$('#g-bolso-nome').value='';
-$('#g-bolso').onchange=()=>{const o=$('#g-bolso').selectedOptions[0],v=$('#g-bolso').value;
-$('#g-bolso-meds').hidden=!v;$('#g-bolso-nome-l').hidden=v!=='livre';
-if(o&&o.dataset.l){$('#g-bolso-l').value=o.dataset.l;$('#g-bolso-a').value=o.dataset.a}
+// molde ou bolso: o bolso é um molde com uma peça retangular só, e as grades numéricas não servem para ele
+const tp=$('#g-tipo'),semBolso=['numerica',''];
+$('#g-tipo-l').hidden=!novo;tp.value='molde';
+$('#g-bolso-sec').hidden=true;$('#g-bolso-l').value='20';$('#g-bolso-a').value='23';
+tp.onchange=()=>{const b=novo&&tp.value==='bolso',nm=$('#g-nome');
+$('#dlg-grade-t').textContent=!novo?'Grade e medidas':b?'Novo bolso':'Novo molde';
+$('#g-bolso-sec').hidden=!b;
+for(const v of semBolso)gs.querySelector(`[value="${v}"]`).hidden=b;
+if(b&&semBolso.includes(gs.value)){gs.value='app';encher()}
+if(nm.value===(b?m.nome:'Bolso'))nm.value=b?'Bolso':m.nome;
 };
+tp.onchange(); // reabrir o diálogo tem de desfazer o que o bolso escondeu da vez anterior
 const ga=m.gradAuto||{x:0,y:0};
 $('#g-auto').hidden=novo; // molde novo ainda não tem peça para graduar
 $('#g-auto-x').value=ga.x?cm2(ga.x):'';$('#g-auto-y').value=ga.y?cm2(ga.y):'';
@@ -673,12 +671,10 @@ d.returnValue='';d.showModal();
 await new Promise(r=>d.addEventListener('close',r,{once:true}));
 if(d.returnValue!=='ok')return null;
 const r={nome:novo?$('#g-nome').value.trim()||m.nome:null,grade:[...gradeDe(gs.value)],base:bs.value,foto:null};
-if(novo&&$('#g-bolso').value){
+if(novo&&tp.value==='bolso'){
 const bl=lerCm('#g-bolso-l'),ba=lerCm('#g-bolso-a');
-if(bl===null||ba===null||bl<=0||ba<=0){toast('Medida da peça auxiliar inválida. Ex.: 20 e 23');return null}
-const nomes={bolso:'Bolso',cos:'Cós'};
-const nome=$('#g-bolso').value==='livre'?($('#g-bolso-nome').value.trim()||'Peça'):nomes[$('#g-bolso').value]||'Peça';
-r.bolso={l:bl,a:ba,nome};
+if(bl===null||ba===null||bl<=0||ba<=0){toast('Medida do bolso inválida. Ex.: 20 e 23');return null}
+r.bolso={l:bl,a:ba,nome:'Bolso'};
 }
 const ax=novo?0:lerCm('#g-auto-x'),ay=novo?0:lerCm('#g-auto-y');
 if(ax===null||ay===null){toast('Medida inválida. Ex.: 1 ou 0,5');return null}

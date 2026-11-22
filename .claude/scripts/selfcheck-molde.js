@@ -327,6 +327,7 @@ testes.push(
   ['final2 sem quebra sem aviso', prodGr.avisos, []],
   ['peca com tamanho em minuscula entra no tamanho da grade', (() => { const mn = M.normalizar(structuredClone(gr)); mn.pecas[0].tam = 'm'; const r = M.molParaProduto(mn); return [r.porTam.M.length, r.porTam.G.length]; })(), [1, 0]],
   ['GRADES pgg', M.GRADES.pgg, ['P', 'M', 'G', 'GG']],
+  ['GRADES g14', M.GRADES.g14, ['G1', 'G2', 'G3', 'G4']],
 );
 
 
