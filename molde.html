@@ -52,7 +52,7 @@ dialog h3{margin:0 0 12px}
 #editor.painel-off{grid-template-columns:auto 1fr 0}
 #editor.painel-off #painel{display:none}
 /* alça colada na beirada do painel: é por ela que se encolhe e se traz de volta */
-#btn-painel{position:absolute;top:50%;right:240px;transform:translateY(-50%);z-index:20;min-width:0;padding:18px 3px;border-radius:8px 0 0 8px;border-right:0;font-size:15px;line-height:1;box-shadow:-1px 0 4px rgba(0,0,0,.12)}
+#btn-painel{position:absolute;top:50%;right:240px;transform:translateY(-50%);z-index:20;min-width:0;padding:22px 6px;border-radius:9px 0 0 9px;border:1px solid var(--ac);border-right:0;background:var(--ac);color:#fff;font-size:17px;font-weight:700;line-height:1;box-shadow:-1px 0 5px rgba(0,0,0,.18)}
 #editor.painel-off #btn-painel{right:0}
 .vazio{color:var(--mut);font-size:13px}
 #refs{max-height:50vh;overflow:auto;margin:8px 0;border:1px solid var(--bd);border-radius:8px}
@@ -145,7 +145,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
 #ferramentas{flex-direction:row;border-right:0;border-bottom:1px solid var(--bd)}
 #painel{border-left:0;border-top:1px solid var(--bd);max-height:30vh}
 /* no celular o painel fica embaixo: a alça vira um botão solto no canto, que serve nos dois estados */
-#btn-painel,#editor.painel-off #btn-painel{top:auto;bottom:8px;right:8px;transform:none;border:1px solid var(--bd);border-radius:8px;padding:7px 13px}
+#btn-painel,#editor.painel-off #btn-painel{top:auto;bottom:8px;right:8px;transform:none;border:1px solid var(--ac);border-radius:8px;padding:8px 15px}
 .rot{display:none} /* no celular a barra já enche de botão: fica só a seta, o aria-label diz o resto */
 }
 </style>
