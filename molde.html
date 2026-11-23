@@ -205,6 +205,7 @@ body{background:#fff;font-size:10pt}
     <div id="abas" role="tablist" aria-label="Painel"><button type="button" role="tab" data-aba="moldes">Moldes</button><button type="button" role="tab" data-aba="grad">Gradação</button><button type="button" role="tab" data-aba="medidas">Medidas</button></div>
     <section id="aba-medidas" role="tabpanel" aria-label="Medidas" hidden>
       <p class="vazio" id="m-vazio"></p>
+      <label><input type="checkbox" id="m-base"> Só o tamanho base</label>
       <table id="m-tab"><thead></thead><tbody></tbody></table>
       <button class="sm" type="button" id="m-add">Adicionar medida</button>
       <button class="sm" type="button" id="m-imp" title="Imprimir a tabela de medidas de todos os tamanhos">Imprimir</button>
@@ -1396,7 +1397,8 @@ MM.removerGradacao(M);alterou();
 // ---- medidas (Task 4). M.medidas[i] = {id,nome,tracos,valores:{tam:mm}}; esperado vs. medido no molde ----
 function desenharMed(){
 if(!M||$('#aba-medidas').hidden)return; // tabela custa um noTamanho por medida e tamanho: só com a aba aberta
-const tams=MM.tamanhos(M),tb=$('#m-tab tbody'),th=$('#m-tab thead'),chave=M.medidas.map(m=>m.id).join(',')+'|'+tams.join(',');
+// com 7 tamanhos a tabela não cabe no painel; a impressão sai sempre com todos
+const tams=$('#m-base').checked?[M.base]:MM.tamanhos(M),tb=$('#m-tab tbody'),th=$('#m-tab thead'),chave=M.medidas.map(m=>m.id).join(',')+'|'+tams.join(',');
 $('#m-vazio').textContent=M.medidas.length?'':'Nenhuma medida. Adicione e ligue aos traços (ex.: reta da cintura).';
 const atual=(m,t)=>{ // medido x esperado: texto + cor (✓ até 3 mm)
 const ids=m.tracos.filter(i=>M.tracos.some(x=>x.id===i)),e=m.valores[t];
@@ -1451,6 +1453,7 @@ r.innerHTML=`<h1>${esc(M.nome||'Molde')}</h1><p>Tabela de medidas, em cm. Em cim
 M.medidas.map(m=>`<tr><td>${esc(m.nome)}</td>${tams.map(t=>`<td>${cel(m,t)}</td>`).join('')}</tr>`).join('')+'</tbody></table>':'<p>Nenhuma medida cadastrada.</p>');
 }
 window.addEventListener('beforeprint',montarMedRel); // Ctrl+P também sai como tabela
+$('#m-base').onchange=desenharMed;
 $('#m-imp').onclick=()=>{montarMedRel();window.print()};
 $('#m-add').onclick=()=>{M.medidas.push({id:'md'+(1+Math.max(0,...M.medidas.map(m=>+m.id.slice(2)||0))),nome:'Medida '+(M.medidas.length+1),tracos:[],valores:{}});alterou()};
 

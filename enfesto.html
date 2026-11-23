@@ -115,6 +115,7 @@ body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
       <button class="sm" type="button" id="b-esp" disabled aria-keyshortcuts="e">Espelhar (E)</button>
       <span class="esp"></span>
       <button class="sm" type="button" id="b-zm" aria-label="Diminuir zoom">−</button>
+      <button class="sm" type="button" id="b-zv" title="Caber o risco inteiro na tela">—</button>
       <button class="sm" type="button" id="b-zp" aria-label="Aumentar zoom">+</button>
       <button class="sm" type="button" id="b-refazer">Refazer encaixe automático</button>
     </div>
@@ -299,15 +300,23 @@ const svg=$('#risco'),H=L+2*R;
 svg.setAttribute('viewBox',`-20 ${-R} ${W+20} ${H}`);
 if(!Z)Z=Math.max(.08,Math.min(1,($('#area').clientWidth-16)/(W+20)));
 svg.style.width=(W+20)*Z+'px';svg.style.height=H*Z+'px';svg.style.fontSize=(12/Z)+'px';
+$('#b-zv').textContent=nf(Z*25.4/96*100,0)+'%'; // escala de verdade: 100% = tamanho real na tela (1 px CSS = 25,4/96 mm)
 }
 
 // ---- ajuste manual (não é salvo) ----
 const nGiros=it=>it.rot==='nenhuma'?1:it.rot==='livre'?4:2;
+// tamanho da peça como ela está no risco: quem confere o molde na mesa precisa destes números
+function medidasPeca(j){
+const pts=poseDe(j);let x1=0,y1=0,a=0;
+for(const [x,y] of pts){if(x>x1)x1=x;if(y>y1)y1=y}
+for(let i=0,k=pts.length-1;i<pts.length;k=i++)a+=pts[k][0]*pts[i][1]-pts[i][0]*pts[k][1];
+return `${nf(x1/10,1)} × ${nf(y1/10,1)} cm · perímetro ${nf(perimetro(pts)/10,1)} cm · área ${nf(Math.abs(a)/2/1e6,3)} m²`;
+}
 function selecionar(j){
 selJ=j;[...$('#pecas').children].forEach((el,k)=>el.classList.toggle('sel',k===j));
 const it=j>=0&&C.itens[P[j].i];
 $('#b-girar').disabled=!it||nGiros(it)<2;$('#b-esp').disabled=!it||!it.espelhar;
-$('#sel').textContent=it?`Selecionada: ${nomePeca(it.nome)} ${it.tam}${it.cor?' · '+it.cor:''} (variante ${P[j].var+1} de ${it.rasters.length})`:'Clique numa peça para arrastar, ou selecione com Tab e use as setas.';
+$('#sel').textContent=it?`Selecionada: ${rotuloPeca(it,P[j].var)}${it.cor?' · '+it.cor:''} · ${medidasPeca(j)} (variante ${P[j].var+1} de ${it.rasters.length})`:'Clique numa peça para arrastar, ou selecione com Tab e use as setas.';
 }
 function mover(j,ox,oy,v){
 const ok=E.moverPeca(OC,C.itens,P,j,ox,oy,v);
@@ -325,6 +334,7 @@ $('#b-esp').onclick=()=>variante('espelhar');
 $('#b-refazer').onclick=()=>{calcular();toast('Encaixe automático refeito.')};
 $('#b-zm').onclick=()=>{Z/=1.25;if(C)desenharFundo()};
 $('#b-zp').onclick=()=>{Z*=1.25;if(C)desenharFundo()};
+$('#b-zv').onclick=()=>{Z=0;if(C)desenharFundo()}; // Z=0 faz desenharFundo recalcular o que cabe na tela
 
 const svg=$('#risco');let drag=null;
 const ptMm=ev=>new DOMPoint(ev.clientX,ev.clientY).matrixTransform(svg.getScreenCTM().inverse());
