@@ -242,7 +242,8 @@ const ERROS=[
 [/rate limit|too many requests/i,'Muitas tentativas. Aguarde alguns minutos e tente de novo.'],
 [/failed to fetch|networkerror|network request|load failed/i,'Sem conexão com o servidor. Verifique sua internet e tente de novo.'],
 [/row-level security|permission denied|not authorized|unauthorized/i,'Sem permissão. Entre novamente.'],
-[/duplicate key/i,'Este registro já existe.']
+[/duplicate key/i,'Este registro já existe.'],
+[/bucket not found/i,'O depósito de fotos não existe no Supabase. Salve sem foto e peça para criar o bucket “produtos” (público).']
 ];
 function ptErro(m){
 m=String((m&&m.message)||m||'');
