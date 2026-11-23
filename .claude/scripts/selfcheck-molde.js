@@ -466,6 +466,13 @@ testes.push(
   ['borda0 da peca: oy 0', rBorda && [posicoesOk(bordaIt, rBorda, 1000), rBorda.posicoes.filter(p => bordaIt[p.i].borda0).every(p => p.oy === 0)], [true, true]],
   ['opts.borda0: todas oy 0', rTodos0 && rTodos0.posicoes.every(p => p.oy === 0), true],
   ['espelhar dobra variantes', [va(antigos.L, { rot: 'livre', espelhar: true }).length, va(antigos.L, { rot: 'nenhuma', espelhar: true }).length], [8, 2]],
+  // E.variante tem de acompanhar a ordem formas × giros de poses(), senão o rótulo do risco mente sobre o giro
+  ['variante: giro padrao 0 e 180', [E.variante(0, {}).ang, E.variante(1, {}).ang, E.variante(0, {}).espelhada], [0, 180, false]],
+  ['variante: livre da os quatro giros', [0, 1, 2, 3].map(v => E.variante(v, { rot: 'livre' }).ang), [0, 90, 180, 270]],
+  ['variante: espelhadas vem depois das normais', [E.variante(3, { rot: 'livre', espelhar: true }).espelhada, E.variante(4, { rot: 'livre', espelhar: true }).espelhada, E.variante(4, { rot: 'livre', espelhar: true }).ang], [false, true, 0]],
+  ['variante: rot nenhuma nao gira, e espelhar troca na variante 1', [E.variante(1, { rot: 'nenhuma', espelhar: true }).ang, E.variante(1, { rot: 'nenhuma', espelhar: true }).espelhada], [0, true]],
+  ['variante: sem espelhar nunca marca espelhada, e v invalido cai na primeira', [E.variante(5, { rot: 'livre' }).espelhada, E.variante(-2, { rot: 'livre' }).ang, E.variante(undefined, {}).ang], [false, 0, 0]],
+  ['variante: casa com o numero de poses de cada caso', [E.poses(antigos.L, { rot: 'livre', espelhar: true }).length, E.variante(7, { rot: 'livre', espelhar: true }).ang], [8, 270]],
   ['espelhada e o reflexo em Y', (() => { const [n, r] = va(antigos.L, { rot: 'nenhuma', espelhar: true });
     return !!r && [...Array(n.ch)].every((_, y) => [...Array(n.cw)].every((_, x) => n.m[y * n.cw + x] === r.m[(n.ch - 1 - y) * n.cw + x])); })(), true],
   ['escala 1,1 x 1 alarga o raster', va(antigos.sq, { escala: { x: 1.1, y: 1 } }).map(r => [r.cw, r.ch])[0], [11, 10]],

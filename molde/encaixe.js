@@ -56,10 +56,16 @@
     const sx = o.escala ? +o.escala.x || 1 : 1, sy = o.escala ? +o.escala.y || 1 : 1;
     // a escala vem depois do giro: encolhC age no comprimento do tecido (X) e encolhL na largura (Y), qualquer que seja o giro
     const esc = p => sx === 1 && sy === 1 ? p : pose(p.map(([x, y]) => [Math.round(x * sx * 1e3) / 1e3, Math.round(y * sy * 1e3) / 1e3]), 0); // arredonda: 200·1,1 não pode virar 12 células
-    const giros = o.rot === 'nenhuma' ? [0] : o.rot === 'livre' ? [0, 1, 2, 3] : [0, 2];
+    const giros = girosDe(o);
     const formas = o.espelhar ? [pts, pts.map(([x, y]) => [x, -y])] : [pts];
     return formas.flatMap(f => giros.map(k => esc(pose(f, k))));
   }
+  const girosDe = o => (o || {}).rot === 'nenhuma' ? [0] : (o || {}).rot === 'livre' ? [0, 1, 2, 3] : [0, 2];
+  // que giro (graus) e que face a variante v de poses() representa; mora aqui para não divergir da ordem formas × giros
+  const variante = (v, o) => {
+    const g = girosDe(o), n = Math.max(0, Math.floor(+v || 0));
+    return { ang: g[n % g.length] * 90, espelhada: !!(o || {}).espelhar && Math.floor(n / g.length) % 2 === 1 };
+  };
   const variantes = (pts, o) => poses(pts, o).map(p => rasterPol(p, 0));
   const rasterRot = (pts, rot) => variantes(pts, { rot });
 
@@ -171,7 +177,7 @@
   // comprimento ocupado pelas peças, em mm (sem cabeceira): max(ox + cw·ENC_RES)
   const compPosicoes = (itens, posicoes) => posicoes.reduce((a, p) => Math.max(a, p.ox + itens[p.i].rasters[p.var].cw * ENC_RES), 0);
 
-  const MoldeEncaixe = { ENC_RES, pose, poses, rasterPol, rasterRot, variantes, encaixar, pecasDoRisco, encaixeMol, ocupacao, cabe, moverPeca, compPosicoes };
+  const MoldeEncaixe = { ENC_RES, pose, poses, variante, rasterPol, rasterRot, variantes, encaixar, pecasDoRisco, encaixeMol, ocupacao, cabe, moverPeca, compPosicoes };
   g.MoldeEncaixe = MoldeEncaixe;
   if (typeof module !== 'undefined') module.exports = MoldeEncaixe;
 })(typeof window !== 'undefined' ? window : globalThis);

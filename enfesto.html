@@ -225,6 +225,19 @@ item('Total de tecido',nf(comp/1000*cam)+' m',nf(comp/1000)+' m × '+cam+' camad
 item('Camadas',String(cam),ENF.alturaMax?'altura máx. '+ENF.alturaMax:'');
 item('Largura útil',nf(C.largUtil/10,1)+' cm',MAT.tubular?'tubular':'');
 item('Peças cortadas',String(C.pecasTotal*cam),C.pecasTotal+' por camada');
+// bruto = sobre a largura cheia do rolo (com ourela), que é a largura que se paga
+const lt=larg();
+if(lt>0){const apB=comp>0?C.areaPecas/(comp*lt):0;
+item('Aproveitamento bruto',nf(apB*100,1)+'%','sobre a largura do rolo ('+nf(lt/10,1)+' cm)');
+item('Área das peças',nf(C.areaPecas/1e6*cam,2)+' m²');
+item('Área desperdiçada',nf(Math.max(0,comp*lt-C.areaPecas)/1e6*cam,2)+' m²');}
+// pesos, custo e consumo: MO.resultados já calcula tudo, só não era mostrado aqui
+const R=MO.resultados({...O,enfestos:[ENF]},[{...C,comp}],MATS);
+item('Peso do tecido',R.pesoTecido?nf(R.pesoTecido,1)+' kg':'—',R.pesoTecido?'':'cadastre a gramatura do tecido');
+if(R.pesoTecido){item('Peso das peças',nf(R.pesoPecas,1)+' kg');
+item('Desperdício',nf(R.pesoDesperdicio,1)+' kg',nf(R.pesoDesperdicio/R.pesoTecido*100,1)+'%');}
+item('Consumo linear',R.consumoLinear?nf(R.consumoLinear,2)+' m/roupa':'—',R.consumoLinear?'':'este enfesto não conta roupa (sem grade de produto)');
+item('Custo do tecido',R.custo?'R$ '+nf(R.custo,2):'—',R.custo?'':'cadastre o preço do tecido');
 $('#painel').innerHTML=lista.join('');
 if(ENF.compMax&&comp>ENF.compMax)av.push(['','O risco é mais comprido que a mesa ('+nf(ENF.compMax/1000)+' m). Se a mesa for maior, corrija o comprimento nas Propriedades do enfesto.']);
 if(ENF.alturaMax&&cam>ENF.alturaMax)av.push(['','Camadas acima da altura máxima ('+ENF.alturaMax+').']);
@@ -235,6 +248,9 @@ $('#avisos').innerHTML=av.map(([c,t])=>`<li class="${c}">${esc(t)}</li>`).join('
 // ---- desenho (mm; X = comprimento, Y = largura) ----
 const PO=new Map(); // rasters -> poses (mesma transformação do encaixe, como MoldeExporta.formas)
 function poseDe(j){const it=C.itens[P[j].i];if(!PO.has(it.rasters))PO.set(it.rasters,E.poses(it.pts,{rot:it.rot,espelhar:it.espelhar,escala:it.escala}));return PO.get(it.rasters)[P[j].var]}
+// rótulo no risco: quem corta precisa saber se a peça está girada e se é a face espelhada do par
+function rotuloPeca(it,v){const{ang,espelhada}=E.variante(v,{rot:it.rot,espelhar:it.espelhar});
+return [nomePeca(it.nome),it.tam,ang?ang+'°':'',espelhada!==!!it.espelho?'esp':''].filter(Boolean).join(' ')}
 function desenharPecas(){
 const g=$('#pecas');g.textContent='';PO.clear();extras.length=0;
 P.forEach((p,j)=>{
@@ -242,7 +258,7 @@ const it=C.itens[p.i],el=document.createElementNS(NS,'g');
 el.setAttribute('class','pc');el.dataset.j=j;el.setAttribute('tabindex','0');el.setAttribute('role','button');
 el.style.setProperty('--c',corTam(it.tam));
 el.append(document.createElementNS(NS,'polygon'),document.createElementNS(NS,'text'));
-el.lastChild.textContent=[nomePeca(it.nome),it.tam].filter(Boolean).join(' ');
+el.lastChild.textContent=rotuloPeca(it,p.var);
 g.append(el);posPeca(j);
 });
 const tams=[...new Set(C.itens.map(it=>it.tam))];
@@ -351,7 +367,7 @@ const fz=2.5/Math.min(277/comp,165/L); // letra de ~2,5 mm no papel
 const pc=fs.map((f,j)=>{
 const it=C.itens[P[j].i];let x0=1/0,x1=-1/0,y0=1/0,y1=-1/0;
 for(const [x,y] of f.pts){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}
-return `<polygon style="--c:${corTam(it.tam)}" points="${f.pts.map(q=>q.join(',')).join(' ')}"/><text x="${(x0+x1)/2}" y="${(y0+y1)/2}">${esc([nomePeca(it.nome),it.tam].filter(Boolean).join(' '))}</text>`;
+return `<polygon style="--c:${corTam(it.tam)}" points="${f.pts.map(q=>q.join(',')).join(' ')}"/><text x="${(x0+x1)/2}" y="${(y0+y1)/2}">${esc(rotuloPeca(it,P[j].var))}</text>`;
 }).join('');
 const dados=[['Ordem',O.nome||'—'],['Enfesto',ENF.nome],['Tecido',nomeTecido()+(MAT.tubular?' (tubular)':'')],
 ['Metros',nf(comp/1000)+' m de risco · '+nf(comp/1000*ENF.camadas)+' m de tecido'],['Camadas',String(ENF.camadas)]];
