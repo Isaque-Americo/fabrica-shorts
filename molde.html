@@ -35,7 +35,7 @@ dialog h3{margin:0 0 12px}
 .row{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
 #aviso{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px;text-align:center}
 #aviso .c{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:24px;max-width:420px}
-#editor{height:100%;display:grid;grid-template:auto 1fr/auto 1fr 240px;grid-template-areas:"topo topo topo" "ferr tela painel";position:relative}
+#editor{height:100%;display:grid;grid-template:auto 1fr/auto 1fr var(--pw,240px);grid-template-areas:"topo topo topo" "ferr tela painel";position:relative}
 #topo{grid-area:topo;display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--card);border-bottom:1px solid var(--bd)}
 #topo a.volta{text-decoration:none;font-size:14px;margin-right:4px}
 #nome{font-weight:600;min-width:160px;max-width:320px;flex:1}
@@ -52,8 +52,8 @@ dialog h3{margin:0 0 12px}
 #editor.painel-off{grid-template-columns:auto 1fr 0}
 #editor.painel-off #painel{display:none}
 /* alça colada na beirada do painel: é por ela que se encolhe e se traz de volta */
-#btn-painel{position:absolute;top:50%;right:240px;transform:translateY(-50%);z-index:20;min-width:0;padding:22px 6px;border-radius:9px 0 0 9px;border:1px solid var(--ac);border-right:0;background:var(--ac);color:#fff;font-size:17px;font-weight:700;line-height:1;box-shadow:-1px 0 5px rgba(0,0,0,.18)}
-#editor.painel-off #btn-painel{right:0}
+#btn-painel{position:absolute;top:50%;right:var(--pw,240px);cursor:ew-resize;transform:translateY(-50%);z-index:20;min-width:0;padding:22px 6px;border-radius:9px 0 0 9px;border:1px solid var(--ac);border-right:0;background:var(--ac);color:#fff;font-size:17px;font-weight:700;line-height:1;box-shadow:-1px 0 5px rgba(0,0,0,.18)}
+#editor.painel-off #btn-painel{right:0;cursor:pointer}
 .vazio{color:var(--mut);font-size:13px}
 #refs{max-height:50vh;overflow:auto;margin:8px 0;border:1px solid var(--bd);border-radius:8px}
 #refs label{display:flex;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px solid var(--bd);cursor:pointer}
@@ -258,7 +258,7 @@ body{background:#fff;font-size:10pt}
     </fieldset>
     </section>
   </aside>
-  <button class="sm" type="button" id="btn-painel" aria-expanded="true" aria-controls="painel" title="Encolher o painel" aria-label="Encolher o painel">›</button>
+  <button class="sm" type="button" id="btn-painel" aria-expanded="true" aria-controls="painel" title="Encolher o painel (arraste para alargar)" aria-label="Encolher o painel">›</button>
 </div>
 <dialog id="dlg-refs" aria-labelledby="dlg-refs-t">
   <h3 id="dlg-refs-t">Referências deste molde</h3>
@@ -816,8 +816,20 @@ location.href='corte.html?prod='+encodeURIComponent(M.produtoIds[0])+(LOCAL?'&lo
 $('#btn-grade').onclick=()=>abrirGrade('');
 $('#btn-fantasma').onclick=()=>{fantasma=!fantasma;desenhar()};
 // a tela cresce junto, então tem de redesenhar (a régua é feita pelo tamanho medido)
-$('#btn-painel').onclick=e=>{const off=$('#editor').classList.toggle('painel-off'),b=e.currentTarget,t=(off?'Mostrar':'Encolher')+' o painel';
-b.textContent=off?'‹':'›';b.title=t;b.setAttribute('aria-label',t);b.setAttribute('aria-expanded',!off);desenhar()};
+$('#btn-painel').onclick=e=>{if(arrastouAlca){arrastouAlca=false;return} // soltou depois de alargar: não encolhe
+const off=$('#editor').classList.toggle('painel-off'),b=e.currentTarget,t=(off?'Mostrar':'Encolher')+' o painel';
+b.textContent=off?'‹':'›';b.title=t+(off?'':' (arraste para alargar)');b.setAttribute('aria-label',t);b.setAttribute('aria-expanded',!off);desenhar()};
+// arrastar a alça alarga o painel: a tabela de medidas com 8 tamanhos não cabe nos 240px
+let alcaX=null,arrastouAlca=false,alcaRaf=false;
+const alcaP=$('#btn-painel'),largPainel=v=>{const w=Math.round(Math.min(Math.max(v,200),innerWidth-200));
+document.documentElement.style.setProperty('--pw',w+'px');try{localStorage.setItem('molde-pw',w)}catch(e){}};
+{const g=+localStorage.getItem('molde-pw');if(g)largPainel(g)}
+alcaP.onpointerdown=e=>{arrastouAlca=false;if(innerWidth<=760||$('#editor').classList.contains('painel-off'))return;alcaX=e.clientX;alcaP.setPointerCapture(e.pointerId)};
+alcaP.onpointermove=e=>{if(alcaX==null||(!arrastouAlca&&Math.abs(e.clientX-alcaX)<4))return;
+arrastouAlca=true;largPainel(innerWidth-e.clientX);
+if(!alcaRaf){alcaRaf=true;requestAnimationFrame(()=>{alcaRaf=false;desenhar()})}};
+alcaP.onpointerup=()=>{alcaX=null};
+alcaP.onpointercancel=()=>{alcaX=null;arrastouAlca=false};
 $('#btn-folha').onclick=()=>{folhaOn=!folhaOn;if(!folhaOn)alin=null;preencherProps();desenhar()};
 $('#folha-op').oninput=()=>desenhar();
 $('#btn-alinhar').onclick=()=>{if(!PODE)return toast('Sem permissão para editar.');if(alin)alin=null;else{folhaOn=true;op=null;modoPeca=null;alin={n:0,v:[]}}preencherProps();desenhar()};
