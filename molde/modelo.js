@@ -246,11 +246,13 @@
     const n = normalizar(m), porTam = {}, avisos = [];
     const vis = n.pecas.filter(p => p.visivel && p.tracos.length), nb = noTamanho(n, n.base);
     const doBase = Object.fromEntries(vis.map(p => [p.id, pecaProduto(nb, p)]));
+    // separacao pela metade (sobraram so as pecas do base): o tam travaria tudo no base e os outros tamanhos sairiam vazios
+    const separado = vis.some(p => p.tam && p.tam.toUpperCase() !== String(n.base).toUpperCase());
     for (const tam of tamanhos(n)) {
       const c = tam === n.base ? nb : noTamanho(n, tam);
       porTam[tam] = [];
       for (const p of vis) {
-        if (p.tam && p.tam.toUpperCase() !== String(tam).toUpperCase()) continue; // molde antigo pode ter tamanho em minuscula
+        if (separado && p.tam && p.tam.toUpperCase() !== String(tam).toUpperCase()) continue; // molde antigo pode ter tamanho em minuscula
         let r = tam === n.base ? doBase[p.id] : pecaProduto(c, c.pecas.find(x => x.id === p.id));
         if (!r && doBase[p.id]) { r = doBase[p.id]; avisos.push({ peca: p.nome, tam }); }
         if (r) porTam[tam].push(r);

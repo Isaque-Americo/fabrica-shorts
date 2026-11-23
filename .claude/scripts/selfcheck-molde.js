@@ -389,7 +389,12 @@ testes.push(
   ['final2 G quebrado usa a peca do base', [prodLp.porTam.G.length, prodLp.porTam.G[0].w], [1, prodLp.pecas[0].w]],
   ['final2 avisos', prodLp.avisos, [{ peca: 'Lapis', tam: 'P' }, { peca: 'Lapis', tam: 'G' }]],
   ['final2 sem quebra sem aviso', prodGr.avisos, []],
-  ['peca com tamanho em minuscula entra no tamanho da grade', (() => { const mn = M.normalizar(structuredClone(gr)); mn.pecas[0].tam = 'm'; const r = M.molParaProduto(mn); return [r.porTam.M.length, r.porTam.G.length]; })(), [1, 0]],
+  // molde separado de verdade (tem peça de outro tamanho): cada peça só entra no seu, e o tam pode vir em minúscula
+  ['peca com tamanho em minuscula entra so no tamanho da grade', (() => { const mn = M.normalizar(structuredClone(gr)); mn.pecas[0].tam = 'm';
+    mn.pecas.push({ ...structuredClone(mn.pecas[0]), id: 'pg', tam: 'G' }); const r = M.molParaProduto(mn); return [r.porTam.M.length, r.porTam.G.length, r.porTam.P.length]; })(), [1, 1, 0]],
+  // separação pela metade: sobrou só a peça do base marcada, o tam é ignorado e todo tamanho recebe a peça
+  ['so o base marcado nao esvazia os outros tamanhos', (() => { const mn = M.normalizar(structuredClone(gr)); mn.pecas[0].tam = 'M';
+    const r = M.molParaProduto(mn); return [r.porTam.M.length, r.porTam.G4.length]; })(), [1, 1]],
   ['GRADES pgg', M.GRADES.pgg, ['P', 'M', 'G', 'GG']],
   ['GRADES g14', M.GRADES.g14, ['G1', 'G2', 'G3', 'G4']],
 );
