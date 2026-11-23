@@ -1975,7 +1975,8 @@ d.oncancel=e=>{if(options.preventClose)e.preventDefault()};
 let avisou=false;
 d.querySelector('form').addEventListener('invalid',e=>{
 const c=e.target;if(avisou)return;avisou=true;setTimeout(()=>avisou=false,300);
-const r=c.closest('label')||c,n=(r.textContent||'').trim().split('\n')[0].trim()||c.name||'um campo';
+const r=c.closest('label'); // só o texto solto do label: o textContent traria as opções do select
+const n=(r?[...r.childNodes].filter(x=>x.nodeType===3).map(x=>x.textContent).join(' '):'').trim().split('\n')[0].trim()||c.name||'um campo';
 c.scrollIntoView({block:'center'});
 const m=d.querySelector('.falta')||Object.assign(document.createElement('p'),{className:'falta'});
 m.style.color='var(--bad,#c33)';m.textContent='Falta preencher: '+n;
