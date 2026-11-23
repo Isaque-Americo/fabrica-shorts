@@ -138,6 +138,7 @@ input.cz-in{position:absolute;width:44px;height:24px;min-height:24px;padding:0 4
       <input type="range" id="c-suav" step="0.1">
       <label for="c-zoom">Zoom <span class="vazio">(ou Ctrl + roda)</span>:<b id="c-zoom-v">1x</b></label>
       <input type="range" id="c-zoom" min="1" max="8" step="any" value="1">
+      <button class="btn peq" type="button" id="c-centro">Recentralizar</button>
       <p class="vazio" id="c-info" role="status">Clique no papel.</p>
       <p id="c-aviso" style="color:var(--warn)" role="status"></p>
       <div class="card" id="c-levar">
@@ -668,6 +669,7 @@ const r=$('#c-cv').getBoundingClientRect();
 pintarContorno(Math.min(CT.w-1,Math.max(0,Math.floor((e.clientX-r.left)*CT.w/r.width))),Math.min(CT.h-1,Math.max(0,Math.floor((e.clientY-r.top)*CT.h/r.height))));
 });
 $('#c-zoom').oninput=()=>{if(CT)zoomPara(+$('#c-zoom').value,ancoraEm())};
+$('#c-centro').onclick=()=>{if(CT)zerarZoom()}; // depois de passear com 8x de zoom, um clique traz a foto inteira de volta
 // Ctrl + roda dá zoom no que está embaixo do cursor, como na aba de molde; sem Ctrl a roda só rola a janela
 $('#c-vis').addEventListener('wheel',e=>{
 if(!CT||!(e.ctrlKey||e.metaKey))return;

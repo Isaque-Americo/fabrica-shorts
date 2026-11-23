@@ -129,6 +129,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
 #m-tab input{width:62px;padding:3px 5px}
 #m-tab input.nm{width:100px}
 #m-tab .ok{color:var(--ok)}#m-tab .ruim{color:var(--bad)}#m-tab .med{display:block;font-size:12px}
+#m-tab .lig{color:var(--mut)}#m-tab .lig.on{color:var(--ok)}
 #g-tab{border-collapse:collapse;font-size:13px;width:100%}
 #g-tab th{color:var(--mut);font-weight:500;text-align:left}
 #g-tab input{width:62px;padding:3px 5px}
@@ -209,7 +210,7 @@ body{background:#fff;font-size:10pt}
       <table id="m-tab"><thead></thead><tbody></tbody></table>
       <button class="sm" type="button" id="m-add">Adicionar medida</button>
       <button class="sm" type="button" id="m-imp" title="Imprimir a tabela de medidas de todos os tamanhos">Imprimir</button>
-      <p class="vazio">Valor esperado em cm. Embaixo, o medido no molde: ✓ até 0,3 cm de diferença, ✗ acima.</p>
+      <p class="vazio">Valor esperado em cm. Embaixo, o medido no molde: ✓ até 0,3 cm de diferença, ✗ acima. ● ao lado do nome: a medida sai do desenho; ○: vale só o que você digitou.</p>
     </section>
     <section id="aba-grad" role="tabpanel" aria-label="Gradação" hidden>
       <p class="vazio" id="g-vazio"></p>
@@ -1402,16 +1403,21 @@ const tams=$('#m-base').checked?[M.base]:MM.tamanhos(M),tb=$('#m-tab tbody'),th=
 $('#m-vazio').textContent=M.medidas.length?'':'Nenhuma medida. Adicione e ligue aos traços (ex.: reta da cintura).';
 const atual=(m,t)=>{ // medido x esperado: texto + cor (✓ até 3 mm)
 const ids=m.tracos.filter(i=>M.tracos.some(x=>x.id===i)),e=m.valores[t];
-if(!ids.length)return {txt:'sem traço',cls:''};
+if(!ids.length)return {txt:'',cls:''}; // o ○ ao lado do nome já diz que não há traço: repetir em cada célula só enche a tabela
 const v=MM.medir(M,ids,t);let txt='medido '+cm2(v)+' cm',cls='';
 if(e!=null){const ok=Math.abs(v-e)<=3+1e-6;txt=(ok?'✓ ':'✗ ')+txt;cls=ok?'ok':'ruim'}
 return {txt,cls}};
 const pinta=(sp,r)=>{sp.textContent=r.txt;sp.className='med '+r.cls};
+// ● = o medido sai do desenho; ○ = só vale o que foi digitado
+const pintaLig=(sp,m)=>{const on=m.tracos.some(i=>M.tracos.some(x=>x.id===i));
+sp.textContent=on?'●':'○';sp.className='lig'+(on?' on':'');
+sp.title=on?'Ligada ao desenho: o medido vem de '+m.tracos.length+' traço(s)':'Sem traço: vale só o valor digitado'};
 // mesma estrutura: só atualiza valores (refazer as linhas tira o foco)
 if(tb.dataset.chave===chave){
 tb.querySelectorAll('input.nm').forEach(i=>{const m=M.medidas.find(x=>x.id===i.dataset.id);if(i!==document.activeElement)i.value=m.nome;i.parentNode.querySelector('.rm').setAttribute('aria-label','Remover medida '+m.nome)});
 tb.querySelectorAll('input[data-tam]').forEach(i=>{const m=M.medidas.find(x=>x.id===i.dataset.id);i.setAttribute('aria-label',m.nome+', esperado em cm, tamanho '+i.dataset.tam);if(i!==document.activeElement)i.value=m.valores[i.dataset.tam]==null?'':cm2(m.valores[i.dataset.tam])});
 tb.querySelectorAll('.med').forEach(sp=>pinta(sp,atual(M.medidas.find(x=>x.id===sp.dataset.id),sp.dataset.tam)));
+tb.querySelectorAll('.lig').forEach(sp=>pintaLig(sp,M.medidas.find(x=>x.id===sp.dataset.id))); // "Ligar" não muda a chave
 return}
 tb.dataset.chave=chave;tb.textContent='';th.textContent='';
 if(M.medidas.length){const h=document.createElement('tr');for(const t of ['Medida',...tams]){const c=document.createElement('th');c.textContent=t;h.append(c)}th.append(h)}
@@ -1424,7 +1430,8 @@ const lig=document.createElement('button');lig.type='button';lig.className='sm';
 lig.onclick=()=>{const m=ac();if(!m)return;const ids=[...sel].filter(i=>M.tracos.some(x=>x.id===i));if(!ids.length)return toast('Selecione traços para ligar.');m.tracos=ids;alterou();toast('Ligada a '+ids.length+' traço(s).')};
 const rm=document.createElement('button');rm.type='button';rm.className='sm rm';rm.textContent='✕';rm.title='Remover medida';rm.setAttribute('aria-label','Remover medida '+m.nome);
 rm.onclick=()=>{M.medidas=M.medidas.filter(x=>x.id!==m.id);alterou()};
-c0.append(nm,document.createElement('br'),lig,' ',rm);tr.append(c0);
+const fl=document.createElement('span');fl.dataset.id=m.id;pintaLig(fl,m);
+c0.append(fl,' ',nm,document.createElement('br'),lig,' ',rm);tr.append(c0);
 for(const t of tams){
 const td=document.createElement('td'),inp=document.createElement('input'),sp=document.createElement('span');
 inp.inputMode='decimal';inp.autocomplete='off';inp.dataset.id=m.id;inp.dataset.tam=t;inp.setAttribute('aria-label',m.nome+', esperado em cm, tamanho '+t);
