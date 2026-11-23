@@ -249,8 +249,10 @@ $('#avisos').innerHTML=av.map(([c,t])=>`<li class="${c}">${esc(t)}</li>`).join('
 const PO=new Map(); // rasters -> poses (mesma transformação do encaixe, como MoldeExporta.formas)
 function poseDe(j){const it=C.itens[P[j].i];if(!PO.has(it.rasters))PO.set(it.rasters,E.poses(it.pts,{rot:it.rot,espelhar:it.espelhar,escala:it.escala}));return PO.get(it.rasters)[P[j].var]}
 // rótulo no risco: quem corta precisa saber se a peça está girada e se é a face espelhada do par
-function rotuloPeca(it,v){const{ang,espelhada}=E.variante(v,{rot:it.rot,espelhar:it.espelhar});
-return [nomePeca(it.nome),it.tam,ang?ang+'°':'',espelhada!==!!it.espelho?'esp':''].filter(Boolean).join(' ')}
+function rotuloPeca(it,v){const base=[nomePeca(it.nome),it.tam];
+if(!E.variante)return base.filter(Boolean).join(' '); // encaixe.js velho no cache do navegador: melhor rótulo sem giro que risco em branco
+const{ang,espelhada}=E.variante(v,{rot:it.rot,espelhar:it.espelhar});
+return [...base,ang?ang+'°':'',espelhada!==!!it.espelho?'esp':''].filter(Boolean).join(' ')}
 function desenharPecas(){
 const g=$('#pecas');g.textContent='';PO.clear();extras.length=0;
 P.forEach((p,j)=>{
