@@ -1971,6 +1971,16 @@ function modal(title,body,onOk,options={}){
 const d=$('#dlg');
 d.innerHTML=`<form method="dialog"><h3>${title}</h3>${body}<div class="row end">${options.preventClose?'':'<button type="button" class="ghost" onclick="dlg.close()">Cancelar</button>'}<button class="pri">${options.preventClose?'Salvar senha':'Salvar'}</button></div></form>`;
 d.oncancel=e=>{if(options.preventClose)e.preventDefault()};
+// o Salvar barrado pela validação não explica nada quando o campo está fora da vista no diálogo rolado
+let avisou=false;
+d.querySelector('form').addEventListener('invalid',e=>{
+const c=e.target;if(avisou)return;avisou=true;setTimeout(()=>avisou=false,300);
+const r=c.closest('label')||c,n=(r.textContent||'').trim().split('\n')[0].trim()||c.name||'um campo';
+c.scrollIntoView({block:'center'});
+const m=d.querySelector('.falta')||Object.assign(document.createElement('p'),{className:'falta'});
+m.style.color='var(--bad,#c33)';m.textContent='Falta preencher: '+n;
+d.querySelector('.row.end').before(m);
+},true);
 d.querySelector('form').onsubmit=async e=>{
 e.preventDefault();
 try{await onOk(Object.fromEntries(new FormData(e.target)),e.target)}catch(err){aviso(err.message||'Erro ao salvar');return}
