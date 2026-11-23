@@ -320,7 +320,8 @@ M.graduarTudo(gt, 10, 20);
 const gtG = G.bbox(M.costura(M.noTamanho(gt, 'G'), gt.pecas[0]));
 // bolso tem medida padrão: a gradação automática cresce só o molde
 const gb = M.normalizar({ grade: ['P', 'M', 'G'], base: 'M' });
-const gbF = D.novaPeca(gb, D.retangulo(gb, P(0, 0), P(100, 200)).ids).peca;
+const gbIds = D.retangulo(gb, P(0, 0), P(100, 200)).ids; // [topo, direita, baixo, esquerda]
+const gbF = D.novaPeca(gb, gbIds).peca;
 const gbB = D.novaPeca(gb, D.retangulo(gb, P(300, 0), P(400, 100)).ids).peca;
 gbF.nome = 'Frente'; gbB.nome = 'Bolso';
 M.graduarTudo(gb, 10, 20);
@@ -362,6 +363,8 @@ testes.push(
   // brief dizia G4=35, mas (índice(G4) − índice(M)) × 5 = 6 × 5 = 30, e o caso com salto (G4=50) também conta 6 passos
   ['graduarTudo: cantos do G e do P', [gt.grad.a.G.dx, gt.grad.a.G.dy, gt.grad.b.G.dx, gt.grad.c.G.dy, gt.grad.a.P.dx], [-5, -10, 5, 10, 5]],
   ['graduarTudo: base em zero e peca do G com 110 x 220', [gt.grad.a.M.dx, gt.grad.a.M.dy, gtG.w, gtG.h], [0, 0, 110, 220]],
+  // "Preencher pela gradação" (molde.html) soma ao esperado do base a diferença entre medir(tam) e medir(base)
+  ['medir topo e lado no base e no G', [M.medir(gb, [gbIds[0]], 'M'), M.medir(gb, [gbIds[0]], 'G'), M.medir(gb, [gbIds[1]], 'G')], [100, 110, 220]],
   ['graduarTudo: bolso fica no tamanho padrao', [ptsDe(gbF).every(id => gb.grad[id]), ptsDe(gbB).some(id => gb.grad[id]), ptsDe(gbB).length], [true, false, 4]],
   ['graduarPasso P M G G4', [gp.grad.p1.P.dx, gp.grad.p1.M.dx, gp.grad.p1.G.dx, gp.grad.p1.G4.dx], [-5, 0, 5, 30]],
   ['graduarPasso salto GG G1 G4', [gs.grad.p1.GG.dx, gs.grad.p1.G1.dx, gs.grad.p1.G4.dx, gs.grad.p1.P.dx], [10, 20, 50, -5]],

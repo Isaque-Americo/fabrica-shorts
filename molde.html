@@ -104,7 +104,7 @@ dialog h3{margin:0 0 12px}
 #props p{margin:8px 0 0}
 select{font:inherit;padding:6px 8px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx)}
 select:focus-visible{outline:2px solid var(--ac);outline-offset:2px}
-body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.leitura #btn-enfesto,body.leitura #btn-desfazer,body.leitura #btn-refazer,body.leitura #btn-extrair,body.leitura #btn-bolso,body.leitura #m-add{display:none}
+body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.leitura #btn-enfesto,body.leitura #btn-desfazer,body.leitura #btn-refazer,body.leitura #btn-extrair,body.leitura #btn-bolso,body.leitura #m-add,body.leitura #m-pre{display:none}
 #ferramentas button:disabled,#btn-extrair:disabled,#btn-bolso:disabled,#props button:disabled,#topo button:disabled{opacity:.4;cursor:not-allowed}
 #tams button{border-color:var(--c);color:var(--tx);min-width:34px}
 #tams button[aria-pressed="true"]{background:var(--c);color:var(--card)}
@@ -209,6 +209,7 @@ body{background:#fff;font-size:10pt}
       <label><input type="checkbox" id="m-base"> Só o tamanho base</label>
       <table id="m-tab"><thead></thead><tbody></tbody></table>
       <button class="sm" type="button" id="m-add">Adicionar medida</button>
+      <button class="sm" type="button" id="m-pre" title="Preenche o esperado dos outros tamanhos usando o quanto a medida cresce no molde graduado">Preencher pela gradação</button>
       <button class="sm" type="button" id="m-imp" title="Imprimir a tabela de medidas de todos os tamanhos">Imprimir</button>
       <p class="vazio">Valor esperado em cm. Embaixo, o medido no molde: ✓ até 0,3 cm de diferença, ✗ acima. ● ao lado do nome: a medida sai do desenho; ○: vale só o que você digitou.</p>
     </section>
@@ -1464,6 +1465,19 @@ M.medidas.map(m=>`<tr><td>${esc(m.nome)}</td>${tams.map(t=>`<td>${cel(m,t)}</td>
 window.addEventListener('beforeprint',montarMedRel); // Ctrl+P também sai como tabela
 $('#m-base').onchange=desenharMed;
 $('#m-imp').onclick=()=>{montarMedRel();window.print()};
+// o molde graduado já sabe quanto cada medida cresce; o esperado do base é a referência do dono e não se mexe
+$('#m-pre').onclick=()=>{
+const ligadas=M.medidas.map(m=>({m,ids:m.tracos.filter(i=>M.tracos.some(x=>x.id===i))})).filter(x=>x.ids.length);
+if(!ligadas.length)return toast('Nenhuma medida ligada ao desenho. Selecione os traços e use “Ligar”.');
+const outros=MM.tamanhos(M).filter(t=>t!==M.base);
+if(ligadas.some(({m})=>outros.some(t=>m.valores[t]!=null))&&!confirm('Isso troca o esperado dos outros tamanhos pelo que o molde graduado mede. O tamanho base fica como está. Continuar?'))return;
+let n=0;
+for(const {m,ids} of ligadas){
+const b=MM.medir(M,ids,M.base);
+if(m.valores[M.base]==null){m.valores[M.base]=Math.round(b);n++}
+for(const t of outros){m.valores[t]=Math.round(m.valores[M.base]+MM.medir(M,ids,t)-b);n++}
+}
+alterou();toast(n?n+' valor(es) preenchidos pela gradação.':'Nada a preencher: um tamanho só e o esperado já digitado.')};
 $('#m-add').onclick=()=>{M.medidas.push({id:'md'+(1+Math.max(0,...M.medidas.map(m=>+m.id.slice(2)||0))),nome:'Medida '+(M.medidas.length+1),tracos:[],valores:{}});alterou()};
 
 let ultCli={x:0,y:0};
