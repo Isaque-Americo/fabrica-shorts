@@ -141,6 +141,8 @@
     });
     m.grad[pontoId] = r;
   }
+  // bolso tem medida padrao: nao cresce de um tamanho para o outro. p.fixa = true faz o mesmo em qualquer peca
+  const naoGradua = p => p.fixa === true || /bolso/i.test(p.nome || '');
   // gradacao automatica: a cada tamanho a peca aumenta x na horizontal e y na vertical (mm),
   // repartido entre os pontos pela distancia ao centro da peca. Refaz a gradacao do molde inteiro.
   function graduarTudo(m, x, y) {
@@ -150,7 +152,9 @@
     for (const p of m.pecas) {
       const ids = new Set();
       for (const t of p.tracos || []) { const tr = acha(m, t.id); if (tr) for (const k of ['a', 'b', 'c']) if (tr[k] && m.pontos[tr[k]]) ids.add(tr[k]); }
-      if (ids.size) { grupos.push([...ids]); for (const id of ids) vistos.add(id); }
+      if (!ids.size) continue;
+      for (const id of ids) vistos.add(id); // ponto de peca fixa tambem fica fora dos soltos
+      if (!naoGradua(p)) grupos.push([...ids]);
     }
     const soltos = Object.keys(m.pontos).filter(id => !vistos.has(id)); // ponto fora de peca cresce com o desenho todo
     if (soltos.length) grupos.push(soltos);
