@@ -537,12 +537,6 @@ const t=document.querySelector('#gp table');
 if(![...t.querySelectorAll('tr td:first-child')].some(td=>td.textContent.toLowerCase()===c.toLowerCase()))t.insertAdjacentHTML('beforeend',linhaCor(c,()=>0));
 i.value='';
 }
-function lerEst(root){
-const est={};
-root.querySelectorAll('input.qi').forEach(i=>{(est[i.dataset.c]=est[i.dataset.c]||{})[i.dataset.t]=+i.value||0});
-if(est['Sem cor']&&!Object.values(est['Sem cor']).some(v=>v))delete est['Sem cor'];
-return est;
-}
 const prod=id=>S.produtos.find(p=>p.id===id);
 const rep=id=>S.reps.find(r=>r.id===id);
 const precoG=p=>+((p&&p.precoG!=null)?p.precoG:(p&&p.preco))||0;
@@ -927,10 +921,10 @@ modal(id?'Editar produto':'Novo produto',`
   <label>Custo fixo (R$ por peça)<input name="pfixo" type="number" step="0.01" min="0" value="${fichaDe(p).fixo??''}"></label></div>
   ${procsHtml(fichaDe(p))}
   <small>Começa com uma cópia da ficha padrão. Ajuste o que difere nesta referência.</small></div></fieldset>
- <label>Estoque por cor e tamanho (peças que você tem hoje)</label><div id="gp">${grade(coresDe(p),(c,s)=>estQ(p,c,s))}</div>
- <div class="r2"><input id="novacor" placeholder="Outra cor (ex.: Bege)"><button type="button" class="ghost" onclick="addCor()">+ Cor</button></div>`,
+ <small>Quantidade em estoque: na aba Estoque, em “Entrada / ajuste”.</small>`,
 async(f,form)=>{
-const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.preco||0,precoG:+f.precoG||0,est:lerEst(form),tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0,molL:+f.molL||0,molC:+f.molC||0,molLG:+f.molLG||0,molCG:+f.molCG||0,perda:+f.perda||0};delete d.id;
+// sem grade de estoque aqui: o {...p} preserva o est que já existe
+const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.preco||0,precoG:+f.precoG||0,tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0,molL:+f.molL||0,molC:+f.molC||0,molLG:+f.molLG||0,molCG:+f.molCG||0,perda:+f.perda||0};delete d.id;
 if(form.querySelector('#fichaProp').checked)d.ficha=lerFicha(form,f.pmo,f.pfixo);else delete d.ficha;
 let ligar=false;
 if(f.molId!=='plt'){ // igual ao salvar do editor (molde.html ligarProdutos): produto ganha molId + mol, o molde lista o produto em produtoIds
@@ -1935,11 +1929,12 @@ return resumo+lin;
 }).join('');
 return `<div class="bar"><h2>Estoque por cor e tamanho</h2></div>
  <div class="tw"><table class="keep"><tr><th>Produto</th><th>Cor</th>${SZ.map(s=>`<th class="n">${s}</th>`).join('')}<th class="n">Total</th><th></th></tr>${rows||'<tr><td colspan="12" class="empty">Cadastre produtos para controlar o estoque.</td></tr>'}</table></div>
- <p style="color:var(--mut)">Cada linha mostra o total por tamanho; clique em “N cores” para abrir a divisão por cor. Os pedidos não alteram o estoque. Use “Entrada / ajuste” para lançar produção pronta (valores positivos) ou saídas e perdas (negativos). Para mudar as quantidades de uma vez, use Editar na aba Produtos. A demanda dos pedidos aprovados aparece na aba A fabricar.</p>`;
+ <p style="color:var(--mut)">Cada linha mostra o total por tamanho; clique em “N cores” para abrir a divisão por cor. Os pedidos não alteram o estoque. Use “Entrada / ajuste” para lançar produção pronta (valores positivos) ou saídas e perdas (negativos). Cor nova também se cria por ali. A demanda dos pedidos aprovados aparece na aba A fabricar.</p>`;
 }
 function fEntrada(id){
 const p=prod(id);
-modal('Entrada / ajuste · '+p.ref+' '+p.nome,`<label>Quantidade a somar por cor e tamanho (use negativo para retirar)</label><div id="gp">${grade(coresDe(p),()=>0,true)}</div>`,
+modal('Entrada / ajuste · '+p.ref+' '+p.nome,`<label>Quantidade a somar por cor e tamanho (use negativo para retirar)</label><div id="gp">${grade(coresDe(p),()=>0,true)}</div>
+ <div class="r2"><input id="novacor" placeholder="Outra cor (ex.: Bege)"><button type="button" class="ghost" onclick="addCor()">+ Cor</button></div>`,
 async(f,form)=>{
 const est=JSON.parse(JSON.stringify(ests(p)));
 form.querySelectorAll('input.qi').forEach(i=>{
