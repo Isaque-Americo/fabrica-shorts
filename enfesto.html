@@ -238,6 +238,8 @@ if(R.pesoTecido){item('Peso das peças',nf(R.pesoPecas,1)+' kg');
 item('Desperdício',nf(R.pesoDesperdicio,1)+' kg',nf(R.pesoDesperdicio/R.pesoTecido*100,1)+'%');}
 item('Consumo linear',R.consumoLinear?nf(R.consumoLinear,2)+' m/roupa':'—',R.consumoLinear?'':'este enfesto não conta roupa (sem grade de produto)');
 item('Custo do tecido',R.custo?'R$ '+nf(R.custo,2):'—',R.custo?'':'cadastre o preço do tecido');
+// perímetro: a faca corta todas as camadas de uma vez, então não multiplica por camadas
+item('Perímetro de corte',nf(P.reduce((s,_,j)=>s+perimetro(poseDe(j)),0)/1000)+' m','o que a faca anda, cortando as camadas de uma vez');
 $('#painel').innerHTML=lista.join('');
 if(ENF.compMax&&comp>ENF.compMax)av.push(['','O risco é mais comprido que a mesa ('+nf(ENF.compMax/1000)+' m). Se a mesa for maior, corrija o comprimento nas Propriedades do enfesto.']);
 if(ENF.alturaMax&&cam>ENF.alturaMax)av.push(['','Camadas acima da altura máxima ('+ENF.alturaMax+').']);
@@ -247,6 +249,7 @@ $('#avisos').innerHTML=av.map(([c,t])=>`<li class="${c}">${esc(t)}</li>`).join('
 
 // ---- desenho (mm; X = comprimento, Y = largura) ----
 const PO=new Map(); // rasters -> poses (mesma transformação do encaixe, como MoldeExporta.formas)
+const perimetro=pts=>pts.reduce((s,q,i)=>{const r=pts[(i+1)%pts.length];return s+Math.hypot(r[0]-q[0],r[1]-q[1])},0);
 function poseDe(j){const it=C.itens[P[j].i];if(!PO.has(it.rasters))PO.set(it.rasters,E.poses(it.pts,{rot:it.rot,espelhar:it.espelhar,escala:it.escala}));return PO.get(it.rasters)[P[j].var]}
 // rótulo no risco: quem corta precisa saber se a peça está girada e se é a face espelhada do par
 function rotuloPeca(it,v){const base=[nomePeca(it.nome),it.tam];

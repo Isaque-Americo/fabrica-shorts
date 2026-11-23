@@ -148,6 +148,21 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
 #btn-painel,#editor.painel-off #btn-painel{top:auto;bottom:8px;right:8px;transform:none;border:1px solid var(--ac);border-radius:8px;padding:8px 15px}
 .rot{display:none} /* no celular a barra já enche de botão: fica só a seta, o aria-label diz o resto */
 }
+#m-rel{display:none}
+@media print{
+@page{size:A4 portrait;margin:12mm}
+:root:root:root{--bg:#fff;--card:#fff;--tx:#000;--mut:#555;--bd:#bbb;color-scheme:light}
+body{background:#fff;font-size:10pt}
+#editor,#aviso,#toast,#medida,dialog{display:none!important}
+#m-rel{display:block}
+#m-rel h1{font:600 16pt Inter,sans-serif;margin:0}
+#m-rel p{margin:1mm 0 5mm;font-size:9pt;color:var(--mut)}
+#m-rel table{border-collapse:collapse;width:100%;font-size:10pt}
+#m-rel th,#m-rel td{border:1px solid var(--bd);padding:3px 6px;text-align:left}
+#m-rel th{background:#eee}
+#m-rel small{display:block;color:var(--mut);font-size:8pt}
+#m-rel tr{break-inside:avoid}
+}
 </style>
 </head>
 <body>
@@ -192,6 +207,7 @@ body.leitura #ferramentas,body.leitura #btn-grade,body.leitura #btn-refs,body.le
       <p class="vazio" id="m-vazio"></p>
       <table id="m-tab"><thead></thead><tbody></tbody></table>
       <button class="sm" type="button" id="m-add">Adicionar medida</button>
+      <button class="sm" type="button" id="m-imp" title="Imprimir a tabela de medidas de todos os tamanhos">Imprimir</button>
       <p class="vazio">Valor esperado em cm. Embaixo, o medido no molde: ✓ até 0,3 cm de diferença, ✗ acima.</p>
     </section>
     <section id="aba-grad" role="tabpanel" aria-label="Gradação" hidden>
@@ -1422,6 +1438,20 @@ td.append(inp,sp);tr.append(td);
 tb.append(tr);
 }
 }
+// tabela imprimível: o painel é estreito demais para 7 tamanhos, e é o papel que vai para a mesa de corte
+function montarMedRel(){
+const r=$('#m-rel');if(!M)return void(r.textContent='');
+const tams=MM.tamanhos(M);
+const cel=(m,t)=>{
+const ids=m.tracos.filter(i=>M.tracos.some(x=>x.id===i)),e=m.valores[t],v=ids.length?MM.medir(M,ids,t):null;
+return (e!=null?cm2(e):'—')+(v!=null?'<small>'+(e!=null?(Math.abs(v-e)<=3+1e-6?'✓ ':'✗ '):'')+cm2(v)+'</small>':'');
+};
+r.innerHTML=`<h1>${esc(M.nome||'Molde')}</h1><p>Tabela de medidas, em cm. Em cima o esperado; embaixo o medido no molde (✓ até 0,3 cm de diferença).</p>`+
+(M.medidas.length?`<table><thead><tr><th>Medida</th>${tams.map(t=>`<th>${esc(t)}</th>`).join('')}</tr></thead><tbody>`+
+M.medidas.map(m=>`<tr><td>${esc(m.nome)}</td>${tams.map(t=>`<td>${cel(m,t)}</td>`).join('')}</tr>`).join('')+'</tbody></table>':'<p>Nenhuma medida cadastrada.</p>');
+}
+window.addEventListener('beforeprint',montarMedRel); // Ctrl+P também sai como tabela
+$('#m-imp').onclick=()=>{montarMedRel();window.print()};
 $('#m-add').onclick=()=>{M.medidas.push({id:'md'+(1+Math.max(0,...M.medidas.map(m=>+m.id.slice(2)||0))),nome:'Medida '+(M.medidas.length+1),tracos:[],valores:{}});alterou()};
 
 let ultCli={x:0,y:0};
@@ -1480,5 +1510,6 @@ if(e.key==='Control'&&ferrCtrl){const v=ferrCtrl,o=opCtrl;ferrCtrl=null;opCtrl=n
 window.addEventListener('blur',()=>{if(ferrCtrl){const v=ferrCtrl,o=opCtrl;ferrCtrl=null;opCtrl=null;escolher(v,true);if(o){op=o;desenhar()}}});
 iniciar();
 </script>
+<section id="m-rel" aria-hidden="true"></section>
 </body>
 </html>
