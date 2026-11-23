@@ -10,9 +10,9 @@
 <script src="molde/ordem.js"></script>
 <script src="acesso.js"></script>
 <style>
-:root{--bg:#f4f4f3;--card:#ffffff;--tx:#18181b;--mut:#71717a;--bd:#e4e4e7;--ac:#c2410c;--fill:#f97316;--acx:#0e0e0f;--ok:#16a34a;--warn:#b45309;--bad:#dc2626;--hd:#18181b;color-scheme:light}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#f4f4f5;color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#f4f4f5;color-scheme:dark}
+:root{--bg:#f4f4f3;--card:#ffffff;--tx:#18181b;--mut:#71717a;--bd:#e4e4e7;--ac:#c2410c;--fill:#f97316;--acx:#0e0e0f;--ok:#16a34a;--warn:#b45309;--bad:#dc2626;--hd:#18181b;--t0:#c92a2a;--t1:#1c6dd0;--t2:#2b8a3e;--t3:#d9480f;--t4:#7048e8;--t5:#8d5b3a;--t6:#c2255c;--t7:#0b7285;color-scheme:light}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#f4f4f5;--t0:#ff6b6b;--t1:#5aa9ff;--t2:#4ade80;--t3:#ffa94d;--t4:#b794f6;--t5:#d4a373;--t6:#f783ce;--t7:#3bd4e6;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#121214;--card:#1c1c1f;--tx:#f4f4f5;--mut:#a1a1aa;--bd:#2e2e33;--ac:#fb923c;--fill:#f97316;--acx:#0e0e0f;--ok:#4ade80;--warn:#fbbf24;--bad:#f87171;--hd:#f4f4f5;--t0:#ff6b6b;--t1:#5aa9ff;--t2:#4ade80;--t3:#ffa94d;--t4:#b794f6;--t5:#d4a373;--t6:#f783ce;--t7:#3bd4e6;color-scheme:dark}
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html,body{min-height:100%}
@@ -180,6 +180,8 @@ const sb=LOCAL?null:supabase.createClient(SB_URL,SB_KEY);
 const $=s=>document.querySelector(s);
 const MO=window.MoldeOrdem;
 const SZ=['P','M','G','GG','G1','G2','G3','G4'];
+// mesma cor do tamanho no risco e na tabela de medidas; tamanho fora da grade do app fica cinza
+const corTam=t=>{const i=SZ.indexOf(t);return i<0?'var(--mut)':'var(--t'+i+')'};
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>'&#'+c.charCodeAt(0)+';');
 const num=v=>{const n=parseFloat(String(v??'').replace(',','.'));return Number.isFinite(n)?n:0};
 const nf=(v,d=2)=>(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d});
@@ -466,7 +468,7 @@ function restaurar(foco){if(!PODE)document.querySelectorAll('#enf-corpo input,#e
 
 function itemHtml(e,it,i,aba){
 const p=prod(it.produtoId),pn=pecasDe(p,aba),k=`${i}-`;
-const grade=tamsDe(p,it).map(t=>{const q=it.grade[t]||0,tot=q*e.camadas/MO.camadasPorRoupa(e,O,p,t,MATS),ped=it.falta[t];return `<div class="tam" role="group" aria-label="Tamanho ${esc(t)}"><span class="t">${esc(t)}</span>
+const grade=tamsDe(p,it).map(t=>{const q=it.grade[t]||0,tot=q*e.camadas/MO.camadasPorRoupa(e,O,p,t,MATS),ped=it.falta[t];return `<div class="tam" role="group" aria-label="Tamanho ${esc(t)}"><span class="t" style="color:${corTam(t)}">${esc(t)}</span>
 <button type="button" data-acao="menos" data-i="${i}" data-t="${esc(t)}" data-foco="${k}m${esc(t)}" aria-label="Menos uma ${esc(t)} por camada"${q?'':' disabled'}>−</button>
 <output aria-label="${esc(t)} por camada">${q}</output>
 <button type="button" data-acao="mais" data-i="${i}" data-t="${esc(t)}" data-foco="${k}p${esc(t)}" aria-label="Mais uma ${esc(t)} por camada">+</button>
