@@ -9,6 +9,7 @@ permissions:
   contents: read
   pages: write
   id-token: write
+  actions: read # deploy-pages procura o artefato pela API de Actions; sem isso da "No artifacts named github-pages"
 
 # cancelar no meio deixava a publicacao do Pages pendurada e a proxima falhava
 # no passo "Deploy to GitHub Pages"; com false as publicacoes entram na fila
