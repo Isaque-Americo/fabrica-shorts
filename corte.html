@@ -47,12 +47,11 @@ table.lst{width:100%;border-collapse:collapse;background:var(--card);border:1px 
 table.lst th,table.lst td{padding:8px 10px;border-bottom:1px solid var(--bd);text-align:left}
 table.lst th{color:var(--mut);font-weight:500;font-size:13px}
 table.lst td.n,table.lst th.n{text-align:right}
-.previa a{display:block;text-decoration:none;color:var(--mut);font-size:12px;line-height:1.3;margin-bottom:8px}
-.previa a span{display:block;margin-top:3px}
-.previa a:last-child{margin-bottom:0}
-.previa svg{display:block;height:56px;width:auto;max-width:260px;background:var(--bg);border:1px solid var(--bd);border-radius:4px} /* a caixa é o próprio tecido: aspect-ratio vem do risco */
-.previa polygon{fill:var(--c);fill-opacity:.35;stroke:var(--c);stroke-width:1.5;vector-effect:non-scaling-stroke}
-.previa a:hover svg,.previa a:focus-visible svg{border-color:var(--ac)}
+#dlg-risco{width:min(920px,96vw)}
+#dlg-risco h4{margin:14px 0 6px;font-size:14px}
+svg.risco-v{display:block;height:min(44vh,380px);width:auto;max-width:100%;background:var(--bg);border:1px solid var(--bd);border-radius:6px} /* a caixa é o tecido: aspect-ratio vem do risco */
+svg.risco-v polygon{fill:var(--c);fill-opacity:.3;stroke:var(--c);stroke-width:1.5;vector-effect:non-scaling-stroke}
+svg.risco-v text{fill:var(--tx);text-anchor:middle;dominant-baseline:middle}
 .abas{display:flex;gap:4px;flex-wrap:wrap;align-items:flex-end;border-bottom:1px solid var(--bd);margin-bottom:10px}
 .abas [role=tab]{font:inherit;font-size:14px;font-weight:600;background:none;border:0;border-bottom:2px solid transparent;color:var(--mut);padding:6px 10px;cursor:pointer}
 .abas [role=tab][aria-selected="true"]{color:var(--tx);border-bottom-color:var(--ac)}
@@ -121,7 +120,7 @@ body{background:#fff;font-size:10pt}
       <h2 style="margin:0;font:700 26px 'Barlow Condensed',Inter,sans-serif;text-transform:uppercase;letter-spacing:.3px">Ordens de corte</h2>
       <button class="pri" type="button" id="btn-nova">Nova ordem</button>
     </div>
-    <table class="lst"><thead><tr><th>Pedido</th><th>Nome</th><th>Referências</th><th>Data</th><th class="n">Metros</th><th>Prévia do risco</th><th>Ações</th></tr></thead><tbody id="lista"></tbody></table>
+    <table class="lst"><thead><tr><th>Pedido</th><th>Nome</th><th>Referências</th><th>Data</th><th class="n">Metros</th><th>Risco</th><th>Ações</th></tr></thead><tbody id="lista"></tbody></table>
   </main>
 </div>
 
@@ -151,6 +150,11 @@ body{background:#fff;font-size:10pt}
   </main>
 </div>
 
+<dialog id="dlg-risco" aria-labelledby="dlg-risco-t">
+  <h3 id="dlg-risco-t">Risco</h3>
+  <div id="dlg-risco-c"></div>
+  <menu class="acoes"><button class="pri" type="button" onclick="this.closest('dialog').close()">Fechar</button></menu>
+</dialog>
 <dialog id="dlg-props" aria-labelledby="dlg-props-t">
   <h3 id="dlg-props-t">Propriedades da ordem</h3>
   <label class="campo">Nome <input id="pr-nome" autocomplete="off"></label>
@@ -311,26 +315,33 @@ const ords=(await B.ordens()).map(r=>({id:r.id,o:MO.normalizar(r.data)})).sort((
 $('#aviso').hidden=true;$('#lista-v').hidden=false;
 const tb=$('#lista');
 if(!ords.length){tb.innerHTML='<tr><td colspan="7" class="vazio">Nenhuma ordem ainda. Aprove um pedido no app ou use “Nova ordem”.</td></tr>';return}
-tb.innerHTML=ords.map(x=>`<tr><td>${x.o.pedidoId?'#'+esc(x.o.pedidoNum??'?'):'avulsa'}</td><td><a href="${esc(urlCom('id',x.id))}">${esc(x.o.nome||'(sem nome)')}</a></td><td>${esc(refsDe(x.o).join(', '))}</td><td>${dataBR(x.o.criadaEm)}</td><td class="n" data-metros="${esc(x.id)}">…</td><td class="previa" data-previa="${esc(x.id)}">…</td><td><a href="${esc(urlCom('id',x.id))}">${PODE?'Editar':'Abrir'}</a>${PODE&&(!x.o.pedidoId||PODE_PED)?` <button class="sm perigo" type="button" data-apagar="${esc(x.id)}">Apagar</button>`:''}</td></tr>`).join('');
+tb.innerHTML=ords.map(x=>`<tr><td>${x.o.pedidoId?'#'+esc(x.o.pedidoNum??'?'):'avulsa'}</td><td><a href="${esc(urlCom('id',x.id))}">${esc(x.o.nome||'(sem nome)')}</a></td><td>${esc(refsDe(x.o).join(', '))}</td><td>${dataBR(x.o.criadaEm)}</td><td class="n" data-metros="${esc(x.id)}">…</td><td><button class="sm" type="button" data-risco="${esc(x.id)}">Risco</button></td><td><a href="${esc(urlCom('id',x.id))}">${PODE?'Editar':'Abrir'}</a>${PODE&&(!x.o.pedidoId||PODE_PED)?` <button class="sm perigo" type="button" data-apagar="${esc(x.id)}">Apagar</button>`:''}</td></tr>`).join('');
 tb.querySelectorAll('[data-apagar]').forEach(b=>b.onclick=()=>apagarOrdem(b.dataset.apagar,ords.find(x=>x.id===b.dataset.apagar).o,false));
-// metros e prévia: um enfesto de cada vez, cedendo a vez ao navegador para a lista não travar
+tb.querySelectorAll('[data-risco]').forEach(b=>b.onclick=()=>verRisco(ords.find(x=>x.id===b.dataset.risco)));
+// resumo gravado a cada salvamento; ordem antiga sem resumo é calculada aqui
 for(const x of ords){
-await new Promise(r=>setTimeout(r));
-const cs=x.o.enfestos.map(e=>{try{return MO.calcularEnfesto(e,x.o,PRODS,MATS)}catch(er){console.error(er);return null}});
 let m=x.o.resumo&&x.o.resumo.metros;
-if(m==null)try{m=MO.resultados(x.o,cs,MATS).metros}catch(er){console.error(er);m=null}
+if(m==null){await new Promise(r=>setTimeout(r));m=resumoDe(x.o).metros}
 const td=tb.querySelector(`[data-metros="${CSS.escape(x.id)}"]`);if(td)td.textContent=m?nf(m)+' m':'—';
-const pv=tb.querySelector(`[data-previa="${CSS.escape(x.id)}"]`);
-if(pv)pv.innerHTML=cs.map((c,i)=>miniRisco(c,x.o.enfestos[i],x.id)).join('')||'<span class="vazio">sem enfesto</span>';
 }
 }
-// prévia do risco na lista: as mesmas formas do enfesto, só a largura útil (sem ourela), para ele ver qual abrir
-function miniRisco(c,e,oid){
-const nome=e.nome||'Enfesto',link=(txt,corpo)=>`<a href="${esc(urlEnfDe(oid,e.id))}" title="${esc(txt)}">${corpo}<span>${esc(txt)}</span></a>`;
-if(!c)return link(nome+' · sem risco','');
-const fs=MoldeExporta.formas(c,PRODS,{cabeceira:e.cabeceira});
-const pol=fs.map((f,j)=>`<polygon style="--c:${corTam(c.itens[c.posicoes[j].i].tam)}" points="${f.pts.map(q=>q.join(',')).join(' ')}"/>`).join('');
-return link(`${nome} · ${nf(c.comp/1000)} m`,`<svg viewBox="0 0 ${c.comp} ${c.largUtil}" style="aspect-ratio:${c.comp}/${c.largUtil}" aria-hidden="true">${pol}</svg>`);
+// botão Risco: só mostra o que está enfestado na mesa, sem mexer em nada (as mesmas formas do enfesto)
+function verRisco(x){
+if(!x)return;
+const d=$('#dlg-risco');
+$('#dlg-risco-t').textContent='Risco · '+(x.o.nome||'Ordem');
+$('#dlg-risco-c').innerHTML=(x.o.enfestos.length?x.o.enfestos:[null]).map(e=>{
+if(!e)return '<p class="vazio">Esta ordem ainda não tem enfesto.</p>';
+let c=null;try{c=MO.calcularEnfesto(e,x.o,PRODS,MATS)}catch(er){console.error(er)}
+const tit=`<h4>${esc(e.nome||'Enfesto')}${c?` · ${nf(c.comp/1000)} m de risco · ${e.camadas} camada(s)`:''}</h4>`;
+if(!c)return tit+'<p class="vazio">Sem risco: falta tecido, largura ou peça do molde neste enfesto.</p>';
+const fz=11*Math.max(c.largUtil/380,c.comp/860); // letra de ~11 px no tamanho em que o desenho aparece (altura 380 px ou largura 860 px)
+const pc=MoldeExporta.formas(c,PRODS,{cabeceira:e.cabeceira,nome:true,textos:true}).map((f,j)=>
+`<polygon style="--c:${corTam(c.itens[c.posicoes[j].i].tam)}" points="${f.pts.map(q=>q.join(',')).join(' ')}"/>`+
+(f.texto?`<text x="${f.texto.x}" y="${f.texto.y}">${esc(f.texto.s)}</text>`:'')).join('');
+return tit+`<svg class="risco-v" viewBox="0 0 ${c.comp} ${c.largUtil}" style="aspect-ratio:${c.comp}/${c.largUtil}" font-size="${fz}" role="img" aria-label="Peças enfestadas em ${esc(e.nome||'')}">${pc}</svg>`;
+}).join('');
+d.showModal();
 }
 // metros e peças da ordem para a lista; null quando o encaixe falha
 function resumoDe(o){try{const r=MO.resultados(o,o.enfestos.map(e=>MO.calcularEnfesto(e,o,PRODS,MATS)),MATS);return {metros:r.metros,pecas:r.pecas}}catch(e){console.error(e);return {metros:null,pecas:null}}}
