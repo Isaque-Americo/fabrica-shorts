@@ -238,7 +238,7 @@
     return cons == null && consG == null ? null : { cons, consG };
   }
 
-  const MoldeOrdem = { normalizar, nova, deFabricar, dePedido, semMolde, ajustarGrade, pecasEnfesto, calcularEnfesto, camadasPorRoupa, resultados, matCusto, meiaPeca, consumoPeloMolde };
+  const MoldeOrdem = { normalizar, nova, deFabricar, dePedido, semMolde, ajustarGrade, pecasEnfesto, calcularEnfesto, camadasPorRoupa, auxRe, resultados, matCusto, meiaPeca, consumoPeloMolde };
   g.MoldeOrdem = MoldeOrdem;
   if (typeof module !== 'undefined') module.exports = MoldeOrdem;
 })(typeof window !== 'undefined' ? window : globalThis);

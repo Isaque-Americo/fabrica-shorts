@@ -280,7 +280,11 @@ item('Largura útil',nf(C.largUtil/10,1)+' cm',MAT.tubular?'tubular':'');
 const R=MO.resultados({...O,enfestos:[ENF]},[{...C,comp}],MATS);
 // o que o dono quer ver é a roupa pronta, não o pano solto: par de camadas face a face = 1 roupa
 const totPc=C.pecasTotal*cam;
-item(R.pecas?'Roupas cortadas':'Peças cortadas',nf(R.pecas||totPc,R.pecas%1?1:0),totPc+' peças de pano · '+C.pecasTotal+' por camada');
+// bolso, cós e vista contam à parte: o dono quer ver quantas peças do corpo saíram
+const aux=C.itens.reduce((s,x)=>s+(MO.auxRe.test(x.nome)?x.rende:0),0)*cam;
+const nomeAux=C.itens.every(x=>!MO.auxRe.test(x.nome)||/bolso/i.test(x.nome))?(aux===1?'bolso':'bolsos'):(aux===1?'peça auxiliar':'peças auxiliares');
+item(R.pecas?'Roupas cortadas':'Peças cortadas',nf(R.pecas||totPc,R.pecas%1?1:0),
+(aux?(totPc-aux)+' peças de pano + '+aux+' '+nomeAux:totPc+' peças de pano')+' · '+C.pecasTotal+' por camada');
 // bruto = sobre a largura cheia do rolo (com ourela), que é a largura que se paga
 const lt=larg();
 if(lt>0){const apB=comp>0?C.areaPecas/(comp*lt):0;
