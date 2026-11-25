@@ -515,6 +515,9 @@ const brl=n=>(+n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const CORES_BASE=['Preto','Marinho','Chumbo','Petróleo','Verde militar','Gelo'];
 const tot=p=>Object.values(ests(p)).reduce((a,c)=>a+SZ.reduce((b,s)=>b+(+c[s]||0),0),0);
+// valor do estoque: G1–G4 tem preço e custo próprios, então o valor vem tamanho a tamanho.
+// vlr(éG) devolve o valor unitário da faixa; ver valEst(p, g=>…) nas chamadas
+const valEst=(p,vlr)=>Object.values(ests(p)).reduce((a,c)=>a+SZ.reduce((b,s)=>b+(+c[s]||0)*vlr(/^G[1-4]$/.test(s)),0),0);
 function ests(p){const e=(p&&p.est)||{};return Object.values(e).some(x=>typeof x==='number')?{'Sem cor':e}:e}
 function estQ(p,c,t){return +((ests(p)[c]||{})[t])||0}
 function coresDe(p,extra=[]){
@@ -870,11 +873,12 @@ return cab+`<tr><td>${foto(p,'fmini',mx)}</td><td>${esc(p.ref)}</td>
  <td>${esc(p.nome)}${p.tecidoId?`<small>${esc(mat(p.tecidoId)?.nome||'')} · ${p.ficha?'ficha própria':'ficha padrão'}</small>`:'<small>custo manual</small>'}${temMolde(p)?'':'<small class="aviso">sem molde</small>'}</td>
  <td class="n">${brl(p.preco)}${pg!==+p.preco?`<small>G1–G4 ${brl(pg)}</small>`:''}</td>
  <td class="n">${pct(c,+p.preco,p)}${cg!==c||pg!==+p.preco?`<small>G1–G4 ${pct(cg,pg,p)}</small>`:''}</td>
- <td class="n ${baixo?'low':''}">${tot(p)}${baixo?'<small>abaixo do mínimo</small>':''}</td>
+ <td class="n ${baixo?'low':''}">${tot(p)}${baixo?'<small>abaixo do mínimo</small>':''}${tot(p)?`<small title="A preço de venda; custo ${brl(valEst(p,g=>custoP(p,g)))}">${brl(valEst(p,g=>g?pg:+p.preco||0))}</small>`:''}</td>
  <td>${acoes('pr'+p.id,[['Ver ficha técnica',`verFicha('${p.id}')`],...(mx?[['Editar produto',`fProd('${p.id}')`],'-',['Excluir produto',`del('produtos','${p.id}')`,'del']]:[])])}</td></tr>`}).join('');
 return `<div class="bar">${campoBusca('Buscar por referência ou descrição')}${mx?'<button class="pri" onclick="fProd()">+ Novo produto</button>':''}</div>
  ${S.produtos.length>3?`<div class="chips"><button class="${agrupa?'':'on'}" onclick="setProdGrupo('nenhum')">Por referência</button><button class="${agrupa?'on':''}" onclick="setProdGrupo('tecido')">Agrupar por tecido</button></div>`:''}
  <div class="tw"><table><tr><th></th><th>Ref.</th><th>Descrição</th><th class="n">Preço</th><th class="n">Margem</th><th class="n">Estoque</th><th></th></tr>${r||'<tr><td colspan="7" class="empty">Nenhum produto cadastrado. Comece pelo botão acima.</td></tr>'}</table></div>
+ <p style="color:var(--mut)">Estoque hoje: <b>${S.produtos.reduce((a,x)=>a+tot(x),0)} peça(s)</b> · <b>${brl(S.produtos.reduce((a,x)=>a+valEst(x,g=>g?precoG(x):+x.preco||0),0))}</b> a preço de venda · ${brl(S.produtos.reduce((a,x)=>a+valEst(x,g=>custoP(x,g)),0))} de custo.</p>
  <p style="color:var(--mut)">A margem desconta imposto, despesas e a maior comissão cadastrada (${nf(comMax(),2)}%). Passe o mouse nela para ver a conta, ou abra a ficha técnica para o custo detalhado.</p>`;
 }
 async function fProd(id){
@@ -2034,6 +2038,8 @@ const t=[['aviamento 20/10un x2 + tecido 10x2m',a.mp,24],
 ['comissao = a maior cadastrada',m.com,10],
 ['preco zero nao divide por zero',margem(10,0).pct,null],
 // meta: deducoes 19%; alvo 30% deixa 51% do preco para o custo
+['valor do estoque cobra G1-G4 pelo preco da faixa',valEst({est:{Preto:{P:2,G1:3}}},g=>g?20:10),80],
+['estoque vazio vale zero',valEst({},g=>10),0],
 ['sem meta nao calcula nada',meta(28.5,100,0),null],
 ['preco que bate a meta de 30%',+meta(28.5,100,30).precoAlvo.toFixed(2),55.88],
 ['custo maximo para a meta de 30%',+meta(28.5,100,30).custoAlvo.toFixed(2),51],
