@@ -907,16 +907,19 @@ modal(id?'Editar produto':'Novo produto',`
  <div class="g2"><label>Consumo de tecido P–GG (m por peça)<input name="cons" type="number" step="0.001" min="0" value="${p.cons??''}"></label>
  <label>Consumo de tecido G1–G4 (m por peça)<input name="consG" type="number" step="0.001" min="0" value="${p.consG??''}" placeholder="igual ao P–GG"></label>
  <label>Custo extra (R$ por peça)<input name="extra" type="number" step="0.01" min="0" value="${p.extra??''}"></label></div>
+ <p style="margin:10px 0 4px"><b>Consumo de tecido: escolha como calcular</b></p>
+ <button type="button" class="ghost" onclick="consMolde()">1) Calcular pelo molde escolhido acima</button>
+ <div id="molcons"></div>
+ <small style="display:block;margin:4px 0 8px">Usa o desenho real do molde, uma peça de cada tamanho, na largura do tecido. Ou preencha o tamanho do molde abaixo e use a estimativa.</small>
  <div class="g2"><label>Molde P–GG: largura (cm)<input name="molL" type="number" step="0.1" min="0" value="${p.molL||''}" title="Largura do retângulo que envolve todas as partes de uma peça"></label>
  <label>Molde P–GG: comprimento (cm)<input name="molC" type="number" step="0.1" min="0" value="${p.molC||''}"></label>
  <label>Molde G1–G4: largura (cm)<input name="molLG" type="number" step="0.1" min="0" value="${p.molLG||''}" placeholder="igual ao P–GG"></label>
  <label>Molde G1–G4: comprimento (cm)<input name="molCG" type="number" step="0.1" min="0" value="${p.molCG||''}" placeholder="igual ao P–GG"></label>
  <label>Perda de encaixe (%)<input name="perda" type="number" step="0.1" min="0" max="90" value="${p.perda||''}" placeholder="Ex.: 12"></label></div>
- <button type="button" class="ghost" onclick="estimarCons(this.form)">Estimar consumo pelo molde</button>
+ <button type="button" class="ghost" onclick="estimarCons(this.form)">2) Estimar pelo tamanho do molde digitado aqui</button>
  <small id="consprev" style="display:block;margin-top:4px">Preenche os dois consumos acima a partir da largura útil do tecido. Estimativa por retângulo: o encaixe real costuma gastar menos.</small>
  <label style="margin:10px 0 0">Molde digitalizado (.plt)<input type="file" name="plt" accept=".plt,.hgl,.hpgl" onchange="lerPlt(this.form)"></label>
  ${id?`<button type="button" class="ghost" onclick="window.open('molde.html?${p.molId?'id='+encodeURIComponent(p.molId):'produto='+encodeURIComponent(id)}','_blank')">Desenhar molde</button>`:''}
- ${id&&p.mol&&p.mol.porTam?`<button type="button" class="ghost" onclick="consMolde('${esc(id)}')">Calcular consumo pelo molde</button><div id="molcons"></div>`:''}
  <small>Arquivo de plotter em HP-GL, como os que saem do CAD ou da digitalização. O app separa os painéis, descarta piques e moldura, e calcula o consumo painel por painel.${molOrigem(p)==='editor'?' <b>Molde desenhado no editor: '+esc((p.mol&&p.mol.arq||'').replace(/^Molde: /,''))+'.</b> Importar um PLT desliga o produto desse molde.':p.mol?' <b>Este produto já tem molde: '+((p.mol.pecas||[]).length)+' painéis'+(p.mol.arq?' ('+esc(p.mol.arq)+')':'')+'.</b> Escolher outro arquivo substitui.':''}</small>
  <div id="pltprev"></div>
  <label style="display:flex;align-items:center;gap:8px;margin:10px 0 4px"><input type="checkbox" id="fichaProp" style="width:auto;margin:0" ${p.ficha?'checked':''} onchange="toggleFichaProp(this)">Esta referência tem ficha própria</label>
@@ -1113,13 +1116,24 @@ $('#consprev').textContent='Consumo calculado painel por painel a partir de '+pl
 }
 // risco de uma peça de cada tamanho com o molde do editor (molde/ordem.js), como sugestão
 let molSug=null;
-function consMolde(id){
-const fm=pltForm(),p=prod(id),box=$('#molcons');
-if(!fm||!p||!box)return;
-const t=mat(fm.tecidoId.value);
-molSug=t&&+t.larg>0?MoldeOrdem.consumoPeloMolde(p,t):null;
+async function consMolde(){
+const fm=pltForm(),box=$('#molcons');
+if(!fm||!box)return;
+const t=mat(fm.tecidoId.value),mid=fm.molId.value,aviso=s=>{molSug=null;box.innerHTML='<p class="low">'+s+'</p>'};
+if(!t)return aviso('Escolha o tecido antes de calcular.');
+if(!(+t.larg>0))return aviso('O tecido "'+esc(t.nome)+'" está sem largura útil. Cadastre-a na aba Matéria-prima.');
+if(!mid)return aviso('Escolha no campo “Molde”, acima, um molde já criado — ou use a estimativa pelo tamanho digitado.');
+if(mid==='plt')return aviso('O arquivo PLT não traz a grade de tamanhos: ele calcula o consumo sozinho ao ser escolhido abaixo.');
+box.innerHTML='<p class="low">Encaixando as peças…</p>';
+// o molde vem do campo acima, não do produto salvo: assim funciona em produto novo (mesma leitura do salvar)
+let mol;
+try{const {data:r,error:er}=await sb.from('docs').select('data').eq('id',mid).eq('col','moldes').single();
+if(er)throw er;
+mol=MoldeModelo.molParaProduto(MoldeModelo.normalizar(r.data));
+}catch(er){return aviso('Não foi possível ler o molde escolhido: '+ptErro(er))}
+molSug=MoldeOrdem.consumoPeloMolde({mol},t);
 box.innerHTML=molSug?`<p style="margin:6px 0">Risco com uma peça de cada tamanho em ${nf(+t.larg,2)} m de largura${t.tubular?' (tubular)':''}: <b>${molSug.cons!=null?nf(molSug.cons)+' m':'—'}</b> por peça (P–GG)${molSug.consG!=null?' · <b>'+nf(molSug.consG)+' m</b> (G1–G4)':''}.</p><button type="button" class="ghost" onclick="consMoldeAplicar()">Usar este consumo</button>`
-:`<p class="low">${!t?'Escolha o tecido antes de calcular.':!(+t.larg>0)?'O tecido "'+esc(t.nome)+'" está sem largura útil. Cadastre-a na aba Matéria-prima.':'Não deu para encaixar: o molde não tem peças nos tamanhos P a G4 ou alguma peça é mais larga que o tecido.'}</p>`;
+:'<p class="low">Não deu para encaixar: o molde não tem peças nos tamanhos P a G4 ou alguma peça é mais larga que o tecido.</p>';
 }
 function consMoldeAplicar(){
 const fm=pltForm();
