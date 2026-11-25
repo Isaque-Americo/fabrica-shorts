@@ -261,6 +261,9 @@ const RASC=()=>'ordem:'+ordId;
 const prod=id=>PRODS.find(p=>p.id===id),mat=id=>MATS.find(m=>m.id===id);
 const curTec=()=>O.tecidos.find(t=>t.id===tecAtual),curEnf=()=>O.enfestos.find(e=>e.id===enfAtual);
 const nomeProd=p=>p?[p.ref,p.nome].filter(Boolean).join(' · ')||'(sem nome)':'Produto não encontrado';
+// referências da ordem: as do pedido mais as dos produtos que entraram nos enfestos
+// (a ordem avulsa nasce com refs vazio, então sem isto a coluna Referências da lista ficava em branco)
+const refsDe=o=>[...new Set([...(o.refs||[]),...(o.enfestos||[]).flatMap(e=>(e.itens||[]).map(it=>(prod(it.produtoId)||{}).ref).filter(Boolean))])].sort();
 const nomeMat=m=>m?[m.nome,m.cor].filter(Boolean).join(' · ')||'(sem nome)':'';
 const nomeTec=(t,i)=>(nomeMat(mat(t.materiaId))||'Tecido sem matéria-prima')+(i===0?' (principal)':'');
 
@@ -282,7 +285,7 @@ clearTimeout(timer);
 if(salvando){agendar();return}
 if(estado==='salvo'||!PODE)return;
 salvando=true;
-const v=ver,t=Date.now(),doc={...structuredClone(O),resumo:resumoDe(O),salvoEm:t};
+const v=ver,t=Date.now(),doc={...structuredClone(O),refs:refsDe(O),resumo:resumoDe(O),salvoEm:t};
 try{localStorage.setItem(RASC(),JSON.stringify({em:t,o:doc}))}catch(e){}
 marcar('salvando');
 try{
@@ -301,7 +304,7 @@ const ords=(await B.ordens()).map(r=>({id:r.id,o:MO.normalizar(r.data)})).sort((
 $('#aviso').hidden=true;$('#lista-v').hidden=false;
 const tb=$('#lista');
 if(!ords.length){tb.innerHTML='<tr><td colspan="6" class="vazio">Nenhuma ordem ainda. Aprove um pedido no app ou use “Nova ordem”.</td></tr>';return}
-tb.innerHTML=ords.map(x=>`<tr><td>${x.o.pedidoId?'#'+esc(x.o.pedidoNum??'?'):'avulsa'}</td><td><a href="${esc(urlCom('id',x.id))}">${esc(x.o.nome||'(sem nome)')}</a></td><td>${esc(x.o.refs.join(', '))}</td><td>${dataBR(x.o.criadaEm)}</td><td class="n" data-metros="${esc(x.id)}">…</td><td><a href="${esc(urlCom('id',x.id))}">${PODE?'Editar':'Abrir'}</a>${PODE&&(!x.o.pedidoId||PODE_PED)?` <button class="sm perigo" type="button" data-apagar="${esc(x.id)}">Apagar</button>`:''}</td></tr>`).join('');
+tb.innerHTML=ords.map(x=>`<tr><td>${x.o.pedidoId?'#'+esc(x.o.pedidoNum??'?'):'avulsa'}</td><td><a href="${esc(urlCom('id',x.id))}">${esc(x.o.nome||'(sem nome)')}</a></td><td>${esc(refsDe(x.o).join(', '))}</td><td>${dataBR(x.o.criadaEm)}</td><td class="n" data-metros="${esc(x.id)}">…</td><td><a href="${esc(urlCom('id',x.id))}">${PODE?'Editar':'Abrir'}</a>${PODE&&(!x.o.pedidoId||PODE_PED)?` <button class="sm perigo" type="button" data-apagar="${esc(x.id)}">Apagar</button>`:''}</td></tr>`).join('');
 tb.querySelectorAll('[data-apagar]').forEach(b=>b.onclick=()=>apagarOrdem(b.dataset.apagar,ords.find(x=>x.id===b.dataset.apagar).o,false));
 // resumo gravado a cada salvamento; ordem antiga sem resumo é calculada aqui
 for(const x of ords){
