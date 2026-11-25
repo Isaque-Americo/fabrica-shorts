@@ -119,7 +119,7 @@ body{background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   <main>
     <dl class="painel" id="painel"></dl>
     <ul id="avisos" aria-live="polite"></ul>
-    <p class="nota">O arrasto manual de peças não é salvo: recarregar ou “Refazer” volta ao encaixe calculado. A quantidade de cada tamanho abaixo salva automaticamente na ordem.</p>
+    <p class="nota">O arrasto manual de peças é salvo na ordem: ao abrir de novo, o risco volta como você deixou. “Refazer” apaga o ajuste e volta ao encaixe calculado; mudar a quantidade de um tamanho também. A quantidade de cada tamanho abaixo salva automaticamente na ordem.</p>
     <div class="ferr">
       <span id="sel" role="status" aria-live="polite">Clique numa peça para arrastar, ou selecione com Tab e use as setas.</span>
       <button class="sm" type="button" id="b-girar" disabled aria-keyshortcuts="r">Girar (R)</button>
@@ -423,7 +423,10 @@ svg.style.width=(W+20)*Z+'px';svg.style.height=H*Z+'px';svg.style.fontSize=(12/Z
 $('#b-zv').textContent=nf(Z*25.4/96*100,0)+'%'; // escala de verdade: 100% = tamanho real na tela (1 px CSS = 25,4/96 mm)
 }
 
-// ---- ajuste manual (não é salvo) ----
+// ---- ajuste manual (salvo na ordem) ----
+// o risco ajustado fica no enfesto (ENF.pos): ao abrir de novo, as peças estão onde ele largou.
+// A assinatura é das peças de agora: mudou a grade, o molde ou o tecido, calcularEnfesto volta ao automático.
+const guardarPos=()=>{if(!PODE)return;ENF.pos={sig:MO.sigItens(C.itens),p:P.map(p=>({i:p.i,ox:Math.round(p.ox),oy:Math.round(p.oy),var:p.var}))};salvar()};
 const nGiros=it=>it.rot==='nenhuma'?1:it.rot==='livre'?4:2;
 // tamanho da peça como ela está no risco: quem confere o molde na mesa precisa destes números
 function medidasPeca(j){
@@ -442,7 +445,7 @@ function mover(j,ox,oy,v){
 fino();
 const ok=E.moverPeca(OC,IF,PF,j,ox*K,oy*K,v);
 $('#pecas').children[j].classList.toggle('bloq',!ok&&!!drag); // contorno vermelho só enquanto arrasta
-if(ok){Object.assign(P[j],{ox:PF[j].ox/K,oy:PF[j].oy/K,var:v});posPeca(j);painel();$('#fundo .fim').setAttribute('x1',compAtual());$('#fundo .fim').setAttribute('x2',compAtual());$('#fundo .tecido').setAttribute('width',compAtual())}
+if(ok){Object.assign(P[j],{ox:PF[j].ox/K,oy:PF[j].oy/K,var:v});guardarPos();posPeca(j);painel();$('#fundo .fim').setAttribute('x1',compAtual());$('#fundo .fim').setAttribute('x2',compAtual());$('#fundo .tecido').setAttribute('width',compAtual())}
 return ok;
 }
 function variante(tipo){
@@ -452,7 +455,7 @@ if(mover(selJ,P[selJ].ox,P[selJ].oy,nv)){selecionar(selJ);desenharFundo()}else t
 }
 $('#b-girar').onclick=()=>variante('girar');
 $('#b-esp').onclick=()=>variante('espelhar');
-$('#b-refazer').onclick=()=>{calcular();toast('Encaixe automático refeito.')};
+$('#b-refazer').onclick=()=>{ENF.pos=null;calcular();salvar();toast('Encaixe automático refeito.')};
 $('#b-zm').onclick=()=>{Z/=1.25;if(C)desenharFundo()};
 $('#b-zp').onclick=()=>{Z*=1.25;if(C)desenharFundo()};
 $('#b-zv').onclick=()=>{Z=0;if(C)desenharFundo()}; // Z=0 faz desenharFundo recalcular o que cabe na tela

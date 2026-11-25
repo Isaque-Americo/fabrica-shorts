@@ -17,6 +17,8 @@
       camadas: Math.max(1, nn(e.camadas)), alturaMax: nn(e.alturaMax), compMax: Math.max(0, num(e.compMax)),
       cabeceira: Math.max(0, num(e.cabeceira)), ourelaE: Math.max(0, num(e.ourelaE)), ourelaD: Math.max(0, num(e.ourelaD)),
       sentido: e.sentido === 'unico' ? 'unico' : 'duplo',
+      // ajuste manual do risco guardado: {sig das peças, p: posições em mm}. Peça diferente => volta ao automático
+      pos: e.pos && Array.isArray(e.pos.p) ? { sig: String(e.pos.sig || ''), p: e.pos.p.map(q => ({ i: nn(q && q.i), ox: nn(q && q.ox), oy: nn(q && q.oy), var: nn(q && q.var) })) } : null,
       itens: (e.itens || []).map(it => ({
         produtoId: (it && it.produtoId) || '', cor: (it && it.cor) || '',
         pecas: it && Array.isArray(it.pecas) ? it.pecas.map(String) : null,
@@ -175,11 +177,17 @@
     return itens;
   }
 
+  // assinatura das peças do risco: o ajuste manual guardado só vale enquanto as peças forem exatamente estas
+  const sigItens = itens => itens.map(x => [x.produtoId, x.tam, x.nome, x.cor, x.espelho ? 1 : 0, x.meia ? 1 : 0].join('|')).join(';');
+
   // posições em mm a partir do início do encaixe (sem ourela E); comp inclui a cabeceira. null: sem peças, sem tecido ou peça mais larga que o tecido
   function calcularEnfesto(enf, ordem, produtos, tecidos) {
     const { aba, mat } = contexto(enf, ordem, tecidos); if (!mat) return null;
     const largUtil = num(mat.larg) * 1000 - (mat.tubular ? 0 : num(enf.ourelaE) + num(enf.ourelaD)); // tubular não tem ourela: a dobra fica na borda real
-    const itens = pecasEnfesto(enf, ordem, produtos, tecidos), r = E.encaixar(itens, largUtil);
+    const itens = pecasEnfesto(enf, ordem, produtos, tecidos);
+    const sp = enf.pos && itens.length && enf.pos.p.length === itens.length && enf.pos.sig === sigItens(itens)
+      && enf.pos.p.every(q => itens[q.i] && itens[q.i].rasters[q.var]) ? enf.pos.p : null;
+    const r = sp ? { posicoes: sp, comp: E.compPosicoes(itens, sp) } : E.encaixar(itens, largUtil);
     if (!r) return null;
     const comp = r.comp + num(enf.cabeceira), areaPecas = itens.reduce((a, x) => a + x.area, 0), grade = {};
     for (const it of enf.itens || []) {
@@ -191,7 +199,7 @@
         if (nn(q) && (!it.pecas || (q0 && it.pecas.includes(q0.nome || '0')))) gr[t] = (gr[t] || 0) + nn(q) / camadasPorRoupa(enf, ordem, p, t, tecidos);
       }
     }
-    return { comp, largUtil, posicoes: r.posicoes, itens, pecasTotal: itens.reduce((a, x) => a + x.rende, 0), areaPecas,
+    return { comp, largUtil, posicoes: r.posicoes, manual: !!sp, itens, pecasTotal: itens.reduce((a, x) => a + x.rende, 0), areaPecas,
       aproveitamento: comp > 0 && largUtil > 0 ? areaPecas / (comp * largUtil) : 0, grade, avisos: itens.avisos };
   }
 
@@ -238,7 +246,7 @@
     return cons == null && consG == null ? null : { cons, consG };
   }
 
-  const MoldeOrdem = { normalizar, nova, deFabricar, dePedido, semMolde, ajustarGrade, pecasEnfesto, calcularEnfesto, camadasPorRoupa, auxRe, resultados, matCusto, meiaPeca, consumoPeloMolde };
+  const MoldeOrdem = { normalizar, nova, deFabricar, dePedido, semMolde, ajustarGrade, pecasEnfesto, sigItens, calcularEnfesto, camadasPorRoupa, auxRe, resultados, matCusto, meiaPeca, consumoPeloMolde };
   g.MoldeOrdem = MoldeOrdem;
   if (typeof module !== 'undefined') module.exports = MoldeOrdem;
 })(typeof window !== 'undefined' ? window : globalThis);
