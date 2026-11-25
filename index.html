@@ -856,7 +856,8 @@ let prodGrupo=(()=>{try{return localStorage.getItem('prodGrupo')}catch(e){return
 function setProdGrupo(v){prodGrupo=v;try{localStorage.setItem('prodGrupo',v)}catch(e){}render()}
 function produtos(){
 const mx=pode('produtos');
-const pct=(c,v)=>{const m=margem(c,v);return m.pct==null?'—':`<span class="${m.lucro<=0?'low':''}" title="${brl(v)} − custo ${brl(c)} − ${nf(m.imp+m.desp+m.com,2)}% de imposto/despesa/comissão (${brl(m.ded)}) = ${brl(m.lucro)} por peça">${Math.round(m.pct)}%</span>`};
+const pct=(c,v,p)=>{const m=margem(c,v),a=+(p&&p.alvo)||0,abaixo=a>0&&m.pct!=null&&m.pct<a-0.05;
+return m.pct==null?'—':`<span class="${m.lucro<=0?'low':''}" title="${brl(v)} − custo ${brl(c)} − ${nf(m.imp+m.desp+m.com,2)}% de imposto/despesa/comissão (${brl(m.ded)}) = ${brl(m.lucro)} por peça${a>0?` · meta ${nf(a,0)}%`:''}">${abaixo?'▼ ':''}${Math.round(m.pct)}%</span>`};
 const tecDe=p=>p.tecidoId?(mat(p.tecidoId)?.nome||'Tecido removido do cadastro'):'Sem tecido na ficha';
 const agrupa=prodGrupo==='tecido';
 const ordem=S.produtos.slice().sort((a,b)=>(agrupa?tecDe(a).localeCompare(tecDe(b)):0)||(a.ref||'').localeCompare(b.ref||''));
@@ -868,7 +869,7 @@ if(agrupa&&tecDe(p)!==grupoAtual){grupoAtual=tecDe(p);cab=`<tr class="grp"><td c
 return cab+`<tr><td>${foto(p,'fmini',mx)}</td><td>${esc(p.ref)}</td>
  <td>${esc(p.nome)}${p.tecidoId?`<small>${esc(mat(p.tecidoId)?.nome||'')} · ${p.ficha?'ficha própria':'ficha padrão'}</small>`:'<small>custo manual</small>'}${temMolde(p)?'':'<small class="aviso">sem molde</small>'}</td>
  <td class="n">${brl(p.preco)}${pg!==+p.preco?`<small>G1–G4 ${brl(pg)}</small>`:''}</td>
- <td class="n">${pct(c,+p.preco)}${cg!==c||pg!==+p.preco?`<small>G1–G4 ${pct(cg,pg)}</small>`:''}</td>
+ <td class="n">${pct(c,+p.preco,p)}${cg!==c||pg!==+p.preco?`<small>G1–G4 ${pct(cg,pg,p)}</small>`:''}</td>
  <td class="n ${baixo?'low':''}">${tot(p)}${baixo?'<small>abaixo do mínimo</small>':''}</td>
  <td>${acoes('pr'+p.id,[['Ver ficha técnica',`verFicha('${p.id}')`],...(mx?[['Editar produto',`fProd('${p.id}')`],'-',['Excluir produto',`del('produtos','${p.id}')`,'del']]:[])])}</td></tr>`}).join('');
 return `<div class="bar">${campoBusca('Buscar por referência ou descrição')}${mx?'<button class="pri" onclick="fProd()">+ Novo produto</button>':''}</div>
@@ -891,7 +892,8 @@ modal(id?'Editar produto':'Novo produto',`
  <label>Estoque mínimo (peças)<input name="min" type="number" min="0" value="${p.min??0}"></label>
  <label>Preço P ao GG (R$)<input name="preco" type="number" step="0.01" min="0" required value="${p.preco??''}"></label>
  <label>Preço G1 ao G4 (R$)<input name="precoG" type="number" step="0.01" min="0" required value="${p.precoG??p.preco??''}"></label>
- <label>Custo manual (R$)<input name="custo" type="number" step="0.01" min="0" value="${p.custo??''}" title="Usado só se o produto não tiver tecido na ficha técnica"></label></div>
+ <label>Custo manual (R$)<input name="custo" type="number" step="0.01" min="0" value="${p.custo??''}" title="Usado só se o produto não tiver tecido na ficha técnica"></label>
+ <label>Margem desejada (%)<input name="alvo" type="number" step="0.1" min="0" max="99" value="${p.alvo??''}" placeholder="Ex.: 35" title="A ficha técnica compara a margem real com esta meta e diz onde melhorar"></label></div>
  <fieldset style="border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:8px 0"><legend style="padding:0 6px;font-weight:600">Fotos (opcional)</legend>
  <div class="r2" style="align-items:flex-start;margin:0">${campoFoto('F')}${campoFoto('C')}</div>
  <small>Reduzidas para 1200px e convertidas em JPEG antes de subir. Aparecem no catálogo do lojista.</small></fieldset>
@@ -925,7 +927,7 @@ modal(id?'Editar produto':'Novo produto',`
  <small>Quantidade em estoque: na aba Estoque, em “Entrada / ajuste”.</small>`,
 async(f,form)=>{
 // sem grade de estoque aqui: o {...p} preserva o est que já existe
-const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,preco:+f.preco||0,precoG:+f.precoG||0,tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0,molL:+f.molL||0,molC:+f.molC||0,molLG:+f.molLG||0,molCG:+f.molCG||0,perda:+f.perda||0};delete d.id;
+const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,alvo:+f.alvo||0,preco:+f.preco||0,precoG:+f.precoG||0,tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0,molL:+f.molL||0,molC:+f.molC||0,molLG:+f.molLG||0,molCG:+f.molCG||0,perda:+f.perda||0};delete d.id;
 if(form.querySelector('#fichaProp').checked)d.ficha=lerFicha(form,f.pmo,f.pfixo);else delete d.ficha;
 let ligar=false;
 if(f.molId!=='plt'){ // igual ao salvar do editor (molde.html ligarProdutos): produto ganha molId + mol, o molde lista o produto em produtoIds
@@ -982,6 +984,14 @@ function margem(custo,preco){
 const f=fichaPad(),imp=+f.imp||0,desp=+f.desp||0,com=comMax(),v=+preco||0;
 const ded=v*(imp+desp+com)/100,lucro=v-(+custo||0)-ded;
 return {imp,desp,com,ded,lucro,pct:v>0?lucro/v*100:null};
+}
+// meta de margem do produto: quanto cobrar, ou até onde baixar o custo, para alcançar p.alvo.
+// k = fatia do preço que sobra para o custo depois do imposto/despesa/comissão e da margem desejada.
+// null quando não há meta; precoAlvo null quando deduções + meta passam de 100% (meta impossível)
+function meta(custo,preco,alvo){
+const a=+alvo||0;if(!(a>0))return null;
+const f=fichaPad(),ded=(+f.imp||0)+(+f.desp||0)+comMax(),k=1-(ded+a)/100,c=+custo||0,v=+preco||0;
+return {alvo:a,ded,k,atual:margem(c,v).pct,precoAlvo:k>0?c/k:null,custoAlvo:v*k,falta:c-v*k};
 }
 const consDe=(p,g)=>g&&p.consG!==''&&p.consG!=null?+p.consG||0:+p.cons||0;
 // shortcut: consumo pelo retângulo que envolve o molde, sem rotação nem encaixe real; trocar quando houver polígonos (fase 5)
@@ -1191,6 +1201,18 @@ modal('Ficha técnica padrão',`<label>Aviamentos e quantidade por peça</label>
 async(v,form)=>{const d={tipo:'ficha',...lerFicha(form,v.mo,v.fixo),imp:+v.imp||0,desp:+v.desp||0};
 d0?await db.doc('config/'+d0.id).set(d):await db.collection('config').add(d)});
 }
+// conselho da meta de margem: compara a margem real com p.alvo e aponta o maior custo.
+// A sobra do tecido vira metros por peça, que é o que dá para mexer no encaixe do enfesto
+function dicaMeta(p,c,preco,rot){
+const m=meta(c.total,preco,p.alvo);if(!m)return'';
+if(m.atual!=null&&m.atual+0.05>=m.alvo)return `<p style="margin:4px 0">${rot}meta de ${nf(m.alvo,0)}% batida: a margem hoje é ${Math.round(m.atual)}%.</p>`;
+const itens=[...c.linhas,{nome:'Mão de obra',ct:c.mo},{nome:'Custo fixo',ct:c.fixo},{nome:'Custo extra',ct:c.extra}]
+ .filter(x=>x.ct>0).sort((a,b)=>b.ct-a.ct).slice(0,2)
+ .map(x=>`${esc(x.nome)} ${brl(x.ct)} (${Math.round(x.ct/c.total*100)}% do custo)${x.tec&&x.cu>0&&m.falta>0&&m.falta<x.ct?` — economizar ${nf(m.falta/x.cu)} m por peça no encaixe já fecha a conta`:''}`).join('; ');
+const caminhos=m.precoAlvo==null?`Imposto, despesa e comissão já levam ${nf(m.ded,2)}% do preço: uma meta de ${nf(m.alvo,0)}% não cabe, as duas passam de 100%.`
+ :`Vender a ${brl(m.precoAlvo)} (hoje ${brl(preco)}) ou baixar o custo de ${brl(c.total)} para ${brl(m.custoAlvo)}, ou seja ${brl(m.falta)} a menos por peça.`;
+return `<p style="margin:4px 0">${rot}faltam ${nf(m.alvo-(m.atual||0),1)} pontos para a meta de ${nf(m.alvo,0)}%. ${caminhos}${c.total>0&&itens?`<br><b>Onde melhorar:</b> ${itens}.`:''}</p>`;
+}
 function verFicha(id){
 const p=prod(id);if(!p)return;
 if(!p.tecidoId){aviso('Escolha o tecido e o consumo na ficha técnica do produto (botão Editar).');return}
@@ -1226,6 +1248,9 @@ d.innerHTML=`<form method="dialog"><h3>Ficha técnica · Ref. ${esc(p.ref)} · $
  <tr><td>Imposto, despesas e comissão<small>${ded}% sobre a venda</small></td><td></td>${col('− '+brl(mA.ded),'− '+brl(mB.ded))}</tr>
  <tr><th>Lucro por peça</th><th></th>${temG?`<th class="n ${mA.lucro<=0?'low':''}">${mg(mA)}</th><th class="n ${mB.lucro<=0?'low':''}">${mg(mB)}</th>`:`<th class="n ${mA.lucro<=0?'low':''}">${mg(mA)}</th>`}</tr></table></div>
  <small>${temG?'A coluna G1–G4 só aparece porque esta referência tem consumo ou preço diferente na grade maior. ':'P–GG e G1–G4 dão no mesmo nesta referência, então os valores valem para todos os tamanhos. '}Usa ${p.ficha?'a ficha própria desta referência':'a ficha padrão'}. A comissão é a maior cadastrada em Representantes, ou seja, o pior caso.</small>
+ ${+p.alvo>0?`<div style="border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:8px 0"><b>Margem desejada: ${nf(+p.alvo,0)}%</b>
+ ${dicaMeta(p,a,+p.preco,temG?'P–GG: ':'')}${temG?dicaMeta(p,b,precoG(p),'G1–G4: '):''}</div>`
+ :'<small>Quer que o app diga onde melhorar? Preencha a “Margem desejada (%)” no cadastro do produto.</small>'}
  <div class="row end">${pode('produtos')?`<button type="button" class="ghost" onclick="dlg.close();fProd('${p.id}')">Editar</button>`:''}<button class="pri">Fechar</button></div></form>`;
 d.showModal();
 }
@@ -2008,6 +2033,13 @@ const t=[['aviamento 20/10un x2 + tecido 10x2m',a.mp,24],
 ['margem %',m.pct,52.5],
 ['comissao = a maior cadastrada',m.com,10],
 ['preco zero nao divide por zero',margem(10,0).pct,null],
+// meta: deducoes 19%; alvo 30% deixa 51% do preco para o custo
+['sem meta nao calcula nada',meta(28.5,100,0),null],
+['preco que bate a meta de 30%',+meta(28.5,100,30).precoAlvo.toFixed(2),55.88],
+['custo maximo para a meta de 30%',+meta(28.5,100,30).custoAlvo.toFixed(2),51],
+['custo ja abaixo do teto: falta negativa',+meta(28.5,100,30).falta.toFixed(2),-22.5],
+['meta acima do que sobra do preco nao tem solucao',meta(28.5,100,90).precoAlvo,null],
+['margem no preco alvo bate a meta',+margem(28.5,meta(28.5,100,30).precoAlvo).pct.toFixed(6),30],
 ['molde do editor tem molId',+(molOrigem({molId:'m',mol:{}})==='editor'),1],
 ['molde so PLT sem molId',+(molOrigem({mol:{}})==='plt'),1],
 ['produto sem molde',+(molOrigem({})===null),1],
