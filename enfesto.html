@@ -276,15 +276,17 @@ item('Comprimento',nf(comp/1000)+' m',(ENF.cabeceira?'com cabeceira de '+nf(ENF.
 item('Total de tecido',nf(comp/1000*cam)+' m',nf(comp/1000)+' m × '+cam+' camada(s)');
 item('Camadas',String(cam),ENF.alturaMax?'altura máx. '+ENF.alturaMax:'');
 item('Largura útil',nf(C.largUtil/10,1)+' cm',MAT.tubular?'tubular':'');
-item('Peças cortadas',String(C.pecasTotal*cam),C.pecasTotal+' por camada');
+// pesos, custo, consumo e contagem de roupa: MO.resultados já calcula tudo
+const R=MO.resultados({...O,enfestos:[ENF]},[{...C,comp}],MATS);
+// o que o dono quer ver é a roupa pronta, não o pano solto: par de camadas face a face = 1 roupa
+const totPc=C.pecasTotal*cam;
+item(R.pecas?'Roupas cortadas':'Peças cortadas',nf(R.pecas||totPc,R.pecas%1?1:0),totPc+' peças de pano · '+C.pecasTotal+' por camada');
 // bruto = sobre a largura cheia do rolo (com ourela), que é a largura que se paga
 const lt=larg();
 if(lt>0){const apB=comp>0?C.areaPecas/(comp*lt):0;
 item('Aproveitamento bruto',nf(apB*100,1)+'%','sobre a largura do rolo ('+nf(lt/10,1)+' cm)');
 item('Área das peças',nf(C.areaPecas/1e6*cam,2)+' m²');
 item('Área desperdiçada',nf(Math.max(0,comp*lt-C.areaPecas)/1e6*cam,2)+' m²');}
-// pesos, custo e consumo: MO.resultados já calcula tudo, só não era mostrado aqui
-const R=MO.resultados({...O,enfestos:[ENF]},[{...C,comp}],MATS);
 item('Peso do tecido',R.pesoTecido?nf(R.pesoTecido,1)+' kg':'—',R.pesoTecido?'':'cadastre a gramatura do tecido');
 if(R.pesoTecido){item('Peso das peças',nf(R.pesoPecas,1)+' kg');
 item('Desperdício',nf(R.pesoDesperdicio,1)+' kg',nf(R.pesoDesperdicio/R.pesoTecido*100,1)+'%');}
