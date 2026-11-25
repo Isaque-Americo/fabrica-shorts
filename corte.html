@@ -397,7 +397,7 @@ const res=[`${e.camadas} camada(s)`,e.alturaMax?`altura máx. ${e.alturaMax}`:''
 const alto=e.alturaMax&&e.camadas>e.alturaMax?` · <span class="ruim">camadas acima da altura máxima</span>`:'';
 const usados=new Set(PRODS.filter(p=>e.itens.some(it=>it.produtoId===p.id)).map(p=>p.id));
 c.innerHTML=`<p class="resumo">${res}${alto} <button class="sm" type="button" data-acao="props" data-foco="props">Editar</button></p>`+
-(e.itens.length?e.itens.map((it,i)=>itemHtml(e,it,i,aba)).join(''):'<p class="vazio">Nenhum produto neste enfesto.</p>')+
+(e.itens.length?e.itens.map((it,i)=>itemHtml(e,it,i,aba)).join(''):'<p class="vazio">Nenhum produto neste enfesto. Escolha a referência abaixo: ela entra com as peças e os tamanhos do molde cadastrado no produto, 1 de cada, e o risco sai na hora.</p>')+
 `<div class="add"><label for="add-prod" class="vazio">Adicionar produto</label><select id="add-prod" data-foco="add-prod">${PRODS.slice().sort((a,b)=>String(a.ref||'').localeCompare(String(b.ref||''))).map(p=>`<option value="${esc(p.id)}">${esc(nomeProd(p))}${p.mol?'':' (sem molde)'}${usados.has(p.id)?' ✓':''}</option>`).join('')}</select>
 <input id="add-cor" aria-label="Cor do produto a adicionar" placeholder="Cor" autocomplete="off" style="width:140px"><button class="sm" type="button" data-acao="add" data-foco="add">Adicionar</button></div>
 <section class="resultado" id="res-${esc(e.id)}" data-enf="${esc(e.id)}" aria-label="Resultados do enfesto"><p class="enf-l"><span data-linha>Calculando o risco…</span>
@@ -520,7 +520,10 @@ if(a==='props')return abrirProps();
 if(a==='add'){
 const pid=$('#add-prod').value,cor=$('#add-cor').value.trim();if(!pid)return;
 if(e.itens.some(x=>x.produtoId===pid&&x.cor===cor))return toast('Este produto e cor já estão no enfesto.');
-e.itens.push({produtoId:pid,cor,pecas:null,grade:{},falta:{}});
+// já trazer o molde do produto: 1 de cada tamanho que o molde tem, como o botão Enfesto do molde (grade vazia não encaixa nada)
+const pp=prod(pid),pt=pp&&pp.mol&&pp.mol.porTam,tp=pt?Object.keys(pt).filter(t=>pt[t]&&pt[t].length):[];
+const tams=tp.length?tp:(pp&&pp.mol&&(pp.mol.pecas||[]).length?['M']:[]); // molde sem grade (PLT) rende em qualquer tamanho: M, como o botão Enfesto do molde
+e.itens.push({produtoId:pid,cor,pecas:null,grade:Object.fromEntries(tams.map(t=>[t,1])),falta:{}});
 }else if(!it)return;
 else if(a==='mais'||a==='menos')MO.ajustarGrade(it,b.dataset.t,a==='mais'?1:-1);
 else if(a==='rm'){if(!confirm(`Remover ${nomeProd(prod(it.produtoId))}${it.cor?' ('+it.cor+')':''} do enfesto?`))return;e.itens.splice(+b.dataset.i,1)}
