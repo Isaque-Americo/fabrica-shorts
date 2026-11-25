@@ -39,6 +39,15 @@ jobs:
         uses: actions/upload-pages-artifact@v5
         with:
           path: _site
+      # o Pages devolve "Deployment failed, try again later" de vez em quando; esperar e repetir evita o commit vazio na mao
       - name: Deploy to GitHub Pages
         id: deployment
+        continue-on-error: true
+        uses: actions/deploy-pages@v5
+      - name: Esperar antes de repetir
+        if: steps.deployment.outcome == 'failure'
+        run: sleep 60
+      - name: Deploy to GitHub Pages (2a tentativa)
+        id: deployment2
+        if: steps.deployment.outcome == 'failure'
         uses: actions/deploy-pages@v5
