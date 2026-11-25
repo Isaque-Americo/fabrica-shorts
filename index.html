@@ -902,7 +902,7 @@ modal(id?'Editar produto':'Novo produto',`
  <div class="r2" style="align-items:flex-start;margin:0">${campoFoto('F')}${campoFoto('C')}</div>
  <small>Reduzidas para 1200px e convertidas em JPEG antes de subir. Aparecem no catálogo do lojista.</small></fieldset>
  <fieldset style="border:1px solid var(--bd);border-radius:10px;padding:8px 12px;margin:8px 0"><legend style="padding:0 6px;font-weight:600">Ficha técnica</legend>
-  <label>Molde<select name="molId" required><option value="">— escolha o molde —</option>${moldes.map(m=>`<option value="${esc(m.id)}"${m.id===p.molId?' selected':''}>${esc(m.nome||'(sem nome)')}</option>`).join('')}<option value="plt"${!p.molId&&p.mol?' selected':''}>Importar PLT</option></select><small>Crie o molde pelo menu “Moldes”. “Importar PLT” usa o arquivo de plotter escolhido abaixo.</small></label>
+  <label>Molde<select name="molId"><option value="">— sem molde: digito o consumo —</option>${moldes.map(m=>`<option value="${esc(m.id)}"${m.id===p.molId?' selected':''}>${esc(m.nome||'(sem nome)')}</option>`).join('')}<option value="plt"${!p.molId&&p.mol?' selected':''}>Importar PLT</option></select><small>Escolha um molde já criado para ligar a esta referência, ou deixe “sem molde” e digite o consumo de tecido abaixo. Crie moldes pelo menu “Moldes”; “Importar PLT” usa o arquivo de plotter escolhido abaixo.</small></label>
   <label>Tecido<select name="tecidoId" required><option value="">— escolha o tecido —</option>${S.materiais.filter(m=>m.tipo==='tecido').sort((a,b)=>(a.nome||'').localeCompare(b.nome||'')).map(m=>`<option value="${m.id}"${m.id===p.tecidoId?' selected':''}>${esc(m.nome)}${m.comp?' · '+esc(m.comp):''}${m.cor?' · '+esc(m.cor):''} (${brl4(matCusto(m))}/m)</option>`).join('')}</select></label>
  <div class="g2"><label>Consumo de tecido P–GG (m por peça)<input name="cons" type="number" step="0.001" min="0" value="${p.cons??''}"></label>
  <label>Consumo de tecido G1–G4 (m por peça)<input name="consG" type="number" step="0.001" min="0" value="${p.consG??''}" placeholder="igual ao P–GG"></label>
@@ -934,7 +934,8 @@ async(f,form)=>{
 const d={...p,ref:f.ref,nome:f.nome,min:+f.min||0,custo:+f.custo||0,alvo:+f.alvo||0,preco:+f.preco||0,precoG:+f.precoG||0,tecidoId:f.tecidoId||'',cons:+f.cons||0,consG:f.consG===''?'':+f.consG||0,extra:+f.extra||0,molL:+f.molL||0,molC:+f.molC||0,molLG:+f.molLG||0,molCG:+f.molCG||0,perda:+f.perda||0};delete d.id;
 if(form.querySelector('#fichaProp').checked)d.ficha=lerFicha(form,f.pmo,f.pfixo);else delete d.ficha;
 let ligar=false;
-if(f.molId!=='plt'){ // igual ao salvar do editor (molde.html ligarProdutos): produto ganha molId + mol, o molde lista o produto em produtoIds
+if(!f.molId){delete d.mol;delete d.molId} // sem molde: quem manda é o consumo digitado. O molde solta o produto sozinho ao ser salvo (ligarProdutos)
+else if(f.molId!=='plt'){ // igual ao salvar do editor (molde.html ligarProdutos): produto ganha molId + mol, o molde lista o produto em produtoIds
 const {data:r,error:er}=await sb.from('docs').select('data').eq('id',f.molId).eq('col','moldes').single();
 if(er)throw new Error('Não foi possível ler o molde escolhido: '+ptErro(er));
 const mol=MoldeModelo.molParaProduto(MoldeModelo.normalizar(r.data));
@@ -952,7 +953,8 @@ else if(id){ // o editor de molde pode ter mudado mol/molId depois que o formul�
 const {data:r,error:er}=await sb.from('docs').select('data').eq('id',id).single();
 if(er)setTimeout(()=>aviso('Não foi possível conferir o molde do produto; ele foi salvo com o molde que estava no formulário.'),100);
 if(r&&r.data){if(r.data.mol)d.mol=r.data.mol;else delete d.mol;if(r.data.molId)d.molId=r.data.molId;else delete d.molId}}
-if(!temMolde(d))throw new Error('Escolha o arquivo PLT do molde.');
+if(!f.molId){if(!(+f.cons>0))throw new Error('Sem molde é preciso digitar o consumo de tecido P–GG (m por peça).')}
+else if(!temMolde(d))throw new Error('Escolha o arquivo PLT do molde.');
 const upF=form.fotoF.files[0],upC=form.fotoC.files[0];
 if(f.delF&&!upF&&p.imgF){await sb.storage.from('produtos').remove([p.imgF]);d.imgF=''}
 if(f.delC&&!upC&&p.imgC){await sb.storage.from('produtos').remove([p.imgC]);d.imgC=''}
