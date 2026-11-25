@@ -212,6 +212,18 @@ async gravar(id,d){await sessaoOk();if(!ok(await sb.from('docs').update({data:d}
 // ---- estado ----
 let O=null,ENF=null,MAT=null,PRODS=[],MATS=[],PODE=false;
 let C=null,P=[],OC=null,selJ=-1,Z=0,W=0; // C = calcularEnfesto; P = posições ajustadas (cópia); OC = ocupação
+// O encaixe automático trabalha numa grade de 2 cm (RES), e por isso as peças nunca encostam: sobra até 2 cm de ar.
+// No ajuste manual as mesmas peças entram em escala K, então a mesma célula de 2 cm vale RES/K mm de verdade (5 mm).
+// IF/PF = peças e posições desse mundo fino (mm × K); só é montado quando ele vai mexer, porque custa rasterizar de novo.
+const K=4,PASSO=RES/K;
+let IF=null,PF=null;
+function fino(){
+if(IF)return;
+IF=C.itens.map(it=>({...it,rasters:E.variantes(it.pts,{rot:it.rot,espelhar:it.espelhar,escala:{x:((it.escala&&+it.escala.x)||1)*K,y:((it.escala&&+it.escala.y)||1)*K}})}));
+PF=P.map(p=>({...p,ox:p.ox*K,oy:p.oy*K}));
+OC=E.ocupacao(IF,PF,C.largUtil*K);
+}
+const cabeEm=(j,ox,oy,v)=>{fino();return E.cabe(OC,IF,PF,j,ox*K,oy*K,v)};
 const extras=[];
 function corTam(t){let i=SZ.indexOf(t);if(i<0){if(!extras.includes(t))extras.push(t);i=SZ.length+extras.indexOf(t)}return `var(--t${i%8})`}
 const oe=()=>MAT&&MAT.tubular?0:ENF.ourelaE; // tubular não tem ourela
@@ -260,9 +272,9 @@ if(entrar){const a=document.createElement('a');a.href='index.html';a.textContent
 function calcular(){
 C=MO.calcularEnfesto(ENF,O,PRODS,MATS);
 selJ=-1;$('#b-mini').disabled=$('#b-exp').disabled=!C;
-if(!C){P=[];OC=null;$('#area').innerHTML='<p class="vazio">'+(!MAT?'Este enfesto está sem tecido: escolha o tecido na ordem.':!(+MAT.larg>0)?`O tecido "${esc(MAT.nome||'')}" está sem largura útil: sem ela não dá para montar o risco. Cadastre a largura do rolo na aba Matéria-prima.`:'Nenhuma peça no risco: adicione quantidades nos tamanhos acima.')+'</p>';painel();renderGrade();return}
+if(!C){P=[];OC=IF=PF=null;$('#area').innerHTML='<p class="vazio">'+(!MAT?'Este enfesto está sem tecido: escolha o tecido na ordem.':!(+MAT.larg>0)?`O tecido "${esc(MAT.nome||'')}" está sem largura útil: sem ela não dá para montar o risco. Cadastre a largura do rolo na aba Matéria-prima.`:'Nenhuma peça no risco: adicione quantidades nos tamanhos acima.')+'</p>';painel();renderGrade();return}
 if(!$('#risco'))$('#area').innerHTML='<svg id="risco" xmlns="http://www.w3.org/2000/svg" role="group" aria-label="Risco do enfesto"><g id="fundo"></g><g id="pecas"></g></svg>';
-P=C.posicoes.map(p=>({...p}));OC=E.ocupacao(C.itens,P,C.largUtil);
+P=C.posicoes.map(p=>({...p}));OC=IF=PF=null; // o mundo fino nasce no primeiro arrasto (fino())
 desenharPecas();desenharFundo();painel();selecionar(-1);renderGrade();
 }
 
@@ -427,9 +439,10 @@ $('#b-girar').disabled=!it||nGiros(it)<2;$('#b-esp').disabled=!it||!it.espelhar;
 $('#sel').textContent=it?`Selecionada: ${rotuloPeca(it,P[j].var)}${it.cor?' · '+it.cor:''} · ${medidasPeca(j)} (variante ${P[j].var+1} de ${it.rasters.length})`:'Clique numa peça para arrastar, ou selecione com Tab e use as setas.';
 }
 function mover(j,ox,oy,v){
-const ok=E.moverPeca(OC,C.itens,P,j,ox,oy,v);
+fino();
+const ok=E.moverPeca(OC,IF,PF,j,ox*K,oy*K,v);
 $('#pecas').children[j].classList.toggle('bloq',!ok&&!!drag); // contorno vermelho só enquanto arrasta
-if(ok){posPeca(j);painel();$('#fundo .fim').setAttribute('x1',compAtual());$('#fundo .fim').setAttribute('x2',compAtual());$('#fundo .tecido').setAttribute('width',compAtual())}
+if(ok){Object.assign(P[j],{ox:PF[j].ox/K,oy:PF[j].oy/K,var:v});posPeca(j);painel();$('#fundo .fim').setAttribute('x1',compAtual());$('#fundo .fim').setAttribute('x2',compAtual());$('#fundo .tecido').setAttribute('width',compAtual())}
 return ok;
 }
 function variante(tipo){
@@ -446,7 +459,7 @@ $('#b-zv').onclick=()=>{Z=0;if(C)desenharFundo()}; // Z=0 faz desenharFundo reca
 
 const svg=$('#risco');let drag=null;
 const ptMm=ev=>new DOMPoint(ev.clientX,ev.clientY).matrixTransform(svg.getScreenCTM().inverse());
-const grade=v=>Math.round(v/RES)*RES;
+const grade=v=>Math.round(v/PASSO)*PASSO;
 svg.addEventListener('pointerdown',ev=>{
 const el=ev.target.closest('.pc');if(!el||ev.button)return;
 const j=+el.dataset.j;selecionar(j);el.focus({preventScroll:true});
@@ -459,19 +472,20 @@ const ox=grade(drag.ox+b.x-drag.a.x),oy=grade(drag.oy+b.y-drag.a.y);
 if(ox===drag.x&&oy===drag.y)return;
 drag.x=ox;drag.y=oy;
 drag.el.setAttribute('transform',`translate(${ox+ENF.cabeceira} ${oy+oe()})`);
-const ok=E.cabe(OC,C.itens,P,drag.j,ox,oy,p.var);
+const ok=cabeEm(drag.j,ox,oy,p.var);
 drag.el.classList.toggle('bloq',!ok);
 if(ok)drag.livre={ox,oy}; // último lugar livre do caminho: é onde a peça encosta se ele largar em cima de outra
 });
-// onde a peça pousa: o ponto em que ele largou; senão um empurrãozinho de até 20 cm; senão o último lugar livre do arrasto; senão o fim do risco
+// onde a peça pousa: o ponto em que ele largou; senão um empurrãozinho (de 5 mm até 4 cm, depois de 2 cm até 20 cm:
+// assim ela encosta na vizinha em vez de pular um buraco); senão o último lugar livre do arrasto; senão o fim do risco
 function pousar(j,ox,oy,v,livre){
-if(ox>=0&&oy>=0&&E.cabe(OC,C.itens,P,j,ox,oy,v))return {ox,oy};
-for(let d=1;d<=10;d++)for(let dx=-d;dx<=d;dx++)for(let dy=-d;dy<=d;dy++){
+if(ox>=0&&oy>=0&&cabeEm(j,ox,oy,v))return {ox,oy};
+for(const [passo,n] of [[PASSO,8],[RES,10]])for(let d=1;d<=n;d++)for(let dx=-d;dx<=d;dx++)for(let dy=-d;dy<=d;dy++){
 if(Math.max(Math.abs(dx),Math.abs(dy))!==d)continue;
-const x=ox+dx*RES,y=oy+dy*RES;
-if(x>=0&&y>=0&&E.cabe(OC,C.itens,P,j,x,y,v))return {ox:x,oy:y};
+const x=ox+dx*passo,y=oy+dy*passo;
+if(x>=0&&y>=0&&cabeEm(j,x,y,v))return {ox:x,oy:y};
 }
-if(livre&&E.cabe(OC,C.itens,P,j,livre.ox,livre.oy,v))return livre;
+if(livre&&cabeEm(j,livre.ox,livre.oy,v))return livre;
 return {ox:E.compPosicoes(C.itens,P),oy:0,fim:true}; // risco cheio: o fim do risco está sempre livre, melhor que devolver a peça
 }
 const soltar=()=>{if(!drag)return;
@@ -484,7 +498,7 @@ posPeca(d.j);desenharFundo();selecionar(selJ)};
 svg.addEventListener('pointerup',soltar);svg.addEventListener('pointercancel',soltar);
 svg.addEventListener('focusin',ev=>{const el=ev.target.closest('.pc');if(el&&+el.dataset.j!==selJ)selecionar(+el.dataset.j)});
 svg.addEventListener('keydown',ev=>{
-const el=ev.target.closest('.pc');if(!el)return;const j=+el.dataset.j,p=P[j],d=ev.shiftKey?5*RES:RES;
+const el=ev.target.closest('.pc');if(!el)return;const j=+el.dataset.j,p=P[j],d=ev.shiftKey?RES:PASSO; // seta = 5 mm (encostar na vizinha), com Shift = 2 cm
 const k={ArrowLeft:[-d,0],ArrowRight:[d,0],ArrowUp:[0,-d],ArrowDown:[0,d]}[ev.key];
 if(k){ev.preventDefault();if(!mover(j,p.ox+k[0],p.oy+k[1],p.var))toast('Não dá para mover para lá: sobrepõe outra peça ou sai do tecido.');else{el.classList.remove('bloq');desenharFundo();selecionar(j)}}
 else if(ev.key==='r'||ev.key==='R'){ev.preventDefault();variante('girar')}
